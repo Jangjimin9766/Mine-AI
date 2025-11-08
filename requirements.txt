@@ -1,0 +1,12 @@
+# --- Web Framework ---
+fastapi             # 메인 프레임워크
+uvicorn[standard]   # ASGI 서버
+
+# --- AI & Data ---
+openai              # OpenAI API (또는 google-generativeai)
+beautifulsoup4      # HTML 파싱 (크롤링)
+requests            # HTTP 요청 (크롤링)
+
+# --- Config ---
+python-dotenv       # .env 파일 로드용
+pydantic-settings   # 설정 관리
