@@ -1,62 +1,106 @@
 from openai import OpenAI
 from app.config import settings
 from app.models.agent import ChatRequest
+import json
 
-# OpenAI 클라이언트 초기화 (정상 작동)
+# OpenAI 클라이언트 초기화
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 def get_llm_summary(text: str) -> str:
     """
-    LLM을 사용하여 텍스트를 요약합니다. (간단 예시)
+    LLM을 사용하여 텍스트를 3줄 내외로 요약합니다.
     """
-    print(f"Requesting summary from LLM for text length: {len(text)}")
+    if not text: return ""
+    print(f"🧠 AI Summarizing text (length: {len(text)})...")
+    
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a fashion editor. Summarize this fashion article concisely."},
+                {"role": "system", "content": "You are a professional fashion editor. Summarize the following fashion article in Korean within 3 sentences. Focus on key trends and items."},
                 {"role": "user", "content": text}
             ],
-            temperature=0.7,
-            max_tokens=150
+            temperature=0.5,
         )
-        summary = response.choices[0].message.content
-        return summary.strip() if summary else "No summary generated."
-    
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"Error during LLM API call: {e}")
-        return "Error: Could not generate summary."
+        print(f"❌ Error during Summary: {e}")
+        return "요약 실패"
+
+def get_tags_from_text(text: str) -> list:
+    """
+    텍스트에서 패션 스타일, 무드, 아이템 관련 태그를 추출합니다.
+    """
+    if not text: return []
+    print(f"🏷️ AI Tagging text...")
+
+    prompt = """
+    Analyze the following fashion text and extract relevant tags.
+    Categories: Style (e.g., Minimal, Vintage), Mood (e.g., Chic, Cozy), Item (e.g., Coat, Boots).
+    Output format: A simple Python list of strings in Korean. Example: ["미니멀", "시크", "롱코트"]
+    Do not write anything else, just the list.
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": text}
+            ],
+            temperature=0.3,
+        )
+        content = response.choices[0].message.content.strip()
+        
+        # 문자열을 리스트로 변환 (안전 장치)
+        if "[" in content and "]" in content:
+            return eval(content) 
+        else:
+            return content.split(",") 
+            
+    except Exception as e:
+        print(f"❌ Error during Tagging: {e}")
+        return []
 
 def get_agent_response(request: ChatRequest, user_data: dict) -> str:
     """
-    사용자 데이터와 채팅 메시지를 기반으로 AI 에이전트 응답 생성
+    [AI 에이전트] 사용자의 데이터와 질문을 바탕으로 맞춤형 답변을 생성합니다.
     """
-    print(f"Generating agent response for user {request.user_id}...")
+    print(f"💬 AI Agent thinking for user {request.user_id}...")
+
+    # 1. 에이전트 페르소나 정의 (프롬프트 엔지니어링)
+    system_prompt = """
+    You are 'M:ine', a professional and trendy personal fashion curator.
     
-    # 1. user_data와 request.message를 조합하여 프롬프트 생성
-    prompt = f"""
-    You are 'M:ine', a personal fashion magazine AI agent.
-    Your user's current collection data: {user_data}
-    User's request: {request.message}
+    [Your Role]
+    - Analyze the user's collection data and question.
+    - Recommend styles or items that fit the user's taste.
+    - Speak in a friendly, stylish tone (Korean).
+    - Use emojis occasionally to keep it lively.
     
-    Provide a helpful and stylish response:
+    [User Data]
+    This is what the user likes (Collections):
+    {user_data}
     """
     
-    # 2. [수정됨] 실제 LLM을 호출하여 답변 생성
+    # user_data가 딕셔너리라면 문자열로 변환
+    formatted_prompt = system_prompt.format(user_data=json.dumps(user_data, ensure_ascii=False))
+
     try:
+        # 2. LLM에게 질문
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo", # 또는 gpt-4
+            model="gpt-3.5-turbo", 
             messages=[
-                # 시스템 역할(프롬프트)과 사용자 메시지를 함께 전달
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": request.message} # (프롬프트에 이미 포함했다면 이 줄은 빼도 됨)
+                {"role": "system", "content": formatted_prompt},
+                {"role": "user", "content": request.message}
             ],
             temperature=0.7,
-            max_tokens=300 # 답변이 길 수 있으니 넉넉하게
+            max_tokens=500
         )
-        ai_answer = response.choices[0].message.content
-        return ai_answer.strip() if ai_answer else "No response generated."
+        
+        ai_answer = response.choices[0].message.content.strip()
+        return ai_answer
 
     except Exception as e:
-        print(f"Error during Agent LLM API call: {e}")
-        return "Error: Could not generate agent response."
+        print(f"❌ Error during Agent Chat: {e}")
+        return "죄송해요, 지금은 패션 영감을 떠올리기 힘드네요. 잠시 후 다시 말을 걸어주세요! 💦"
