@@ -275,7 +275,9 @@
         async function generateMagazine() {
             const topic = document.getElementById('topicInput').value;
             const mood = document.getElementById('moodInput').value;
-            const userEmail = localStorage.getItem('userEmail'); // Use logged-in email
+            const token = localStorage.getItem('accessToken'); // Need token for Spring
+
+            if (!token) return logout();
 
             if (!topic) {
                 alert("주제를 입력해주세요!");
@@ -284,24 +286,28 @@
 
             // UI Reset
             document.getElementById('result').classList.add('hidden');
-            document.getElementById('magazineListSection').classList.add('hidden'); // Hide list if open
+            document.getElementById('magazineListSection').classList.add('hidden');
             document.getElementById('loading').classList.remove('hidden');
             document.getElementById('sectionsContainer').innerHTML = '';
 
             try {
-                const response = await fetch('http://localhost:8000/api/magazine/create', {
+                // Gateway Pattern: Call Spring, not Python
+                const response = await fetch(`${SPRING_URL}/api/magazines`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ topic: topic, user_mood: mood, user_email: userEmail })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ topic: topic, mood: mood }) // Spring DTO might expect 'mood', not 'user_mood'
                 });
 
-                if (!response.ok) throw new Error('Network response was not ok');
+                if (!response.ok) throw new Error('Network response was not ok: ' + await response.text());
 
-                const data = await response.json();
-                renderMagazine(data);
+                // Spring returns the ID of the created magazine
+                const newMagazineId = await response.json();
 
-                // Refresh list if it was previously loaded
-                // loadMagazines(); // Optional: refresh list in background
+                // Fetch the full details using the ID
+                await loadMagazineDetail(newMagazineId);
 
             } catch (error) {
                 alert("생성 실패: " + error.message);
