@@ -16,4 +16,5 @@ class Magazine(BaseModel):
 
 class MagazineRequest(BaseModel):
     topic: str              # 주제 (예: "겨울 코트 추천")
+    user_email: str         # 사용자 아이디 (Username) - Spring에서 보냄
     user_mood: Optional[str] = None # 사용자 취향 (선택)

@@ -45,21 +45,21 @@
 
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <input type="email" id="loginEmail"
-                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition"
-                            placeholder="name@example.com">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">아이디 (Username)</label>
+                        <input type="text" id="loginUsername"
+                            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none"
+                            placeholder="아이디">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
                         <input type="password" id="loginPassword"
-                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition"
-                            placeholder="••••••••">
+                            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none"
+                            placeholder="********">
                     </div>
                     <button onclick="login()"
-                        class="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-gray-800 transition transform active:scale-95">
-                        로그인
-                    </button>
+                        class="w-full bg-black text-white py-3 rounded-lg font-bold hover:bg-gray-800 transition">로그인</button>
+                    <button onclick="toggleAuthMode('signup')"
+                        class="w-full text-sm text-gray-500 hover:text-black mt-2">계정이 없으신가요? 회원가입</button>
                 </div>
                 <p class="text-center mt-6 text-sm text-gray-500">
                     계정이 없으신가요? <button onclick="toggleAuth('signup')"
@@ -74,22 +74,28 @@
 
                 <div class="space-y-4">
                     <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">아이디 (Username)</label>
+                        <input type="text" id="signupUsername"
+                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition"
+                            placeholder="아이디">
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
                         <input type="email" id="signupEmail"
                             class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition"
                             placeholder="name@example.com">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Nickname</label>
-                        <input type="text" id="signupNickname"
-                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition"
-                            placeholder="User Name">
-                    </div>
-                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
                         <input type="password" id="signupPassword"
                             class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition"
                             placeholder="••••••••">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nickname</label>
+                        <input type="text" id="signupNickname"
+                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition"
+                            placeholder="User Name">
                     </div>
                     <button onclick="signup()"
                         class="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-gray-800 transition transform active:scale-95">
@@ -214,55 +220,62 @@
         }
 
         async function signup() {
+            const username = document.getElementById('signupUsername').value;
             const email = document.getElementById('signupEmail').value;
             const password = document.getElementById('signupPassword').value;
             const nickname = document.getElementById('signupNickname').value;
 
-            if (!email || !password || !nickname) return alert("모든 항목을 입력해주세요.");
+            if (!username || !email || !password || !nickname) {
+                alert("모든 필드를 입력해주세요.");
+                return;
+            }
 
             try {
-                const res = await fetch(`${SPRING_URL}/api/auth/signup`, {
+                const response = await fetch(`${SPRING_URL}/api/auth/signup`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password, nickname })
+                    body: JSON.stringify({ username, email, password, nickname })
                 });
 
-                if (res.ok) {
+                if (response.ok) {
                     alert("회원가입 성공! 로그인해주세요.");
                     toggleAuth('login');
                 } else {
-                    alert("회원가입 실패: " + (await res.text()));
+                    const errorText = await response.text();
+                    alert("가입 실패: " + errorText);
                 }
-            } catch (e) { alert("서버 오류: " + e.message); }
+            } catch (error) {
+                alert("오류 발생: " + error.message);
+            }
         }
 
         async function login() {
-            const email = document.getElementById('loginEmail').value;
+            const username = document.getElementById('loginUsername').value;
             const password = document.getElementById('loginPassword').value;
 
-            if (!email || !password) return alert("이메일과 비밀번호를 입력해주세요.");
+            if (!username || !password) {
+                alert("아이디와 비밀번호를 입력해주세요.");
+                return;
+            }
 
             try {
-                const res = await fetch(`${SPRING_URL}/api/auth/login`, {
+                const response = await fetch(`${SPRING_URL}/api/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+                    body: JSON.stringify({ username, password })
                 });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    // Assuming response is { accessToken: "...", ... }
-                    if (data.accessToken) {
-                        localStorage.setItem('accessToken', data.accessToken);
-                        localStorage.setItem('userEmail', email);
-                        checkAuth();
-                    } else {
-                        alert("토큰을 받지 못했습니다. 서버 응답을 확인해주세요.");
-                    }
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('accessToken', data.accessToken);
+                    localStorage.setItem('userEmail', username); // Store username instead of email for display
+                    checkAuth();
                 } else {
-                    alert("로그인 실패: " + (await res.text()));
+                    alert("로그인 실패: 아이디 또는 비밀번호를 확인해주세요.");
                 }
-            } catch (e) { alert("서버 오류: " + e.message); }
+            } catch (error) {
+                alert("오류 발생: " + error.message);
+            }
         }
 
         function logout() {
