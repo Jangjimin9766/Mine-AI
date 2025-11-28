@@ -19,6 +19,6 @@ def create_magazine(request: MagazineRequest, background_tasks: BackgroundTasks)
     
     # 2. [핵심] Spring 서버로 전송 (백그라운드 작업으로 처리)
     # 사용자는 AI 결과를 바로 보고, 저장은 뒤에서 조용히 수행됨 (응답 속도 저하 없음)
-    background_tasks.add_task(save_magazine_to_spring, magazine_data)
+    background_tasks.add_task(save_magazine_to_spring, magazine_data, request.user_email)
     
     return magazine_data
