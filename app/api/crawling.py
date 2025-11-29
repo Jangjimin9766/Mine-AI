@@ -1,28 +1,42 @@
 from fastapi import APIRouter, BackgroundTasks
-# [수정] 클래스가 아닌 함수를 임포트
-from app.core.crawler import crawl_fashion_site 
-# from app.config import settings # (DB 저장 시 필요)
-# import requests # (DB 저장 시 필요)
+from app.core.crawler import crawl_fashion_site
+# [추가] AI 함수들 임포트
+from app.core.llm_gateway import get_llm_summary, get_tags_from_text 
 
 router = APIRouter()
 
 def run_crawling_task(url: str):
     """
-    백그라운드에서 실행될 실제 크롤링 작업
+    [크롤링 -> AI 요약 -> AI 태깅] 파이프라인 실행
     """
-    # [수정] 임포트한 함수를 바로 호출
-    result = crawl_fashion_site(url)
+    print(f"🚀 Task Started: Processing {url}")
     
-    # (TODO: 크롤링 결과를 Spring Boot 서버로 POST)
-    # print(f"Crawling task finished for {url}. Result: {result.get('title')}")
-    # requests.post(f"{settings.SPRING_API_URL}/api/internal/crawled-data", json=result)
+    # 1. 크롤링 (데이터 수집)
+    data = crawl_fashion_site(url)
+    
+    if data.get("status") == "fail":
+        print("⚠️ Crawling failed, stopping task.")
+        return
+
+    # 2. AI 요약 (데이터 가공)
+    summary = get_llm_summary(data["content"])
+    data["summary"] = summary # 결과에 추가
+
+    # 3. AI 태깅 (데이터 분석)
+    tags = get_tags_from_text(data["content"])
+    data["tags"] = tags # 결과에 추가
+
+    # 4. 결과 확인 (나중에는 여기서 Spring 서버로 전송함)
+    print("\n" + "="*40)
+    print(f"✅ [COMPLETE] {data['title']}")
+    print(f"📝 Summary: {data['summary']}")
+    print(f"🏷️ Tags: {data['tags']}")
+    print("="*40 + "\n")
+    
+    # TODO: requests.post(SPRING_API_URL, json=data)
 
 
 @router.post("/start-crawl")
 def api_start_crawl(url: str, background_tasks: BackgroundTasks):
-    """
-    크롤링 작업을 백그라운드로 실행하도록 요청합니다.
-    """
     background_tasks.add_task(run_crawling_task, url)
-    
-    return {"message": "Crawling task started in background", "url": url}
+    return {"message": "Crawling & Analysis started", "url": url}

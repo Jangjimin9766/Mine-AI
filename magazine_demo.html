@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M:ine AI Magazine Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+
+    <!-- Auth Modal (Overlay) -->
+    <div id="authModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+            <!-- Login Form -->
+            <div id="loginForm" class="p-8">
+                <h2 class="text-3xl font-extrabold text-center mb-2">Welcome Back 👋</h2>
+                <p class="text-center text-gray-500 mb-8">나만의 AI 매거진을 만들어보세요</p>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">아이디 (Username)</label>
+                        <input type="text" id="loginUsername"
+                            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none"
+                            placeholder="아이디">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+                        <input type="password" id="loginPassword"
+                            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none"
+                            placeholder="********">
+                    </div>
+                    <button onclick="login()"
+                        class="w-full bg-black text-white py-3 rounded-lg font-bold hover:bg-gray-800 transition">로그인</button>
+                    <button onclick="toggleAuthMode('signup')"
+                        class="w-full text-sm text-gray-500 hover:text-black mt-2">계정이 없으신가요? 회원가입</button>
+                </div>
+                <p class="text-center mt-6 text-sm text-gray-500">
+                    계정이 없으신가요? <button onclick="toggleAuth('signup')"
+                        class="text-black font-bold hover:underline">회원가입</button>
+                </p>
+            </div>
+
+            <!-- Signup Form (Hidden) -->
+            <div id="signupForm" class="p-8 hidden">
+                <h2 class="text-3xl font-extrabold text-center mb-2">Join M:ine AI 🚀</h2>
+                <p class="text-center text-gray-500 mb-8">새로운 계정을 생성합니다</p>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">아이디 (Username)</label>
+                        <input type="text" id="signupUsername"
+                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition"
+                            placeholder="아이디">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="signupEmail"
+                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition"
+                            placeholder="name@example.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" id="signupPassword"
+                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition"
+                            placeholder="••••••••">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nickname</label>
+                        <input type="text" id="signupNickname"
+                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition"
+                            placeholder="User Name">
+                    </div>
+                    <button onclick="signup()"
+                        class="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-gray-800 transition transform active:scale-95">
+                        회원가입
+                    </button>
+                </div>
+                <p class="text-center mt-6 text-sm text-gray-500">
+                    이미 계정이 있으신가요? <button onclick="toggleAuth('login')"
+                        class="text-black font-bold hover:underline">로그인</button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App (Hidden until logged in) -->
+    <div id="mainApp" class="max-w-4xl mx-auto p-6 hidden filter blur-sm transition-all duration-500">
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-10">
+            <div>
+                <h1 class="text-3xl font-extrabold text-gray-900">✨ M:ine AI Magazine</h1>
+                <p class="text-gray-500 text-sm">AI가 만드는 나만의 패션 매거진</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="userDisplay"
+                    class="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-full"></span>
+                <button onclick="logout()" class="text-sm text-red-500 font-bold hover:underline">로그아웃</button>
+            </div>
+        </header>
+
+        <!-- Input Section -->
+        <div class="bg-white rounded-2xl shadow-lg p-8 mb-8">
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">주제 (Topic)</label>
+                    <input type="text" id="topicInput" placeholder="예: 2024 겨울 미니멀 룩"
+                        class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition">
+                </div>
+                <div class="w-full md:w-1/3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">무드 (Mood)</label>
+                    <input type="text" id="moodInput" placeholder="예: 시크, 모던"
+                        class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition">
+                </div>
+            </div>
+
+            <div class="flex gap-4 mt-6">
+                <button onclick="generateMagazine()"
+                    class="flex-1 bg-black text-white font-bold py-4 rounded-xl hover:bg-gray-800 transition transform hover:scale-[1.01] active:scale-[0.99] shadow-md">
+                    매거진 생성하기
+                </button>
+                <button onclick="loadMagazines()"
+                    class="flex-1 bg-white text-black border-2 border-black font-bold py-4 rounded-xl hover:bg-gray-50 transition transform hover:scale-[1.01] active:scale-[0.99] shadow-md">
+                    내 매거진 목록 보기
+                </button>
+            </div>
+        </div>
+
+        <!-- Magazine List Section -->
+        <div id="magazineListSection" class="hidden mb-12 animate-fade-in-up">
+            <h2 class="text-2xl font-bold mb-6">📚 내 매거진 목록</h2>
+            <div id="magazineListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- List items will be injected here -->
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden text-center py-20">
+            <div class="loader mx-auto mb-4"></div>
+            <p class="text-lg text-gray-600 animate-pulse">AI가 최신 트렌드를 분석하고 있습니다...<br><span
+                    class="text-sm text-gray-400">(약 15~30초 소요)</span></p>
+        </div>
+
+        <!-- Result Section -->
+        <div id="result" class="hidden space-y-8 animate-fade-in-up">
+            <!-- Cover -->
+            <div class="bg-white rounded-3xl shadow-xl overflow-hidden">
+                <div class="relative h-96">
+                    <img id="coverImage" src="" alt="Cover" class="w-full h-full object-cover">
+                    <div
+                        class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-8">
+                        <div id="tags" class="flex gap-2 mb-4 flex-wrap"></div>
+                        <h2 id="magTitle" class="text-4xl md:text-5xl font-bold text-white leading-tight mb-2"></h2>
+                    </div>
+                </div>
+                <div class="p-8 md:p-10">
+                    <p id="introduction"
+                        class="text-xl text-gray-600 leading-relaxed font-light italic border-l-4 border-black pl-6">
+                    </p>
+                </div>
+            </div>
+
+            <!-- Sections Container -->
+            <div id="sectionsContainer" class="space-y-8"></div>
+
+            <!-- Floating Prompt Input (for dynamic interaction) -->
+            <div id="interactionPrompt" class="hidden sticky bottom-4 mt-8 z-10">
+                <div class="bg-white/95 backdrop-blur-sm border-2 border-gray-300 rounded-2xl p-4 shadow-xl">
+                    <div class="flex items-center gap-3">
+                        <input type="text" id="promptInput" placeholder="관련 있는 주제를 입력해주세요."
+                            class="flex-1 px-4 py-3 border-0 bg-gray-50 rounded-xl focus:ring-2 focus:ring-black outline-none"
+                            onkeypress="if(event.key==='Enter') sendInteractionPrompt()">
+                        <button onclick="sendInteractionPrompt()"
+                            class="px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition">
+                            →
+                        </button>
+                    </div>
+                    <div id="promptHint" class="mt-2 text-sm text-gray-500">
+                        예: "첫 번째 섹션을 더 구체적으로", "가격 정보 추가해줘", "사진을 바꿔줘"
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SPRING_URL = 'http://localhost:8080';
+
+        // --- Auth Logic ---
+        function checkAuth() {
+            const token = localStorage.getItem('accessToken');
+            const email = localStorage.getItem('userEmail');
+
+            if (token && email) {
+                document.getElementById('authModal').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden', 'filter', 'blur-sm');
+                document.getElementById('userDisplay').innerText = `Logged in as: ${email}`;
+            } else {
+                document.getElementById('authModal').classList.remove('hidden');
+                document.getElementById('mainApp').classList.add('hidden', 'filter', 'blur-sm');
+            }
+        }
+
+        function toggleAuth(mode) {
+            if (mode === 'signup') {
+                document.getElementById('loginForm').classList.add('hidden');
+                document.getElementById('signupForm').classList.remove('hidden');
+            } else {
+                document.getElementById('signupForm').classList.add('hidden');
+                document.getElementById('loginForm').classList.remove('hidden');
+            }
+        }
+
+        async function signup() {
+            const username = document.getElementById('signupUsername').value;
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const nickname = document.getElementById('signupNickname').value;
+
+            if (!username || !email || !password || !nickname) {
+                alert("모든 필드를 입력해주세요.");
+                return;
+            }
+
+            try {
+                const response = await fetch(`${SPRING_URL}/api/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password, nickname })
+                });
+
+                if (response.ok) {
+                    alert("회원가입 성공! 로그인해주세요.");
+                    toggleAuth('login');
+                } else {
+                    const errorText = await response.text();
+                    alert("가입 실패: " + errorText);
+                }
+            } catch (error) {
+                alert("오류 발생: " + error.message);
+            }
+        }
+
+        async function login() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!username || !password) {
+                alert("아이디와 비밀번호를 입력해주세요.");
+                return;
+            }
+
+            try {
+                const response = await fetch(`${SPRING_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('accessToken', data.accessToken);
+                    localStorage.setItem('userEmail', username); // Store username instead of email for display
+                    checkAuth();
+                } else {
+                    alert("로그인 실패: 아이디 또는 비밀번호를 확인해주세요.");
+                }
+            } catch (error) {
+                alert("오류 발생: " + error.message);
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('userEmail');
+            location.reload();
+        }
+
+        // --- Magazine Logic ---
+        async function generateMagazine() {
+            const topic = document.getElementById('topicInput').value;
+            const mood = document.getElementById('moodInput').value;
+            const token = localStorage.getItem('accessToken'); // Need token for Spring
+
+            if (!token) return logout();
+
+            if (!topic) {
+                alert("주제를 입력해주세요!");
+                return;
+            }
+
+            // UI Reset
+            document.getElementById('result').classList.add('hidden');
+            document.getElementById('magazineListSection').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('sectionsContainer').innerHTML = '';
+
+            try {
+                // Gateway Pattern: Call Spring, not Python
+                const response = await fetch(`${SPRING_URL}/api/magazines`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ topic: topic, mood: mood }) // Spring DTO might expect 'mood', not 'user_mood'
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok: ' + await response.text());
+
+                // Spring returns the ID of the created magazine
+                const newMagazineId = await response.json();
+
+                // Fetch the full details using the ID
+                await loadMagazineDetail(newMagazineId);
+
+            } catch (error) {
+                alert("생성 실패: " + error.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        async function loadMagazines() {
+            const token = localStorage.getItem('accessToken');
+            if (!token) return logout();
+
+            const listSection = document.getElementById('magazineListSection');
+            const listContainer = document.getElementById('magazineListContainer');
+
+            // Hide other sections
+            document.getElementById('result').classList.add('hidden');
+            listSection.classList.remove('hidden');
+
+            listContainer.innerHTML = '<div class="col-span-2 text-center py-10"><div class="loader mx-auto"></div></div>';
+
+            try {
+                // Call Spring Server with Token
+                const response = await fetch(`${SPRING_URL}/api/magazines`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch magazines');
+
+                const magazines = await response.json();
+                renderMagazineList(magazines);
+
+            } catch (error) {
+                listContainer.innerHTML = `<div class="col-span-2 text-center text-red-500 py-4">목록을 불러오지 못했습니다.<br>(${error.message})</div>`;
+            }
+        }
+
+        async function loadMagazineDetail(id) {
+            const token = localStorage.getItem('accessToken');
+            if (!token) return logout();
+
+            // Show loading
+            document.getElementById('magazineListSection').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${SPRING_URL}/api/magazines/${id}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch magazine detail');
+
+                const data = await response.json();
+                renderMagazine(data, true); // true = show back button
+
+            } catch (error) {
+                alert("상세보기 실패: " + error.message);
+                document.getElementById('magazineListSection').classList.remove('hidden'); // Show list again
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function renderMagazine(data, showBackButton = false) {
+            const resultSection = document.getElementById('result');
+            resultSection.classList.remove('hidden');
+
+            // Store magazine ID for interaction
+            currentMagazineId = data.id;
+
+            // Show interaction prompt
+            document.getElementById('interactionPrompt').classList.remove('hidden');
+
+            // Back Button Logic
+            const existingBackBtn = document.getElementById('backToResultBtn');
+            if (existingBackBtn) existingBackBtn.remove();
+
+            if (showBackButton) {
+                const backBtn = document.createElement('button');
+                backBtn.id = 'backToResultBtn';
+                backBtn.className = 'mb-6 flex items-center text-gray-600 hover:text-black font-bold transition';
+                backBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5 mr-2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg> 목록으로 돌아가기';
+                backBtn.onclick = () => {
+                    resultSection.classList.add('hidden');
+                    document.getElementById('magazineListSection').classList.remove('hidden');
+                };
+                resultSection.prepend(backBtn);
+            }
+
+            // Header
+            document.getElementById('magTitle').innerText = data.title;
+            document.getElementById('introduction').innerText = data.introduction;
+            document.getElementById('coverImage').src = data.cover_image_url || data.coverImageUrl || 'https://via.placeholder.com/800x400?text=No+Image';
+
+            // Tags
+            const tagsContainer = document.getElementById('tags');
+            if (data.tags) {
+                tagsContainer.innerHTML = data.tags.map(tag =>
+                    `<span class="bg-white/20 backdrop-blur-md text-white px-3 py-1 rounded-full text-sm font-medium">#${tag}</span>`
+                ).join('');
+            } else {
+                tagsContainer.innerHTML = '';
+            }
+
+            // Sections
+            const container = document.getElementById('sectionsContainer');
+            container.innerHTML = ''; // Clear previous sections
+
+            if (data.sections) {
+                data.sections.forEach((section, index) => {
+                    const isImageLeft = index % 2 === 0; // Alternate layout
+
+                    let html = '';
+                    if (section.image_url || section.imageUrl) {
+                        html = `
+                            <div class="bg-white rounded-2xl shadow-md overflow-hidden flex flex-col md:flex-row ${isImageLeft ? '' : 'md:flex-row-reverse'}">
+                                <div class="md:w-1/2 h-64 md:h-auto">
+                                    <img src="${section.image_url || section.imageUrl}" class="w-full h-full object-cover hover:scale-105 transition duration-700">
+                                </div>
+                                <div class="p-8 md:w-1/2 flex flex-col justify-center">
+                                    <h3 class="text-2xl font-bold mb-4 text-gray-800">${section.heading}</h3>
+                                    <p class="text-gray-600 leading-relaxed">${section.content}</p>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        html = `
+                            <div class="bg-white rounded-2xl shadow-md p-8">
+                                <h3 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">${section.heading}</h3>
+                                <p class="text-gray-600 leading-relaxed">${section.content}</p>
+                            </div>
+                        `;
+                    }
+                    container.innerHTML += html;
+                });
+            }
+        }
+
+        function renderMagazineList(magazines) {
+            const container = document.getElementById('magazineListContainer');
+            container.innerHTML = '';
+
+            if (magazines.length === 0) {
+                container.innerHTML = '<div class="col-span-2 text-center text-gray-500 py-10">생성된 매거진이 없습니다.</div>';
+                return;
+            }
+
+            magazines.forEach(mag => {
+                const html = `
+                    <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition cursor-pointer border border-gray-100" onclick="loadMagazineDetail(${mag.id})">
+                        <div class="h-48 overflow-hidden">
+                            <img src="${mag.cover_image_url || mag.coverImageUrl || 'https://via.placeholder.com/400x200'}" class="w-full h-full object-cover hover:scale-105 transition duration-500">
+                        </div>
+                        <div class="p-5">
+                            <h3 class="font-bold text-lg mb-2 line-clamp-1">${mag.title}</h3>
+                            <p class="text-sm text-gray-500 line-clamp-2">${mag.introduction}</p>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += html;
+            });
+        }
+
+        let currentMagazineId = null;
+
+        async function sendInteractionPrompt() {
+            const input = document.getElementById('promptInput');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            const hint = document.getElementById('promptHint');
+            hint.textContent = 'AI가 처리 중입니다...';
+            hint.className = 'mt-2 text-sm text-blue-600';
+
+            const token = localStorage.getItem('accessToken');
+
+            try {
+                const res = await fetch(`${SPRING_URL}/api/magazines/${currentMagazineId}/interact`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+
+                    // Wait 500ms to ensure Spring has saved changes
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    // 매거진 새로고침
+                    await loadMagazineDetail(currentMagazineId);
+
+                    hint.textContent = `✓ ${data.message}`;
+                    hint.className = 'mt-2 text-sm text-green-600';
+
+                    input.value = '';
+
+                    setTimeout(() => {
+                        hint.textContent = '예: "첫 번째 섹션을 더 구체적으로", "가격 정보 추가해줘", "사진을 바꿔줘"';
+                        hint.className = 'mt-2 text-sm text-gray-500';
+                    }, 3000);
+                } else {
+                    hint.textContent = '처리 중 오류가 발생했습니다.';
+                    hint.className = 'mt-2 text-sm text-red-600';
+                }
+            } catch (e) {
+                hint.textContent = '서버 오류: ' + e.message;
+                hint.className = 'mt-2 text-sm text-red-600';
+            }
+        }
+
+        // Initialize
+        checkAuth();
+    </script>
+</body>
+
+</html>
+```

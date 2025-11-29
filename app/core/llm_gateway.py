@@ -1,62 +1,64 @@
-from openai import OpenAI
-from app.config import settings
 from app.models.agent import ChatRequest
-
-# OpenAI 클라이언트 초기화 (정상 작동)
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+from app.core.llm_client import llm_client # [변경] 우리가 만든 클라이언트 임포트
+import json
 
 def get_llm_summary(text: str) -> str:
     """
-    LLM을 사용하여 텍스트를 요약합니다. (간단 예시)
+    텍스트 요약
     """
-    print(f"Requesting summary from LLM for text length: {len(text)}")
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a fashion editor. Summarize this fashion article concisely."},
-                {"role": "user", "content": text}
-            ],
-            temperature=0.7,
-            max_tokens=150
-        )
-        summary = response.choices[0].message.content
-        return summary.strip() if summary else "No summary generated."
+    if not text: return ""
+    print(f"🧠 AI Summarizing text (length: {len(text)})...")
     
-    except Exception as e:
-        print(f"Error during LLM API call: {e}")
-        return "Error: Could not generate summary."
+    system_prompt = "You are a professional fashion editor. Summarize the following fashion article in Korean within 3 sentences. Focus on key trends and items."
+    
+    # [변경] 직접 호출 -> llm_client 사용
+    return llm_client.generate_text(system_prompt, text, temperature=0.5)
 
-def get_agent_response(request: ChatRequest, user_data: dict) -> str:
+def get_tags_from_text(text: str) -> list:
     """
-    사용자 데이터와 채팅 메시지를 기반으로 AI 에이전트 응답 생성
+    태그 추출
     """
-    print(f"Generating agent response for user {request.user_id}...")
-    
-    # 1. user_data와 request.message를 조합하여 프롬프트 생성
-    prompt = f"""
-    You are 'M:ine', a personal fashion magazine AI agent.
-    Your user's current collection data: {user_data}
-    User's request: {request.message}
-    
-    Provide a helpful and stylish response:
-    """
-    
-    # 2. [수정됨] 실제 LLM을 호출하여 답변 생성
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo", # 또는 gpt-4
-            messages=[
-                # 시스템 역할(프롬프트)과 사용자 메시지를 함께 전달
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": request.message} # (프롬프트에 이미 포함했다면 이 줄은 빼도 됨)
-            ],
-            temperature=0.7,
-            max_tokens=300 # 답변이 길 수 있으니 넉넉하게
-        )
-        ai_answer = response.choices[0].message.content
-        return ai_answer.strip() if ai_answer else "No response generated."
+    if not text: return []
+    print(f"🏷️ AI Tagging text...")
 
-    except Exception as e:
-        print(f"Error during Agent LLM API call: {e}")
-        return "Error: Could not generate agent response."
+    system_prompt = """
+    Analyze the following fashion text and extract relevant tags.
+    Categories: Style (e.g., Minimal, Vintage), Mood (e.g., Chic, Cozy), Item (e.g., Coat, Boots).
+    Output format: A simple Python list of strings in Korean. Example: ["미니멀", "시크", "롱코트"]
+    Do not write anything else, just the list.
+    """
+    
+    # [변경] llm_client 사용
+    result_text = llm_client.generate_text(system_prompt, text, temperature=0.3)
+    
+    try:
+        if "[" in result_text and "]" in result_text:
+            return eval(result_text)
+        else:
+            return result_text.split(",")
+    except:
+        return []
+
+def get_agent_response(request: ChatRequest, data: dict) -> str:
+    """
+    AI 에이전트 채팅
+    """
+    print(f"💬 AI Agent thinking for user {request.user_id}...")
+
+    system_prompt = """
+    You are 'M:ine', a professional and trendy personal fashion curator.
+    
+    [Your Role]
+    - Analyze the provided data (search results or user collection) and the question.
+    - Recommend styles or items that fit the context.
+    - Speak in a friendly, stylish tone (Korean).
+    - Use emojis occasionally to keep it lively.
+    
+    [Context Data]
+    {data}
+    """
+    
+    formatted_system = system_prompt.format(data=json.dumps(data, ensure_ascii=False))
+    
+    # [변경] llm_client 사용
+    return llm_client.generate_text(formatted_system, request.message, temperature=0.7)

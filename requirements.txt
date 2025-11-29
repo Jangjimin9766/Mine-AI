@@ -6,7 +6,7 @@ uvicorn[standard]   # ASGI 서버
 openai              # OpenAI API (또는 google-generativeai)
 beautifulsoup4      # HTML 파싱 (크롤링)
 requests            # HTTP 요청 (크롤링)
-
+tavily-python
 # --- Config ---
 python-dotenv       # .env 파일 로드용
 pydantic-settings   # 설정 관리

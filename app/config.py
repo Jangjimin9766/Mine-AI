@@ -12,6 +12,9 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str
     SPRING_API_URL: str = "http://localhost:8080"
+    
+    # 검색용 키 추가
+    TAVILY_API_KEY: str
+    JINA_API_KEY: str = "" # 선택 사항이라 기본값 비워둠
 
-# 어디서든 import 해서 사용할 수 있도록 객체 생성
 settings = Settings()
