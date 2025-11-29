@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M:ine - AI Magazine Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #000;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .interest-card {
+            transition: all 0.3s;
+        }
+
+        .interest-card.selected {
+            background: black;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .chat-message {
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50">
+    <!-- 관심사 선택 모달 -->
+    <div id="interestModal"
+        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-2xl w-full">
+            <h2 class="text-3xl font-bold mb-2">관심사 선택</h2>
+            <p class="text-gray-600 mb-6">최대 3개까지 선택해주세요</p>
+            <div id="interestGrid" class="grid grid-cols-3 gap-3 mb-6"></div>
+            <button onclick="saveInterests()"
+                class="w-full bg-black text-white py-3 rounded-xl font-bold hover:bg-gray-800">완료</button>
+        </div>
+    </div>
+
+    <!-- 메인 컨테이너 -->
+    <div class="max-w-7xl mx-auto p-6">
+        <!-- 헤더 -->
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-4xl font-extrabold">M:ine AI</h1>
+            <div id="userInfo" class="hidden">
+                <span id="userName" class="mr-4 font-semibold"></span>
+                <button onclick="logout()" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">로그아웃</button>
+            </div>
+        </div>
+
+        <!-- 매거진 생성 섹션 -->
+        <div class="bg-white rounded-2xl p-8 shadow-lg mb-8">
+            <h2 class="text-2xl font-bold mb-4">새 매거진 만들기</h2>
+            <div class="flex gap-4">
+                <input type="text" id="topicInput" placeholder="주제를 입력하세요 (예: 제주도 겨울 여행)"
+                    class="flex-1 px-4 py-3 border rounded-xl focus:ring-2 focus:ring-black outline-none">
+                <button onclick="generateMagazine()"
+                    class="px-8 py-3 bg-black text-white rounded-xl font-bold hover:bg-gray-800">생성하기</button>
+            </div>
+            <div id="loading" class="hidden flex justify-center items-center mt-8">
+                <div class="loader"></div>
+                <span class="ml-4 text-gray-600">AI가 매거진을 만들고 있습니다...</span>
+            </div>
+        </div>
+
+        <!-- 매거진 뷰어 -->
+        <div id="magazineViewer" class="hidden bg-white rounded-2xl p-8 shadow-lg mb-8 relative">
+            <!-- 플로팅 프롬프트 입력창 (매거진 위에 표시) -->
+            <div id="floatingPrompt" class="hidden sticky top-4 z-10 mb-6">
+                <div class="bg-white/95 backdrop-blur-sm border-2 border-gray-300 rounded-2xl p-4 shadow-xl">
+                    <div class="flex items-center gap-3">
+                        <input type="text" id="promptInput" placeholder="관련 있는 주제를 입력해주세요."
+                            class="flex-1 px-4 py-3 border-0 bg-gray-50 rounded-xl focus:ring-2 focus:ring-black outline-none"
+                            onkeypress="if(event.key==='Enter') sendPrompt()">
+                        <button onclick="sendPrompt()"
+                            class="px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition">
+                            →
+                        </button>
+                    </div>
+                    <div id="promptHint" class="mt-2 text-sm text-gray-500">
+                        예: "첫 번째 섹션을 더 구체적으로", "가격 정보 추가해줘", "사진을 바꿔줘"
+                    </div>
+                </div>
+            </div>
+
+            <div id="magazineContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const SPRING_URL = 'http://localhost:8080';
+        let currentMagazineId = null;
+        let selectedInterests = [];
+        const availableInterests = [
+            { name: 'LIFESTYLE', display: '생활' },
+            { name: 'SPORTS', display: '스포츠' },
+            { name: 'MUSIC', display: '음악' },
+            { name: 'TRAVEL', display: '여행' },
+            { name: 'CYCLING', display: '자전거' },
+            { name: 'ART', display: '예술' },
+            { name: 'BEAUTY', display: '뷰티' },
+            { name: 'FOOD', display: '푸드' },
+            { name: 'HEALTH', display: '건강' },
+            { name: 'INTERIOR', display: '인테리어' }
+        ];
+
+        // 초기화
+        window.onload = () => {
+            checkAuth();
+            renderInterestGrid();
+        };
+
+        function checkAuth() {
+            const token = localStorage.getItem('accessToken');
+            if (token) {
+                document.getElementById('userInfo').classList.remove('hidden');
+                document.getElementById('userName').textContent = localStorage.getItem('userEmail') || 'User';
+                loadUserInterests();
+            } else {
+                // 간단한 로그인 (데모용)
+                const username = prompt('Username:');
+                const password = prompt('Password:');
+                if (username && password) {
+                    login(username, password);
+                }
+            }
+        }
+
+        async function login(username, password) {
+            try {
+                const res = await fetch(`${SPRING_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('accessToken', data.accessToken);
+                    localStorage.setItem('userEmail', username);
+                    location.reload();
+                } else {
+                    alert('로그인 실패');
+                }
+            } catch (e) {
+                alert('서버 오류: ' + e.message);
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        // 관심사 그리드 렌더링
+        function renderInterestGrid() {
+            const grid = document.getElementById('interestGrid');
+            grid.innerHTML = availableInterests.map(interest => `
+                <div class="interest-card cursor-pointer p-4 border-2 rounded-xl text-center font-semibold hover:border-black" 
+                     onclick="toggleInterest('${interest.name}')" 
+                     data-interest="${interest.name}">
+                    ${interest.display}
+                </div>
+            `).join('');
+        }
+
+        function toggleInterest(name) {
+            const card = document.querySelector(`[data-interest="${name}"]`);
+            if (selectedInterests.includes(name)) {
+                selectedInterests = selectedInterests.filter(i => i !== name);
+                card.classList.remove('selected');
+            } else {
+                if (selectedInterests.length >= 3) {
+                    alert('최대 3개까지 선택 가능합니다');
+                    return;
+                }
+                selectedInterests.push(name);
+                card.classList.add('selected');
+            }
+        }
+
+        async function saveInterests() {
+            const token = localStorage.getItem('accessToken');
+            try {
+                await fetch(`${SPRING_URL}/api/users/interests`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ interests: selectedInterests })
+                });
+                document.getElementById('interestModal').classList.add('hidden');
+                alert('관심사가 저장되었습니다!');
+            } catch (e) {
+                alert('저장 실패: ' + e.message);
+            }
+        }
+
+        async function loadUserInterests() {
+            const token = localStorage.getItem('accessToken');
+            try {
+                const res = await fetch(`${SPRING_URL}/api/users/interests`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const interests = await res.json();
+                    if (interests.length === 0) {
+                        document.getElementById('interestModal').classList.remove('hidden');
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load interests:', e);
+            }
+        }
+
+        // 매거진 생성
+        async function generateMagazine() {
+            const topic = document.getElementById('topicInput').value;
+            const token = localStorage.getItem('accessToken');
+
+            if (!topic) {
+                alert('주제를 입력해주세요');
+                return;
+            }
+
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('magazineViewer').classList.add('hidden');
+
+            try {
+                const res = await fetch(`${SPRING_URL}/api/magazines`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ topic, mood: '' })
+                });
+
+                if (res.ok) {
+                    currentMagazineId = await res.json();
+                    await loadMagazineDetail(currentMagazineId);
+                    document.getElementById('floatingPrompt').classList.remove('hidden');
+                } else {
+                    alert('생성 실패: ' + await res.text());
+                }
+            } catch (e) {
+                alert('오류: ' + e.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        async function loadMagazineDetail(id) {
+            const token = localStorage.getItem('accessToken');
+            try {
+                const res = await fetch(`${SPRING_URL}/api/magazines/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const magazine = await res.json();
+                    renderMagazine(magazine);
+                }
+            } catch (e) {
+                alert('로드 실패: ' + e.message);
+            }
+        }
+
+        function renderMagazine(magazine) {
+            const viewer = document.getElementById('magazineViewer');
+            const content = document.getElementById('magazineContent');
+
+            content.innerHTML = `
+                <div class="mb-8">
+                    <img src="${magazine.coverImageUrl}" class="w-full h-96 object-cover rounded-2xl mb-4">
+                    <h1 class="text-4xl font-extrabold mb-4">${magazine.title}</h1>
+                    <p class="text-lg text-gray-600 mb-4">${magazine.introduction}</p>
+                    <div class="flex gap-2">
+                        ${magazine.tags.map(tag => `<span class="px-3 py-1 bg-gray-200 rounded-full text-sm">${tag}</span>`).join('')}
+                    </div>
+                </div>
+                ${magazine.sections.map((section, i) => `
+                    <div class="mb-8 p-6 bg-gray-50 rounded-xl" data-section-index="${i}">
+                        <h2 class="text-2xl font-bold mb-3">${section.heading}</h2>
+                        <p class="text-gray-700 leading-relaxed mb-4">${section.content}</p>
+                        ${section.imageUrl ? `<img src="${section.imageUrl}" class="w-full rounded-lg">` : ''}
+                    </div>
+                `).join('')}
+            `;
+
+            viewer.classList.remove('hidden');
+        }
+
+        // 프롬프트 전송
+        async function sendPrompt() {
+            const input = document.getElementById('promptInput');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            // 로딩 표시
+            const hint = document.getElementById('promptHint');
+            hint.textContent = 'AI가 처리 중입니다...';
+            hint.className = 'mt-2 text-sm text-blue-600';
+
+            const token = localStorage.getItem('accessToken');
+
+            try {
+                const res = await fetch(`${SPRING_URL}/api/magazines/${currentMagazineId}/interact`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+
+                    // 매거진 새로고침
+                    await loadMagazineDetail(currentMagazineId);
+
+                    // 성공 메시지
+                    hint.textContent = `✓ ${data.message}`;
+                    hint.className = 'mt-2 text-sm text-green-600';
+
+                    input.value = '';
+
+                    // 3초 후 힌트 복원
+                    setTimeout(() => {
+                        hint.textContent = '예: "첫 번째 섹션을 더 구체적으로", "가격 정보 추가해줘", "사진을 바꿔줘"';
+                        hint.className = 'mt-2 text-sm text-gray-500';
+                    }, 3000);
+                } else {
+                    hint.textContent = '처리 중 오류가 발생했습니다.';
+                    hint.className = 'mt-2 text-sm text-red-600';
+                }
+            } catch (e) {
+                hint.textContent = '서버 오류: ' + e.message;
+                hint.className = 'mt-2 text-sm text-red-600';
+            }
+        }
+    </script>
+</body>
+
+</html>

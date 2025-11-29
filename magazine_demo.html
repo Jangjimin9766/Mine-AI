@@ -188,6 +188,24 @@
 
             <!-- Sections Container -->
             <div id="sectionsContainer" class="space-y-8"></div>
+
+            <!-- Floating Prompt Input (for dynamic interaction) -->
+            <div id="interactionPrompt" class="hidden sticky bottom-4 mt-8 z-10">
+                <div class="bg-white/95 backdrop-blur-sm border-2 border-gray-300 rounded-2xl p-4 shadow-xl">
+                    <div class="flex items-center gap-3">
+                        <input type="text" id="promptInput" placeholder="관련 있는 주제를 입력해주세요."
+                            class="flex-1 px-4 py-3 border-0 bg-gray-50 rounded-xl focus:ring-2 focus:ring-black outline-none"
+                            onkeypress="if(event.key==='Enter') sendInteractionPrompt()">
+                        <button onclick="sendInteractionPrompt()"
+                            class="px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition">
+                            →
+                        </button>
+                    </div>
+                    <div id="promptHint" class="mt-2 text-sm text-gray-500">
+                        예: "첫 번째 섹션을 더 구체적으로", "가격 정보 추가해줘", "사진을 바꿔줘"
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -394,6 +412,12 @@
             const resultSection = document.getElementById('result');
             resultSection.classList.remove('hidden');
 
+            // Store magazine ID for interaction
+            currentMagazineId = data.id;
+
+            // Show interaction prompt
+            document.getElementById('interactionPrompt').classList.remove('hidden');
+
             // Back Button Logic
             const existingBackBtn = document.getElementById('backToResultBtn');
             if (existingBackBtn) existingBackBtn.remove();
@@ -482,6 +506,58 @@
                 `;
                 container.innerHTML += html;
             });
+        }
+
+        let currentMagazineId = null;
+
+        async function sendInteractionPrompt() {
+            const input = document.getElementById('promptInput');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            const hint = document.getElementById('promptHint');
+            hint.textContent = 'AI가 처리 중입니다...';
+            hint.className = 'mt-2 text-sm text-blue-600';
+
+            const token = localStorage.getItem('accessToken');
+
+            try {
+                const res = await fetch(`${SPRING_URL}/api/magazines/${currentMagazineId}/interact`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+
+                    // Wait 500ms to ensure Spring has saved changes
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    // 매거진 새로고침
+                    await loadMagazineDetail(currentMagazineId);
+
+                    hint.textContent = `✓ ${data.message}`;
+                    hint.className = 'mt-2 text-sm text-green-600';
+
+                    input.value = '';
+
+                    setTimeout(() => {
+                        hint.textContent = '예: "첫 번째 섹션을 더 구체적으로", "가격 정보 추가해줘", "사진을 바꿔줘"';
+                        hint.className = 'mt-2 text-sm text-gray-500';
+                    }, 3000);
+                } else {
+                    hint.textContent = '처리 중 오류가 발생했습니다.';
+                    hint.className = 'mt-2 text-sm text-red-600';
+                }
+            } catch (e) {
+                hint.textContent = '서버 오류: ' + e.message;
+                hint.className = 'mt-2 text-sm text-red-600';
+            }
         }
 
         // Initialize

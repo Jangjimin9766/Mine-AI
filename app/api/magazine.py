@@ -7,10 +7,13 @@ router = APIRouter()
 @router.post("/create", response_model=Magazine)
 def create_magazine(request: MagazineRequest):
     """
-    AI가 매거진을 생성하고, 완료되면 Spring 서버에 자동으로 저장합니다.
+    AI가 매거진을 생성합니다. (모든 주제 지원: 패션, 여행, 음악, 건강 등)
     """
     # 1. AI가 매거진 생성 (시간이 좀 걸림)
-    magazine_data = generate_magazine_content(request.topic)
+    magazine_data = generate_magazine_content(
+        topic=request.topic,
+        user_interests=request.user_interests
+    )
     
     if not magazine_data:
         raise HTTPException(status_code=500, detail="Failed to generate magazine")

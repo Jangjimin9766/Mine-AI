@@ -9,8 +9,18 @@ tavily = TavilyClient(api_key=settings.TAVILY_API_KEY)
 def search_with_tavily(query: str):
     """
     Tavily를 이용해 검색하고, AI가 읽기 좋은 답변과 이미지를 가져옵니다.
+    이미지가 없으면 플레이스홀더 이미지를 사용합니다.
     """
     print(f"🔎 Tavily Searching for: {query}")
+    
+    # 플레이스홀더 이미지 (Tavily 실패 시 사용)
+    FALLBACK_IMAGES = [
+        "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200",  # Gradient
+        "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200",  # Abstract
+        "https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1200",  # Gradient 2
+        "https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=1200",  # Abstract 2
+        "https://images.unsplash.com/photo-1557682224-5b8590cd9ec5?w=1200",  # Gradient 3
+    ]
     
     try:
         # search_depth="advanced": 좀 더 깊이 있게 검색
@@ -22,12 +32,24 @@ def search_with_tavily(query: str):
             max_results=3
         )
         
-        # Tavily는 이미 요약된 content를 줍니다.
-        return response.get('results', []), response.get('images', [])
+        results = response.get('results', [])
+        images = response.get('images', [])
+        
+        # 이미지가 없으면 플레이스홀더 사용
+        if not images or len(images) == 0:
+            print(f"⚠️ No images found, using fallback images")
+            images = FALLBACK_IMAGES
+        
+        # 최소 5개 이미지 보장
+        while len(images) < 5:
+            images.extend(FALLBACK_IMAGES)
+        
+        print(f"✅ Found {len(results)} results and {len(images)} images")
+        return results, images[:10]  # 최대 10개까지만
 
     except Exception as e:
-        print(f"❌ Tavily Error: {e}")
-        return [], []
+        print(f"❌ Tavily Error: {e}, using fallback")
+        return [], FALLBACK_IMAGES
 
 def scrape_with_jina(url: str):
     """
