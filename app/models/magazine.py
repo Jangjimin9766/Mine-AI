@@ -19,3 +19,14 @@ class MagazineRequest(BaseModel):
     user_email: str         # 사용자 아이디 (Username) - Spring에서 보냄
     user_mood: Optional[str] = None # 사용자 취향 (선택)
     user_interests: Optional[List[str]] = None # 사용자 관심사 (예: ["여행", "음악", "건강"])
+
+class MoodboardRequest(BaseModel):
+    topic: Optional[str] = None
+    user_mood: Optional[str] = None
+    user_interests: Optional[List[str]] = None
+    magazine_tags: Optional[List[str]] = None
+    magazine_titles: Optional[List[str]] = None
+
+class MoodboardResponse(BaseModel):
+    image_url: str
+    description: str
