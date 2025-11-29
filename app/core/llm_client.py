@@ -51,5 +51,22 @@ class LLMClient:
             print(f"❌ LLM JSON Generation Error: {e}")
             return {}
 
+    def generate_image(self, prompt: str, size: str = "1024x1024", quality: str = "standard") -> str:
+        """
+        DALL-E 3를 사용한 이미지 생성
+        """
+        try:
+            response = self.client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                size=size,
+                quality=quality,
+                n=1,
+            )
+            return response.data[0].url
+        except Exception as e:
+            print(f"❌ LLM Image Generation Error: {e}")
+            return ""
+
 # 싱글톤 인스턴스 생성 (어디서든 llm_client만 임포트하면 됨)
 llm_client = LLMClient()
