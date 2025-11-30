@@ -10,3 +10,7 @@ tavily-python
 # --- Config ---
 python-dotenv       # .env 파일 로드용
 pydantic-settings   # 설정 관리
+diffusers           # Stable Diffusion
+transformers        # Hugging Face Transformers
+accelerate          # Model acceleration
+torch               # PyTorch
