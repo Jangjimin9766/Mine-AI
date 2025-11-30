@@ -429,7 +429,7 @@ MIT License
 
 ---
 
-## 🙏 감사의 말
+## 🙏 coop
 
 - **OpenAI**: GPT-3.5-turbo API
 - **Stability AI**: Stable Diffusion XL 모델
