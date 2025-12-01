@@ -7,6 +7,27 @@ M:ine AI는 사용자가 원하는 어떤 주제든 실시간으로 웹 검색�
 
 ---
 
+## 👥 Contributors
+
+<table align="center">
+  <tr>
+    <td align="center" width="150px">
+      <a href="https://github.com/jangjimin9766">
+        <img src="https://github.com/jangjimin9766.png" width="100px" style="border-radius:50%"/>
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <b>Jimin Jang</b><br/>
+      <a href="https://github.com/jangjimin9766">@jangjimin9766</a><br/>
+      <br/>
+      Team Leader<br/>
+      Full-Stack Dev
+    </td>
+  </tr>
+</table>
+
 ## ✨ 주요 기능
 
 ### 🎨 **1. AI 매거진 자동 생성**
@@ -418,15 +439,6 @@ if not result_json.get('cover_image_url').startswith('http'):
 ## 📝 라이센스
 
 MIT License
-
----
-
-## 👤 개발자
-
-**Jang Ji Min**
-
-이 프로젝트는 AI 기술을 활용하여 콘텐츠 생성의 민주화를 실현하고자 하는 비전에서 시작되었습니다.  
-누구나 자신만의 프리미엄 매거진을 만들 수 있는 세상을 꿈꿉니다.
 
 ---
 
