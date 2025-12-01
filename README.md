@@ -23,7 +23,7 @@ M:ine AI는 사용자가 원하는 어떤 주제든 실시간으로 웹 검색�
       <a href="https://github.com/jangjimin9766">@jangjimin9766</a><br/>
       <br/>
       Team Leader<br/>
-      Full-Stack Dev
+      Back-end Dev
     </td>
   </tr>
 </table>
