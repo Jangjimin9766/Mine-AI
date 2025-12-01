@@ -22,8 +22,9 @@ M:ine AI는 사용자가 원하는 어떤 주제든 실시간으로 웹 검색�
       <b>Jimin Jang</b><br/>
       <a href="https://github.com/jangjimin9766">@jangjimin9766</a><br/>
      <b> Tech Lead</b><br/>
-      System Architecture<br/>
-      Backend & DevOps
+      AI Engineering<br/>
+      Prompt Engineering<br/>
+      Model Optimization (MPS)
     </td>
   </tr>
 </table>
