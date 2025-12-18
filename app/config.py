@@ -16,5 +16,8 @@ class Settings(BaseSettings):
     # 검색용 키 추가
     TAVILY_API_KEY: str
     JINA_API_KEY: str = "" # 선택 사항이라 기본값 비워둠
+    
+    # 보안 키
+    PYTHON_API_KEY: str = "mine-secret-key-1234"
 
 settings = Settings()
