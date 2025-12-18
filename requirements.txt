@@ -14,3 +14,8 @@ diffusers           # Stable Diffusion
 transformers        # Hugging Face Transformers
 accelerate          # Model acceleration
 torch               # PyTorch
+
+# --- Testing ---
+pytest              # Testing framework
+httpx               # Async HTTP client for testing
+pytest-asyncio      # Asyncio support for pytest

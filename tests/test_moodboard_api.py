@@ -13,6 +13,7 @@ def test_create_moodboard(mock_generate_image, mock_generate_text):
 
     response = client.post(
         "/api/magazine/moodboard",
+        headers={"x-api-key": "mine-secret-key-1234"},
         json={
             "topic": None,
             "user_mood": "Sophisticated",
