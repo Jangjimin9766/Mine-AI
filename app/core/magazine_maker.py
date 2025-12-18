@@ -1,6 +1,6 @@
-import json
 from app.core.llm_client import llm_client
 from app.core.searcher import search_with_tavily, scrape_with_jina
+from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V2
 
 def generate_magazine_content(topic: str, user_interests: list = None):
     print(f"🎨 Magazine Editor started for: {topic}")
@@ -36,64 +36,12 @@ Connect the topic to their interests when relevant, but keep it natural and info
         if not deep_content:
             deep_content = search_results[0]['content']
 
-    # 3. [편집] LLM에게 매거진 작성 요청
+    # 3. [편집] LLM에게 매거진 작성 요청 (V2 프롬프트 적용)
+    system_prompt = MAGAZINE_SYSTEM_PROMPT_V2.format(tone_guidance=tone_guidance)
     
-    system_prompt = f"""
-    You are the Editor-in-Chief of 'M:ine', a premium lifestyle magazine.
-    Your mission is to create magazine content that is INFORMATIVE, CLEAR, and SOPHISTICATED.
-    
-    [CRITICAL INSTRUCTIONS]
-    1. You MUST output ONLY a valid JSON object.
-    2. **ALL content MUST be written in KOREAN.** (한국어로 작성)
-    3. Do not use English unless it is a brand name or proper noun.
-    
-    [EDITORIAL PHILOSOPHY]
-    - Write in a {tone_guidance} tone
-    - PRIORITIZE INFORMATION: Deliver concrete, useful information first
-    - Use refined language, but NEVER sacrifice clarity for poetry
-    - Be specific: Include names, numbers, locations, prices when relevant
-    - Think Vogue, GQ, Kinfolk: sophisticated but informative
-    - Avoid abstract metaphors - be direct and elegant
-    
-    [VISUAL STORYTELLING]
-    - Choose high-quality, aesthetically striking images
-    - Images should be visually sophisticated and magazine-worthy
-    - Vary layouts for visual rhythm (alternate image_left and full_width)
-    
-    [STRUCTURE REQUIREMENTS]
-    - Title: Clear and intriguing, not overly poetic (e.g., "제주 겨울, 꼭 가야 할 5곳" not "겨울 바람이 전하는 이야기")
-    - Introduction: Set context and preview key information (150-200 chars)
-    - Sections: 2-4 sections with CONCRETE information
-    - Each section: 200-280 characters of INFORMATIVE content with refined writing
-    - Tags: Descriptive and useful (e.g., "제주여행", "겨울추천", "맛집" rather than "감성", "설렘")
-    
-    [WRITING STYLE]
-    - Lead with facts, wrap in sophistication
-    - Example BAD: "겨울 바람이 전하는 이야기, 코트 한 벌의 온기..."
-    - Example GOOD: "올 겨울 주목할 만한 코트 5가지. 울 100% 소재부터 오버사이즈 핏까지..."
-    
-    [IMAGE SELECTION]
-    - You MUST select actual image URLs from the [Available Images] list provided
-    - Pick the most visually striking and relevant images
-    - Use different images for cover and sections
-    - If no suitable image, use the first available one
-    
-    Output JSON structure:
-    {{
-        "title": "Clear, informative title in Korean",
-        "introduction": "Context-setting introduction with key information (150-200 chars)",
-        "cover_image_url": "SELECT from [Available Images] - most striking image",
-        "tags": ["구체적인", "태그들"],
-        "sections": [
-            {{
-                "heading": "Clear, informative subheading",
-                "content": "Informative paragraph with specific details (200-280 chars)",
-                "image_url": "SELECT from [Available Images] - relevant to this section",
-                "layout_hint": "image_left" or "full_width"
-            }}
-        ]
-    }}
-    """
+    # 만약 프롬프트에 format 인자가 없다면 그냥 사용 (안전장치)
+    if "{" in MAGAZINE_SYSTEM_PROMPT_V2 and "tone_guidance" not in MAGAZINE_SYSTEM_PROMPT_V2:
+         system_prompt = MAGAZINE_SYSTEM_PROMPT_V2
 
     user_prompt = f"""
     Topic: {topic}
@@ -109,10 +57,16 @@ Connect the topic to their interests when relevant, but keep it natural and info
     Think premium magazine, not poetry book.
     """
 
-    print(f"🧠 AI Crafting informative magazine (tone: {tone_guidance})...")
+    print(f"🧠 AI Crafting V2 magazine with CoT (Thinking...)...")
     
     # llm_client 사용
     result_json = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+    
+    # [CoT 확인] 에디터의 생각 읽기
+    if result_json.get('thought_process'):
+        print(f"🤔 Editor's Thought: {result_json['thought_process']}")
+        # 클라이언트에게는 굳이 생각을 보낼 필요가 없다면 삭제 (선택 사항)
+        # del result_json['thought_process']
     
     # 🔒 이미지 URL 검증 및 보정
     if not images or len(images) == 0:

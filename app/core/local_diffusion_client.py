@@ -11,7 +11,14 @@ class LocalDiffusionClient:
 
     def _load_model(self):
         if self.pipe is None:
-            print("⏳ Loading Stable Diffusion XL model to MPS (This may take a while on first run)...")
+            # Device selection logic
+            device = "cpu"
+            if torch.cuda.is_available():
+                device = "cuda"
+            elif torch.backends.mps.is_available():
+                device = "mps"
+            
+            print(f"⏳ Loading Stable Diffusion XL model to {device.upper()} (This may take a while on first run)...")
             try:
                 self.pipe = DiffusionPipeline.from_pretrained(
                     self.model_id,
@@ -19,13 +26,13 @@ class LocalDiffusionClient:
                     use_safetensors=True,
                     variant="fp16"
                 )
-                # Mac M-series GPU Acceleration
-                self.pipe.to("mps")
+                
+                self.pipe.to(device)
                 
                 # Optional: Memory optimization
                 # self.pipe.enable_attention_slicing()
                 
-                print("✅ Model loaded successfully on MPS.")
+                print(f"✅ Model loaded successfully on {device.upper()}.")
             except Exception as e:
                 print(f"❌ Failed to load model: {e}")
                 self.pipe = None
