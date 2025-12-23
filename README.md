@@ -7,28 +7,6 @@ M:ine AI는 사용자가 원하는 어떤 주제든 실시간으로 웹 검색�
 
 ---
 
-## 👥 Contributors
-
-<table align="center">
-  <tr>
-    <td align="center" width="150px">
-      <a href="https://github.com/jangjimin9766">
-        <img src="https://github.com/jangjimin9766.png" width="100px" style="border-radius:50%"/>
-      </a>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <b>장지민</b><br/>
-      <a href="https://github.com/jangjimin9766">@jangjimin9766</a><br/>
-     <b> Tech Lead</b><br/>
-      AI Engineering<br/>
-      Prompt Engineering<br/>
-      Model Optimization (MPS)
-    </td>
-  </tr>
-</table>
-
 ## ✨ 주요 기능
 
 ### 🎨 **1. AI 매거진 자동 생성**
@@ -455,8 +433,28 @@ MIT License
 
 <div align="center">
 
-**M:ine AI - Where Every Topic Becomes a Magazine** ✨
+team:SOULution
+Mine
+## 👥 Contributors
 
-Made with ❤️ and 🤖
+<table align="center">
+  <tr>
+    <td align="center" width="150px">
+      <a href="https://github.com/jangjimin9766">
+        <img src="https://github.com/jangjimin9766.png" width="100px" style="border-radius:50%"/>
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <b>장지민</b><br/>
+      <a href="https://github.com/jangjimin9766">@jangjimin9766</a><br/>
+     <b> Tech Lead</b><br/>
+      AI Engineering<br/>
+      Prompt Engineering<br/>
+      Model Optimization (MPS)
+    </td>
+  </tr>
+</table>
 
 </div>
