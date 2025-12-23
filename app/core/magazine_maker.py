@@ -1,4 +1,5 @@
 from app.core.llm_client import llm_client
+import json
 from app.core.searcher import search_with_tavily, scrape_with_jina
 from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V2
 
@@ -37,7 +38,11 @@ Connect the topic to their interests when relevant, but keep it natural and info
             deep_content = search_results[0]['content']
 
     # 3. [편집] LLM에게 매거진 작성 요청 (V2 프롬프트 적용)
-    system_prompt = MAGAZINE_SYSTEM_PROMPT_V2.format(tone_guidance=tone_guidance)
+    # JSON 포맷팅 이슈를 방지하기 위해 format() 호출 제거 (프롬프트 내에 {}가 많음)
+    system_prompt = MAGAZINE_SYSTEM_PROMPT_V2
+    
+    # 만약 톤 가이던스를 꼭 넣고 싶다면, 프롬프트 내에 명시적인 placeholder를 두고 replace를 사용해야 함.
+    # 하지만 현재 프롬프트는 그 자체로 충분하므로 패스.
     
     # 만약 프롬프트에 format 인자가 없다면 그냥 사용 (안전장치)
     if "{" in MAGAZINE_SYSTEM_PROMPT_V2 and "tone_guidance" not in MAGAZINE_SYSTEM_PROMPT_V2:
@@ -87,7 +92,23 @@ Connect the topic to their interests when relevant, but keep it natural and info
         if not section.get('image_url') or not section['image_url'].startswith('http'):
             section['image_url'] = images[min(i + 1, len(images) - 1)]
             print(f"⚠️ Fixed section {i} image_url to: {section['image_url']}")
+
+    # 4. [부록] 매거진과 1:1 매칭되는 무드보드 생성 (Local SDXL)
+    from app.core.moodboard_maker import generate_moodboard
     
-    print(f"✅ Magazine created with {len(result_json.get('sections', []))} sections")
+    print(f"🎨 Generating matching moodboard for magazine: {result_json.get('title')}")
+    
+    moodboard_data = generate_moodboard(
+        topic=topic,
+        user_interests=user_interests,
+        magazine_tags=result_json.get('tags', []),
+        magazine_titles=[result_json.get('title', 'Untitled')]
+    )
+    
+    if moodboard_data:
+        result_json['moodboard'] = moodboard_data
+        print(f"✅ Moodboard attached to magazine")
+    
+    print(f"✅ Magazine with moodboard created: {len(result_json.get('sections', []))} sections")
     
     return result_json

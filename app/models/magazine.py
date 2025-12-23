@@ -1,18 +1,25 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
+class MoodboardResponse(BaseModel):
+    image_url: str
+    description: str
+
 class MagazineSection(BaseModel):
     heading: str            # 소제목
     content: str            # 본문 내용
     image_url: Optional[str] = None # 들어갈 이미지 URL (없을 수도 있음)
-    layout_hint: str = "basic" # 프론트에게 주는 힌트 (예: 'image_left', 'full_width')
+    layout_type: str = "basic" # 프론트엔드 렌더링 힌트 (예: 'hero', 'quote', 'split_left', 'split_right')
+    caption: Optional[str] = None # 이미지 캡션 (선택)
 
 class Magazine(BaseModel):
     title: str              # 매거진 전체 제목
+    subtitle: str           # 사용자의 흥미를 끄는 부제
     introduction: str       # 도입부 (에디터의 말)
     cover_image_url: str    # 표지 이미지
     sections: List[MagazineSection] # 본문 섹션들
     tags: List[str]         # 태그
+    moodboard: Optional[MoodboardResponse] = None # 매거진과 1:1 매칭되는 무드보드
 
 class MagazineRequest(BaseModel):
     topic: str              # 주제 (예: "겨울 코트 추천", "제주도 여행", "건강한 아침 식단")
@@ -26,7 +33,3 @@ class MoodboardRequest(BaseModel):
     user_interests: Optional[List[str]] = None
     magazine_tags: Optional[List[str]] = None
     magazine_titles: Optional[List[str]] = None
-
-class MoodboardResponse(BaseModel):
-    image_url: str
-    description: str
