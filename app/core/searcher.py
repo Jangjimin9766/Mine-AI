@@ -2,9 +2,18 @@ from tavily import TavilyClient
 import requests
 from app.config import settings
 
-# Tavily 클라이언트 초기화 (settings에서 키 로드)
-# .env 파일에 TAVILY_API_KEY가 반드시 있어야 합니다.
-tavily = TavilyClient(api_key=settings.TAVILY_API_KEY)
+# Tavily 클라이언트는 함수 내에서 지연 초기화 (CI 테스트 호환성)
+_tavily_client = None
+
+def _get_tavily_client():
+    """Tavily 클라이언트를 지연 초기화하여 반환"""
+    global _tavily_client
+    if _tavily_client is None:
+        api_key = settings.TAVILY_API_KEY
+        if not api_key or api_key == "test-key":
+            return None  # 테스트 환경에서는 None 반환
+        _tavily_client = TavilyClient(api_key=api_key)
+    return _tavily_client
 
 def search_with_tavily(query: str):
     """
@@ -21,6 +30,12 @@ def search_with_tavily(query: str):
         "https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=1200",  # Abstract 2
         "https://images.unsplash.com/photo-1557682224-5b8590cd9ec5?w=1200",  # Gradient 3
     ]
+    
+    # Tavily 클라이언트 가져오기 (없으면 fallback)
+    tavily = _get_tavily_client()
+    if tavily is None:
+        print(f"⚠️ Tavily API key not configured, using fallback")
+        return [], FALLBACK_IMAGES
     
     try:
         # search_depth="advanced": 좀 더 깊이 있게 검색
