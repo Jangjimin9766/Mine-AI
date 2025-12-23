@@ -4,20 +4,30 @@ import json
 
 class LLMClient:
     def __init__(self):
-        # 지금은 OpenAI를 쓰지만, 나중엔 여기서 로컬 모델을 로드할 수도 있습니다.
-        # self.local_model = load_lora_model(...) 
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        # 지연 초기화를 위해 None으로 시작
+        self._client = None
         self.default_model = "gpt-3.5-turbo"
+
+    def _get_client(self):
+        """OpenAI 클라이언트를 지연 초기화하여 반환"""
+        if self._client is None:
+            api_key = settings.OPENAI_API_KEY
+            if not api_key or api_key == "test-key":
+                return None  # 테스트 환경에서는 None 반환
+            self._client = OpenAI(api_key=api_key)
+        return self._client
 
     def generate_text(self, system_prompt: str, user_prompt: str, temperature: float = 0.7) -> str:
         """
         일반적인 텍스트 생성 (요약, 채팅, 태깅 등)
         """
+        client = self._get_client()
+        if client is None:
+            print("⚠️ OpenAI API key not configured")
+            return ""
+        
         try:
-            # [확장 포인트] 나중에 model_type 인자를 받아서 분기 처리 가능
-            # if model_type == 'local_lora': return self._call_local_model(...)
-            
-            response = self.client.chat.completions.create(
+            response = client.chat.completions.create(
                 model=self.default_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -34,15 +44,20 @@ class LLMClient:
         """
         JSON 포맷 강제 생성 (매거진 데이터 생성용)
         """
+        client = self._get_client()
+        if client is None:
+            print("⚠️ OpenAI API key not configured")
+            return {}
+        
         try:
-            response = self.client.chat.completions.create(
-                model=self.default_model, # JSON 모드는 1106 버전 이상 권장되나 3.5-turbo 최신도 지원함
+            response = client.chat.completions.create(
+                model=self.default_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=temperature,
-                response_format={"type": "json_object"} # OpenAI 전용 JSON 모드
+                response_format={"type": "json_object"}
             )
             
             content = response.choices[0].message.content
@@ -50,8 +65,6 @@ class LLMClient:
         except Exception as e:
             print(f"❌ LLM JSON Generation Error: {e}")
             return {}
-
-    # generate_image removed (Moved to StabilityClient)
 
 # 싱글톤 인스턴스 생성 (어디서든 llm_client만 임포트하면 됨)
 llm_client = LLMClient()
