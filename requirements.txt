@@ -10,10 +10,11 @@ tavily-python
 # --- Config ---
 python-dotenv       # .env 파일 로드용
 pydantic-settings   # 설정 관리
-diffusers==0.25.0   # Stable Diffusion (pinned for torch.xpu compatibility)
+diffusers==0.25.0   # Stable Diffusion (pinned for compatibility)
 transformers        # Hugging Face Transformers
 accelerate          # Model acceleration
 torch==2.1.0        # PyTorch (pinned for compatibility)
+huggingface_hub==0.21.0  # Pinned for diffusers compatibility
 
 # --- Testing ---
 pytest              # Testing framework
