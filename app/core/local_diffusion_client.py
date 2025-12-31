@@ -24,6 +24,24 @@ if not hasattr(torch, 'xpu'):
         @staticmethod
         def get_device_name(device=None):
             return ""
+        @staticmethod
+        def manual_seed(seed):
+            pass
+        @staticmethod
+        def manual_seed_all(seed):
+            pass
+        @staticmethod
+        def set_device(device):
+            pass
+        @staticmethod
+        def get_device_properties(device):
+            return None
+        @staticmethod  
+        def memory_allocated(device=None):
+            return 0
+        @staticmethod
+        def max_memory_allocated(device=None):
+            return 0
     torch.xpu = FakeXPU()
 
 # Now safe to import diffusers
