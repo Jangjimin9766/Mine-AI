@@ -1,14 +1,16 @@
-from diffusers import DiffusionPipeline
 import torch
-import base64
 import sys
-from io import BytesIO
 
 # Workaround for diffusers compatibility with PyTorch versions lacking torch.xpu
-# (Intel XPU support). This prevents AttributeError on RunPod/CUDA environments.
+# (Intel XPU support). This MUST be before importing diffusers!
 if not hasattr(torch, 'xpu'):
     torch.xpu = type(sys)('fake_xpu')
     torch.xpu.is_available = lambda: False
+
+# Now safe to import diffusers
+from diffusers import DiffusionPipeline
+import base64
+from io import BytesIO
 
 class LocalDiffusionClient:
     def __init__(self):
