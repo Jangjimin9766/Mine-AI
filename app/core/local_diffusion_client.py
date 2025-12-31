@@ -4,8 +4,27 @@ import sys
 # Workaround for diffusers compatibility with PyTorch versions lacking torch.xpu
 # (Intel XPU support). This MUST be before importing diffusers!
 if not hasattr(torch, 'xpu'):
-    torch.xpu = type(sys)('fake_xpu')
-    torch.xpu.is_available = lambda: False
+    class FakeXPU:
+        """Complete mock of torch.xpu module for compatibility."""
+        @staticmethod
+        def is_available():
+            return False
+        @staticmethod
+        def empty_cache():
+            pass
+        @staticmethod
+        def synchronize():
+            pass
+        @staticmethod
+        def device_count():
+            return 0
+        @staticmethod
+        def current_device():
+            return 0
+        @staticmethod
+        def get_device_name(device=None):
+            return ""
+    torch.xpu = FakeXPU()
 
 # Now safe to import diffusers
 from diffusers import DiffusionPipeline
