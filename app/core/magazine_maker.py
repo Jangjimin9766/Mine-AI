@@ -70,8 +70,8 @@ Connect the topic to their interests when relevant, but keep it natural and info
     # [CoT 확인] 에디터의 생각 읽기
     if result_json.get('thought_process'):
         print(f"🤔 Editor's Thought: {result_json['thought_process']}")
-        # 클라이언트에게는 굳이 생각을 보낼 필요가 없다면 삭제 (선택 사항)
-        # del result_json['thought_process']
+        # 클라이언트에게는 굳이 생각을 보낼 필요가 없다면 삭제 (Spring DTO 호환성)
+        del result_json['thought_process']
     
     # 🔒 이미지 URL 검증 및 보정
     if not images or len(images) == 0:
