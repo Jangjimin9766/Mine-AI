@@ -103,20 +103,35 @@ def handle_create_moodboard(data: dict) -> dict:
     """
     Handle moodboard creation request.
     """
-    from app.core.moodboard_maker import generate_moodboard
+    print("🎨 [1/4] Moodboard handler started")
+    print(f"🎨 [1/4] Data received: {data}")
     
-    result = generate_moodboard(
-        topic=data.get("topic"),
-        user_mood=data.get("user_mood"),
-        user_interests=data.get("user_interests"),
-        magazine_tags=data.get("magazine_tags"),
-        magazine_titles=data.get("magazine_titles")
-    )
-    
-    if not result:
-        return {"error": "Failed to generate moodboard"}
-    
-    return result
+    try:
+        print("🎨 [2/4] Importing generate_moodboard...")
+        from app.core.moodboard_maker import generate_moodboard
+        print("🎨 [2/4] Import successful")
+        
+        print("🎨 [3/4] Calling generate_moodboard...")
+        result = generate_moodboard(
+            topic=data.get("topic"),
+            user_mood=data.get("user_mood"),
+            user_interests=data.get("user_interests"),
+            magazine_tags=data.get("magazine_tags"),
+            magazine_titles=data.get("magazine_titles")
+        )
+        print(f"🎨 [4/4] Result: {result is not None}")
+        
+        if not result:
+            print("🎨 [4/4] Result is None, returning error")
+            return {"error": "Failed to generate moodboard"}
+        
+        print("🎨 [4/4] Success! Returning result")
+        return result
+        
+    except Exception as e:
+        print(f"❌ Moodboard Error: {e}")
+        print(f"📋 Traceback:\n{traceback.format_exc()}")
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 
 # Start the RunPod serverless worker
