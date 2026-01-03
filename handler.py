@@ -1,11 +1,12 @@
 """
 RunPod Serverless Handler for M:ine AI Server
 Converts FastAPI endpoints to RunPod serverless format.
-# Rebuild trigger: 2026-01-01 - x86_64 architecture fix
+# Rebuild trigger: 2026-01-04 - Added detailed error logging
 """
 import runpod
 import os
 import json
+import traceback
 
 # Ensure environment variables are set for API clients
 # These will be passed via RunPod's environment configuration
@@ -40,7 +41,8 @@ def handler(event):
             
     except Exception as e:
         print(f"❌ Handler Error: {e}")
-        return {"error": str(e)}
+        print(f"📋 Full Traceback:\n{traceback.format_exc()}")
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 
 def handle_create_magazine(data: dict) -> dict:

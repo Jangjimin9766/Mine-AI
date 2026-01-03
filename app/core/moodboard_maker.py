@@ -1,5 +1,6 @@
 from app.core.llm_client import llm_client
 from app.core.local_diffusion_client import local_diffusion_client
+import traceback
 
 def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None) -> str:
     """
