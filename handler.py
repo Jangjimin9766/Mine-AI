@@ -61,7 +61,7 @@ def handler(event):
         
         if action == "create_magazine":
             return handle_create_magazine(data)
-        elif action == "create_moodboard":
+        elif action == "create_moodboard" or action == "generate_moodboard":
             return handle_create_moodboard(data)
         elif action == "health":
             return {"status": "healthy", "message": "M:ine AI Serverless is running"}
