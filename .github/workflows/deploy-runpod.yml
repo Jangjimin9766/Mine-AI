@@ -42,7 +42,9 @@ jobs:
           context: .
           file: ./Dockerfile.serverless
           push: true
-          tags: jiminjang/mine-ai-serverless:latest
+          tags: |
+            jiminjang/mine-ai-serverless:latest
+            jiminjang/mine-ai-serverless:${{ github.sha }}
           no-cache: true
           build-args: |
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
