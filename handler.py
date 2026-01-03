@@ -1,12 +1,41 @@
 """
 RunPod Serverless Handler for M:ine AI Server
 Converts FastAPI endpoints to RunPod serverless format.
-# Rebuild trigger: 2026-01-04 - Added detailed error logging
+# Rebuild trigger: 2026-01-04-v2 - Diagnose worker crash
 """
+print("=" * 50)
+print("🔧 handler.py is loading...")
+print("=" * 50)
+
 import runpod
 import os
 import json
 import traceback
+import sys
+
+print(f"✅ Basic imports done. Python: {sys.version}")
+print(f"✅ Working directory: {os.getcwd()}")
+
+# Test critical imports BEFORE handler runs
+try:
+    print("📦 Testing app.core imports...")
+    from app.core.llm_client import llm_client
+    print("✅ llm_client imported")
+except Exception as e:
+    print(f"❌ llm_client import failed: {e}")
+    print(traceback.format_exc())
+
+try:
+    print("📦 Testing local_diffusion_client import...")
+    from app.core.local_diffusion_client import local_diffusion_client
+    print("✅ local_diffusion_client imported")
+except Exception as e:
+    print(f"❌ local_diffusion_client import failed: {e}")
+    print(traceback.format_exc())
+
+print("=" * 50)
+print("🎯 All imports completed, defining handler...")
+print("=" * 50)
 
 # Ensure environment variables are set for API clients
 # These will be passed via RunPod's environment configuration
