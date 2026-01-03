@@ -29,3 +29,11 @@ jobs:
         TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
       run: |
         pytest
+
+    - name: Discord Notification
+      if: always()
+      uses: sarisia/actions-status-discord@v1
+      with:
+        webhook: ${{ secrets.DISCORD_WEBHOOK }}
+        title: "🧪 API CI Tests"
+        color: ${{ job.status == 'success' && '0x238636' || '0xDA3633' }}

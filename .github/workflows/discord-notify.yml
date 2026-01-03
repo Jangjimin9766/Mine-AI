@@ -1,0 +1,146 @@
+name: Discord Notifications
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    types: [opened, closed, reopened, synchronize]
+  issues:
+    types: [opened, closed, reopened]
+  create:
+  delete:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      # Push 이벤트 알림
+      - name: Push Notification
+        if: github.event_name == 'push'
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          title: "📦 Push to `${{ github.ref_name }}`"
+          description: |
+            **Commit:** `${{ github.event.head_commit.id }}`
+            **Author:** ${{ github.event.head_commit.author.name }}
+            **Message:** ${{ github.event.head_commit.message }}
+            
+            [View Commit](${{ github.event.head_commit.url }})
+          color: 0x5865F2
+
+      # Pull Request 이벤트 알림
+      - name: PR Opened Notification
+        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          title: "🔀 New Pull Request"
+          description: |
+            **#${{ github.event.pull_request.number }}** ${{ github.event.pull_request.title }}
+            **Author:** ${{ github.event.pull_request.user.login }}
+            **Branch:** `${{ github.event.pull_request.head.ref }}` → `${{ github.event.pull_request.base.ref }}`
+            
+            [View PR](${{ github.event.pull_request.html_url }})
+          color: 0x238636
+
+      - name: PR Merged Notification
+        if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          title: "✅ Pull Request Merged"
+          description: |
+            **#${{ github.event.pull_request.number }}** ${{ github.event.pull_request.title }}
+            **Merged by:** ${{ github.event.pull_request.merged_by.login }}
+            
+            [View PR](${{ github.event.pull_request.html_url }})
+          color: 0x8957E5
+
+      - name: PR Closed Notification
+        if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == false
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          title: "❌ Pull Request Closed"
+          description: |
+            **#${{ github.event.pull_request.number }}** ${{ github.event.pull_request.title }}
+            
+            [View PR](${{ github.event.pull_request.html_url }})
+          color: 0xDA3633
+
+      # Issue 이벤트 알림
+      - name: Issue Opened Notification
+        if: github.event_name == 'issues' && github.event.action == 'opened'
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          title: "📋 New Issue"
+          description: |
+            **#${{ github.event.issue.number }}** ${{ github.event.issue.title }}
+            **Author:** ${{ github.event.issue.user.login }}
+            
+            [View Issue](${{ github.event.issue.html_url }})
+          color: 0x238636
+
+      - name: Issue Closed Notification
+        if: github.event_name == 'issues' && github.event.action == 'closed'
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          title: "✅ Issue Closed"
+          description: |
+            **#${{ github.event.issue.number }}** ${{ github.event.issue.title }}
+            
+            [View Issue](${{ github.event.issue.html_url }})
+          color: 0x8957E5
+
+      # 브랜치/태그 생성 알림
+      - name: Branch/Tag Created Notification
+        if: github.event_name == 'create'
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          title: "🌱 ${{ github.event.ref_type }} Created"
+          description: |
+            **Name:** `${{ github.event.ref }}`
+            **Created by:** ${{ github.actor }}
+          color: 0x238636
+
+      # 브랜치/태그 삭제 알림
+      - name: Branch/Tag Deleted Notification
+        if: github.event_name == 'delete'
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          title: "🗑️ ${{ github.event.ref_type }} Deleted"
+          description: |
+            **Name:** `${{ github.event.ref }}`
+            **Deleted by:** ${{ github.actor }}
+          color: 0xDA3633
+
+      # 릴리즈 알림
+      - name: Release Notification
+        if: github.event_name == 'release'
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          title: "🎉 New Release: ${{ github.event.release.tag_name }}"
+          description: |
+            **${{ github.event.release.name }}**
+            
+            ${{ github.event.release.body }}
+            
+            [View Release](${{ github.event.release.html_url }})
+          color: 0xF0883E
