@@ -63,6 +63,8 @@ def handler(event):
             return handle_create_magazine(data)
         elif action == "create_moodboard" or action == "generate_moodboard":
             return handle_create_moodboard(data)
+        elif action == "edit_magazine" or action == "chat":
+            return handle_edit_magazine(data)
         elif action == "health":
             return {"status": "healthy", "message": "M:ine AI Serverless is running"}
         else:
@@ -130,6 +132,70 @@ def handle_create_moodboard(data: dict) -> dict:
         
     except Exception as e:
         print(f"❌ Moodboard Error: {e}")
+        print(f"📋 Traceback:\n{traceback.format_exc()}")
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
+
+def handle_edit_magazine(data: dict) -> dict:
+    """
+    Handle magazine editing/chat request.
+    Uses magazine_editor to modify existing magazines based on user instructions.
+    """
+    print("💬 [1/4] Edit magazine handler started")
+    print(f"💬 [1/4] Data received: {data}")
+    
+    try:
+        from app.core.magazine_editor import (
+            analyze_user_intent,
+            regenerate_section,
+            add_new_section,
+            change_overall_tone
+        )
+        print("💬 [2/4] Imports successful")
+        
+        message = data.get("message", "")
+        magazine_data = data.get("magazine_data", {})
+        
+        if not message:
+            return {"error": "message is required"}
+        if not magazine_data:
+            return {"error": "magazine_data is required"}
+        
+        print(f"💬 [3/4] Analyzing intent for: {message[:50]}...")
+        
+        # 1. 사용자 의도 분석
+        intent = analyze_user_intent(message, magazine_data)
+        print(f"💬 [3/4] Intent: {intent}")
+        
+        # 2. 의도에 따른 처리
+        result = None
+        if intent.intent_type == "regenerate_section":
+            result = regenerate_section(
+                magazine_data,
+                intent.target_section_index,
+                intent.instruction
+            )
+        elif intent.intent_type == "add_section":
+            result = add_new_section(magazine_data, intent.instruction)
+        elif intent.intent_type == "change_tone":
+            result = change_overall_tone(magazine_data, intent.instruction)
+        else:
+            # 기본: 전체 톤 변경으로 처리
+            result = change_overall_tone(magazine_data, message)
+        
+        print(f"💬 [4/4] Result: {result is not None}")
+        
+        if not result:
+            return {"error": "Failed to edit magazine"}
+        
+        return {
+            "success": True,
+            "intent": intent.intent_type if intent else "general",
+            "updated_magazine": result
+        }
+        
+    except Exception as e:
+        print(f"❌ Edit Magazine Error: {e}")
         print(f"📋 Traceback:\n{traceback.format_exc()}")
         return {"error": str(e), "traceback": traceback.format_exc()}
 
