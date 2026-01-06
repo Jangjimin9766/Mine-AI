@@ -169,15 +169,15 @@ def handle_edit_magazine(data: dict) -> dict:
         
         # 2. 의도에 따른 처리
         result = None
-        if intent.intent_type == "regenerate_section":
+        if intent.action == "regenerate_section":
             result = regenerate_section(
                 magazine_data,
                 intent.target_section_index,
                 intent.instruction
             )
-        elif intent.intent_type == "add_section":
+        elif intent.action == "add_section":
             result = add_new_section(magazine_data, intent.instruction)
-        elif intent.intent_type == "change_tone":
+        elif intent.action == "change_tone":
             result = change_overall_tone(magazine_data, intent.instruction)
         else:
             # 기본: 전체 톤 변경으로 처리
@@ -190,7 +190,7 @@ def handle_edit_magazine(data: dict) -> dict:
         
         return {
             "success": True,
-            "intent": intent.intent_type if intent else "general",
+            "intent": intent.action if intent else "general",
             "updated_magazine": result
         }
         
