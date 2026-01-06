@@ -69,23 +69,28 @@ def search_with_tavily(query: str):
 def scrape_with_jina(url: str):
     """
     Jina AI Reader를 사용하여 URL의 본문을 마크다운으로 깔끔하게 가져옵니다.
+    실패해도 None을 반환하여 매거진 생성이 계속 진행됩니다.
     """
     print(f"📖 Jina Reading: {url}")
     
     # Jina는 URL 앞에 'https://r.jina.ai/'만 붙이면 됩니다.
     jina_url = f"https://r.jina.ai/{url}"
     
-    headers = {
-        "Authorization": f"Bearer {settings.JINA_API_KEY}" # 키가 없어도 되긴 하는데, 있으면 안정적
-    }
+    # API 키가 있을 때만 Authorization 헤더 추가 (없으면 무인증으로 시도)
+    headers = {}
+    if settings.JINA_API_KEY:
+        headers["Authorization"] = f"Bearer {settings.JINA_API_KEY}"
+    else:
+        print("⚠️ JINA_API_KEY not set, trying without auth...")
     
     try:
         response = requests.get(jina_url, headers=headers, timeout=10)
         if response.status_code == 200:
-            return response.text # 깔끔한 마크다운 텍스트 반환
+            print("✅ Jina read successful")
+            return response.text  # 깔끔한 마크다운 텍스트 반환
         else:
-            print(f"⚠️ Jina request failed with status: {response.status_code}")
+            print(f"⚠️ Jina request failed with status: {response.status_code}, continuing without deep content")
             return None
     except Exception as e:
-        print(f"❌ Jina Error: {e}")
+        print(f"⚠️ Jina Error: {e}, continuing without deep content")
         return None
