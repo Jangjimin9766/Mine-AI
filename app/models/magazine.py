@@ -7,10 +7,12 @@ class MoodboardResponse(BaseModel):
 
 class MagazineSection(BaseModel):
     heading: str            # 소제목
-    content: str            # 본문 내용
+    content: str            # 본문 내용 (HTML 태그 포함 가능)
     image_url: Optional[str] = None # 들어갈 이미지 URL (없을 수도 있음)
     layout_type: str = "basic" # 프론트엔드 렌더링 힌트 (예: 'hero', 'quote', 'split_left', 'split_right')
+    layout_hint: Optional[str] = None # 추가 레이아웃 힌트 (예: 'image_left', 'full_width')
     caption: Optional[str] = None # 이미지 캡션 (선택)
+    display_order: Optional[int] = None # 그리드 내 표시 순서
 
 class Magazine(BaseModel):
     title: str              # 매거진 전체 제목

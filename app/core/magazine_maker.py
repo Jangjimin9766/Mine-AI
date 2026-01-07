@@ -1,13 +1,14 @@
 from app.core.llm_client import llm_client
 import json
 from app.core.searcher import search_with_tavily, scrape_with_jina
-from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V2
+from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V3
 
-def generate_magazine_content(topic: str, user_interests: list = None):
+def generate_magazine_content(topic: str, user_interests: list = None, user_mood: str = None):
     print(f"🎨 Magazine Editor started for: {topic}")
     
     # Build sophisticated interest context
     interest_context = ""
+    mood_context = ""
     tone_guidance = "clear, informative, and sophisticated"
     
     if user_interests and len(user_interests) > 0:
@@ -27,6 +28,18 @@ Connect the topic to their interests when relevant, but keep it natural and info
         elif any(interest.lower() in ['travel', 'food', 'lifestyle'] for interest in user_interests):
             tone_guidance = "experiential, detailed, and informative"
 
+    # Build user mood context
+    if user_mood:
+        mood_context = f"""
+[User Mood]
+The user wants a '{user_mood}' style. Adjust your tone accordingly:
+- If 'Classic': Write elegantly and timelessly.
+- If 'Fun': Write wittily and energetically.
+- If 'Minimal': Write concisely with clean aesthetics.
+- If 'Bold': Write with strong statements and impact.
+"""
+        print(f"🎭 User mood: {user_mood}")
+
     # 1. [취재] Tavily로 정보와 이미지 수집
     search_results, images = search_with_tavily(topic)
     
@@ -37,20 +50,13 @@ Connect the topic to their interests when relevant, but keep it natural and info
         if not deep_content:
             deep_content = search_results[0]['content']
 
-    # 3. [편집] LLM에게 매거진 작성 요청 (V2 프롬프트 적용)
-    # JSON 포맷팅 이슈를 방지하기 위해 format() 호출 제거 (프롬프트 내에 {}가 많음)
-    system_prompt = MAGAZINE_SYSTEM_PROMPT_V2
-    
-    # 만약 톤 가이던스를 꼭 넣고 싶다면, 프롬프트 내에 명시적인 placeholder를 두고 replace를 사용해야 함.
-    # 하지만 현재 프롬프트는 그 자체로 충분하므로 패스.
-    
-    # 만약 프롬프트에 format 인자가 없다면 그냥 사용 (안전장치)
-    if "{" in MAGAZINE_SYSTEM_PROMPT_V2 and "tone_guidance" not in MAGAZINE_SYSTEM_PROMPT_V2:
-         system_prompt = MAGAZINE_SYSTEM_PROMPT_V2
+    # 3. [편집] LLM에게 매거진 작성 요청 (V3 프롬프트 - 독립 콘텐츠 카드 + HTML 태그)
+    system_prompt = MAGAZINE_SYSTEM_PROMPT_V3
 
     user_prompt = f"""
     Topic: {topic}
     {interest_context}
+    {mood_context}
     
     [Research Material]
     {deep_content[:3000]}
@@ -60,6 +66,7 @@ Connect the topic to their interests when relevant, but keep it natural and info
     
     Create a magazine article that delivers CLEAR, USEFUL INFORMATION in a sophisticated, refined style.
     Think premium magazine, not poetry book.
+    Generate at least 4 sections with variety in layout_type.
     """
 
     print(f"🧠 AI Crafting V2 magazine with CoT (Thinking...)...")
@@ -87,11 +94,16 @@ Connect the topic to their interests when relevant, but keep it natural and info
         result_json['cover_image_url'] = images[0]
         print(f"⚠️ Fixed cover_image_url to: {images[0]}")
     
-    # 섹션 이미지 검증
+    # 섹션 이미지 검증 및 display_order 추가
     for i, section in enumerate(result_json.get('sections', [])):
         if not section.get('image_url') or not section['image_url'].startswith('http'):
             section['image_url'] = images[min(i + 1, len(images) - 1)]
             print(f"⚠️ Fixed section {i} image_url to: {section['image_url']}")
+        # display_order 자동 부여 (그리드 순서)
+        section['display_order'] = i
+        # layout_hint 기본값 설정
+        if not section.get('layout_hint'):
+            section['layout_hint'] = 'image_left'
 
     # 4. [부록] 매거진과 1:1 매칭되는 무드보드 생성 (Local SDXL)
     from app.core.moodboard_maker import generate_moodboard

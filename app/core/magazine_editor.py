@@ -232,3 +232,111 @@ def change_overall_tone(magazine_data: dict, instruction: str) -> list:
         new_sections.append(new_section)
     
     return new_sections
+
+
+# ==========================================
+# 섹션 레벨 편집 (Section-Level Editing)
+# ==========================================
+
+def edit_section_content(section_data: dict, message: str) -> dict:
+    """
+    섹션 레벨 상호작용: 특정 섹션의 본문만 수정
+    Spring의 edit_section action에서 호출됨
+    
+    Args:
+        section_data: 현재 섹션 데이터 (heading, content, image_url, layout_hint, layout_type, caption)
+        message: 사용자 수정 요청 (예: "더 감성적으로 바꿔줘")
+    
+    Returns:
+        Spring이 기대하는 형식의 응답:
+        {
+            "intent": "edit_content",
+            "success": True,
+            "updated_section": { heading, content, image_url, layout_hint, layout_type, caption }
+        }
+    """
+    from app.core.llm_client import llm_client
+    from app.core.prompts import SECTION_EDIT_PROMPT
+    
+    # 원본 이미지 URL 보존
+    original_image_url = section_data.get('image_url', '')
+    original_layout_hint = section_data.get('layout_hint', 'image_left')
+    original_layout_type = section_data.get('layout_type', 'basic')
+    
+    system_prompt = SECTION_EDIT_PROMPT
+    
+    user_prompt = f"""
+    Current section data:
+    - Heading: {section_data.get('heading', '')}
+    - Content: {section_data.get('content', '')}
+    - Image URL: {original_image_url}
+    - Layout Type: {original_layout_type}
+    - Layout Hint: {original_layout_hint}
+    - Caption: {section_data.get('caption', '')}
+    
+    User request: {message}
+    
+    Modify this section according to the user's request.
+    CRITICAL: Use this EXACT image_url in your response: {original_image_url}
+    """
+    
+    try:
+        result = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+        
+        # 이미지 URL 강제 보존 (LLM이 변경하더라도)
+        result['image_url'] = original_image_url
+        
+        # layout_hint, layout_type 기본값 보장
+        if not result.get('layout_hint'):
+            result['layout_hint'] = original_layout_hint
+        if not result.get('layout_type'):
+            result['layout_type'] = original_layout_type
+        
+        return {
+            "intent": "edit_content",
+            "success": True,
+            "updated_section": {
+                "heading": result.get('heading', section_data.get('heading', '')),
+                "content": result.get('content', section_data.get('content', '')),
+                "image_url": result.get('image_url'),
+                "layout_hint": result.get('layout_hint'),
+                "layout_type": result.get('layout_type'),
+                "caption": result.get('caption', section_data.get('caption'))
+            }
+        }
+    except Exception as e:
+        print(f"❌ edit_section_content error: {e}")
+        return {
+            "intent": "edit_content",
+            "success": False,
+            "error": str(e),
+            "updated_section": None
+        }
+
+
+def delete_section(magazine_data: dict, section_index: int) -> dict:
+    """
+    매거진 레벨: 섹션 삭제
+    
+    Returns:
+        {
+            "intent": "delete_section",
+            "success": True,
+            "section_index": 2
+        }
+    """
+    sections = magazine_data.get('sections', [])
+    
+    if section_index < 0 or section_index >= len(sections):
+        return {
+            "intent": "delete_section",
+            "success": False,
+            "error": f"Invalid section index: {section_index}"
+        }
+    
+    return {
+        "intent": "delete_section",
+        "success": True,
+        "section_index": section_index
+    }
+

@@ -65,6 +65,8 @@ def handler(event):
             return handle_create_moodboard(data)
         elif action == "edit_magazine" or action == "chat":
             return handle_edit_magazine(data)
+        elif action == "edit_section":
+            return handle_edit_section(data)
         elif action == "health":
             return {"status": "healthy", "message": "M:ine AI Serverless is running"}
         else:
@@ -84,15 +86,19 @@ def handle_create_magazine(data: dict) -> dict:
     
     topic = data.get("topic")
     user_interests = data.get("user_interests", [])
+    user_mood = data.get("user_mood")
     
     if not topic:
         return {"error": "topic is required"}
     
     print(f"📰 Creating magazine for topic: {topic}")
+    if user_mood:
+        print(f"🎭 User mood: {user_mood}")
     
     result = generate_magazine_content(
         topic=topic,
-        user_interests=user_interests
+        user_interests=user_interests,
+        user_mood=user_mood
     )
     
     if not result:
@@ -198,6 +204,70 @@ def handle_edit_magazine(data: dict) -> dict:
         print(f"❌ Edit Magazine Error: {e}")
         print(f"📋 Traceback:\n{traceback.format_exc()}")
         return {"error": str(e), "traceback": traceback.format_exc()}
+
+
+def handle_edit_section(data: dict) -> dict:
+    """
+    Handle section-level editing request.
+    Spring sends this via POST /api/magazines/{magazineId}/sections/{sectionId}/interact
+    
+    Expected data format:
+    {
+        "magazine_id": 1,
+        "section_id": 101,
+        "section_data": {
+            "id": 101,
+            "heading": "...",
+            "content": "<p>...</p>",
+            "image_url": "...",
+            "layout_hint": "...",
+            "layout_type": "...",
+            "caption": "..."
+        },
+        "message": "이 내용 좀 더 감성적으로 바꿔줘"
+    }
+    
+    Returns (Spring-compatible):
+    {
+        "intent": "edit_content",
+        "success": True,
+        "updated_section": { ... }
+    }
+    """
+    print("✏️ [1/3] Edit section handler started")
+    print(f"✏️ [1/3] Data received: {data}")
+    
+    try:
+        from app.core.magazine_editor import edit_section_content
+        print("✏️ [2/3] Import successful")
+        
+        section_data = data.get("section_data", {})
+        message = data.get("message", "")
+        
+        if not section_data:
+            return {"error": "section_data is required", "success": False}
+        if not message:
+            return {"error": "message is required", "success": False}
+        
+        print(f"✏️ [2/3] Editing section: {section_data.get('heading', 'N/A')[:30]}")
+        print(f"✏️ [2/3] User request: {message[:50]}...")
+        
+        # 섹션 레벨 편집 수행
+        result = edit_section_content(section_data, message)
+        
+        print(f"✏️ [3/3] Result success: {result.get('success', False)}")
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Edit Section Error: {e}")
+        print(f"📋 Traceback:\n{traceback.format_exc()}")
+        return {
+            "intent": "edit_content",
+            "success": False,
+            "error": str(e),
+            "updated_section": None
+        }
 
 
 # Start the RunPod serverless worker
