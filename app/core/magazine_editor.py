@@ -238,6 +238,23 @@ def change_overall_tone(magazine_data: dict, instruction: str) -> list:
 # 섹션 레벨 편집 (Section-Level Editing)
 # ==========================================
 
+def strip_markdown_codeblocks(content: str) -> str:
+    """
+    LLM 출력에서 마크다운 코드블럭을 제거합니다.
+    예: ```html\n<p>내용</p>\n``` → <p>내용</p>
+    """
+    import re
+    
+    # ```html ... ``` 또는 ``` ... ``` 패턴 제거
+    pattern = r'```(?:html|HTML)?\s*([\s\S]*?)\s*```'
+    match = re.search(pattern, content)
+    if match:
+        return match.group(1).strip()
+    
+    # 코드블럭이 없으면 그대로 반환
+    return content.strip()
+
+
 def edit_section_content(section_data: dict, message: str) -> dict:
     """
     섹션 레벨 상호작용: 의도 분류 기반 섹션 수정
@@ -287,13 +304,26 @@ def edit_section_content(section_data: dict, message: str) -> dict:
         new_heading = original_heading
         
         if intent == 'APPEND_CONTENT':
+            # 이미지 검색 (Tavily 사용)
+            from app.core.searcher import search_with_tavily
+            import json
+            
+            print(f"🔍 Searching images for: {message[:30]}...")
+            try:
+                _, images = search_with_tavily(message)
+                available_images = json.dumps(images[:5], ensure_ascii=False) if images else "[]"
+            except Exception as e:
+                print(f"⚠️ Image search failed: {e}")
+                available_images = "[]"
+            
             # 기존 내용 유지 + 새 내용 추가
             append_prompt = APPEND_CONTENT_PROMPT.format(
                 existing_content=original_content,
-                message=message
+                message=message,
+                available_images=available_images
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only.",
+                "You are a magazine editor. Output HTML content only. Include images using <img> tags.",
                 append_prompt,
                 temperature=0.7
             )
@@ -347,17 +377,32 @@ def edit_section_content(section_data: dict, message: str) -> dict:
                 
         else:
             # 기본: APPEND_CONTENT와 동일하게 처리
+            from app.core.searcher import search_with_tavily
+            import json
+            
+            print(f"🔍 Searching images for: {message[:30]}...")
+            try:
+                _, images = search_with_tavily(message)
+                available_images = json.dumps(images[:5], ensure_ascii=False) if images else "[]"
+            except Exception as e:
+                print(f"⚠️ Image search failed: {e}")
+                available_images = "[]"
+            
             append_prompt = APPEND_CONTENT_PROMPT.format(
                 existing_content=original_content,
-                message=message
+                message=message,
+                available_images=available_images
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only.",
+                "You are a magazine editor. Output HTML content only. Include images using <img> tags.",
                 append_prompt,
                 temperature=0.7
             )
         
         print(f"✏️ [3/3] Content updated successfully")
+        
+        # 마크다운 코드블럭 제거 (LLM이 ```html ... ``` 형태로 출력하는 경우)
+        new_content = strip_markdown_codeblocks(new_content)
         
         # 결과 반환 (Spring 형식)
         return {
