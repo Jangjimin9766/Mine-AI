@@ -240,74 +240,146 @@ def change_overall_tone(magazine_data: dict, instruction: str) -> list:
 
 def edit_section_content(section_data: dict, message: str) -> dict:
     """
-    섹션 레벨 상호작용: 특정 섹션의 본문만 수정
-    Spring의 edit_section action에서 호출됨
+    섹션 레벨 상호작용: 의도 분류 기반 섹션 수정
+    
+    Step 1: 사용자 의도 분류 (APPEND_CONTENT, CHANGE_TONE, FULL_REWRITE 등)
+    Step 2: 의도에 따른 적절한 처리 (기존 콘텐츠 보존 기본)
     
     Args:
-        section_data: 현재 섹션 데이터 (heading, content, image_url, layout_hint, layout_type, caption)
-        message: 사용자 수정 요청 (예: "더 감성적으로 바꿔줘")
+        section_data: 현재 섹션 데이터
+        message: 사용자 수정 요청
     
     Returns:
-        Spring이 기대하는 형식의 응답:
-        {
-            "intent": "edit_content",
-            "success": True,
-            "updated_section": { heading, content, image_url, layout_hint, layout_type, caption }
-        }
+        Spring이 기대하는 형식의 응답
     """
     from app.core.llm_client import llm_client
-    from app.core.prompts import SECTION_EDIT_PROMPT
+    from app.core.prompts import (
+        INTENT_CLASSIFICATION_PROMPT,
+        APPEND_CONTENT_PROMPT,
+        CHANGE_TONE_PROMPT,
+        FULL_REWRITE_PROMPT,
+        SECTION_EDIT_PROMPT
+    )
     
-    # 원본 이미지 URL 보존
+    # 원본 데이터 보존
+    original_heading = section_data.get('heading', '')
+    original_content = section_data.get('content', '')
     original_image_url = section_data.get('image_url', '')
     original_layout_hint = section_data.get('layout_hint', 'image_left')
     original_layout_type = section_data.get('layout_type', 'basic')
-    
-    system_prompt = SECTION_EDIT_PROMPT
-    
-    user_prompt = f"""
-    Current section data:
-    - Heading: {section_data.get('heading', '')}
-    - Content: {section_data.get('content', '')}
-    - Image URL: {original_image_url}
-    - Layout Type: {original_layout_type}
-    - Layout Hint: {original_layout_hint}
-    - Caption: {section_data.get('caption', '')}
-    
-    User request: {message}
-    
-    Modify this section according to the user's request.
-    CRITICAL: Use this EXACT image_url in your response: {original_image_url}
-    """
+    original_caption = section_data.get('caption', '')
     
     try:
-        result = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+        # Step 1: 의도 분류
+        print(f"✏️ [1/3] Classifying intent for: {message[:50]}...")
+        intent_prompt = INTENT_CLASSIFICATION_PROMPT.format(message=message)
+        intent_result = llm_client.generate_json(
+            "You are an intent classifier. Output valid JSON only.",
+            intent_prompt,
+            temperature=0.3
+        )
         
-        # 이미지 URL 강제 보존 (LLM이 변경하더라도)
-        result['image_url'] = original_image_url
+        intent = intent_result.get('intent', 'APPEND_CONTENT')
+        print(f"✏️ [2/3] Detected intent: {intent}")
         
-        # layout_hint, layout_type 기본값 보장
-        if not result.get('layout_hint'):
-            result['layout_hint'] = original_layout_hint
-        if not result.get('layout_type'):
-            result['layout_type'] = original_layout_type
+        # Step 2: 의도별 처리
+        new_content = original_content
+        new_heading = original_heading
         
+        if intent == 'APPEND_CONTENT':
+            # 기존 내용 유지 + 새 내용 추가
+            append_prompt = APPEND_CONTENT_PROMPT.format(
+                existing_content=original_content,
+                message=message
+            )
+            new_content = llm_client.generate_text(
+                "You are a magazine editor. Output HTML content only.",
+                append_prompt,
+                temperature=0.7
+            )
+            
+        elif intent == 'CHANGE_TONE':
+            # 정보 유지 + 톤만 변경
+            tone_prompt = CHANGE_TONE_PROMPT.format(
+                existing_content=original_content,
+                message=message
+            )
+            new_content = llm_client.generate_text(
+                "You are a magazine editor. Output HTML content only.",
+                tone_prompt,
+                temperature=0.7
+            )
+            
+        elif intent == 'FULL_REWRITE':
+            # 전체 재작성 (명시적 요청 시에만)
+            rewrite_prompt = FULL_REWRITE_PROMPT.format(
+                heading=original_heading,
+                message=message
+            )
+            new_content = llm_client.generate_text(
+                "You are a magazine editor. Output HTML content only.",
+                rewrite_prompt,
+                temperature=0.7
+            )
+            
+        elif intent == 'CHANGE_HEADING':
+            # 제목만 변경
+            heading_result = llm_client.generate_json(
+                "Generate a new heading based on the request. Output JSON: {\"heading\": \"새 제목\"}",
+                f"현재 제목: {original_heading}\n요청: {message}",
+                temperature=0.7
+            )
+            new_heading = heading_result.get('heading', original_heading)
+            
+        elif intent == 'DELETE_PARAGRAPH':
+            # 문단 삭제 (BeautifulSoup 사용)
+            try:
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(original_content, 'html.parser')
+                paragraphs = soup.find_all(['p', 'h3', 'ul', 'ol'])
+                target_idx = intent_result.get('target_paragraph', -1)
+                if target_idx is not None and 0 <= target_idx < len(paragraphs):
+                    paragraphs[target_idx].decompose()
+                new_content = str(soup)
+            except ImportError:
+                # BeautifulSoup 없으면 fallback
+                new_content = original_content
+                
+        else:
+            # 기본: APPEND_CONTENT와 동일하게 처리
+            append_prompt = APPEND_CONTENT_PROMPT.format(
+                existing_content=original_content,
+                message=message
+            )
+            new_content = llm_client.generate_text(
+                "You are a magazine editor. Output HTML content only.",
+                append_prompt,
+                temperature=0.7
+            )
+        
+        print(f"✏️ [3/3] Content updated successfully")
+        
+        # 결과 반환 (Spring 형식)
         return {
-            "intent": "edit_content",
+            "intent": intent.lower(),
             "success": True,
             "updated_section": {
-                "heading": result.get('heading', section_data.get('heading', '')),
-                "content": result.get('content', section_data.get('content', '')),
-                "image_url": result.get('image_url'),
-                "layout_hint": result.get('layout_hint'),
-                "layout_type": result.get('layout_type'),
-                "caption": result.get('caption', section_data.get('caption'))
+                "id": section_data.get('id'),
+                "heading": new_heading,
+                "content": new_content,
+                "image_url": original_image_url,  # 항상 보존
+                "layout_hint": original_layout_hint,
+                "layout_type": original_layout_type,
+                "caption": original_caption
             }
         }
+        
     except Exception as e:
         print(f"❌ edit_section_content error: {e}")
+        import traceback
+        print(traceback.format_exc())
         return {
-            "intent": "edit_content",
+            "intent": "modify_content",
             "success": False,
             "error": str(e),
             "updated_section": None

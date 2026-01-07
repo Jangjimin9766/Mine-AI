@@ -175,35 +175,55 @@ def handle_edit_magazine(data: dict) -> dict:
         
         # 2. 의도에 따른 처리
         result = None
+        new_sections = []
+        deleted_section_ids = []
+        
         if intent.action == "regenerate_section":
             result = regenerate_section(
                 magazine_data,
                 intent.target_section_index,
                 intent.instruction
             )
+            new_sections = [result] if result else []
         elif intent.action == "add_section":
             result = add_new_section(magazine_data, intent.instruction)
+            new_sections = [result] if result else []
+        elif intent.action == "delete_section":
+            # 삭제 대상 섹션 ID 추출
+            if intent.target_section_index is not None:
+                sections = magazine_data.get('sections', [])
+                if 0 <= intent.target_section_index < len(sections):
+                    deleted_section_ids = [sections[intent.target_section_index].get('id')]
         elif intent.action == "change_tone":
             result = change_overall_tone(magazine_data, intent.instruction)
+            new_sections = result if isinstance(result, list) else []
         else:
             # 기본: 전체 톤 변경으로 처리
             result = change_overall_tone(magazine_data, message)
+            new_sections = result if isinstance(result, list) else []
         
-        print(f"💬 [4/4] Result: {result is not None}")
+        print(f"💬 [4/4] Result: {result is not None or len(deleted_section_ids) > 0}")
         
-        if not result:
-            return {"error": "Failed to edit magazine"}
-        
+        # Spring이 기대하는 응답 형식
         return {
+            "intent": intent.action if intent else "no_change",
             "success": True,
-            "intent": intent.action if intent else "general",
-            "updated_magazine": result
+            "updated_magazine": {
+                "heading": intent.response_message if intent else "수정이 완료되었습니다",
+                "new_sections": new_sections,
+                "deleted_section_ids": deleted_section_ids
+            }
         }
         
     except Exception as e:
         print(f"❌ Edit Magazine Error: {e}")
         print(f"📋 Traceback:\n{traceback.format_exc()}")
-        return {"error": str(e), "traceback": traceback.format_exc()}
+        return {
+            "intent": "no_change",
+            "success": False,
+            "error": str(e),
+            "updated_magazine": None
+        }
 
 
 def handle_edit_section(data: dict) -> dict:

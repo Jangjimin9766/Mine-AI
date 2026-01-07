@@ -131,6 +131,91 @@ Output ONLY valid JSON. No markdown code blocks.
 # 섹션 레벨 편집 프롬프트
 # ==========================================
 
+# Step 1: 의도 분류 프롬프트
+INTENT_CLASSIFICATION_PROMPT = """
+당신은 사용자 요청의 의도를 분류하는 AI입니다.
+아래 의도 중 가장 적합한 것을 선택하세요:
+
+- APPEND_CONTENT: 새로운 내용을 추가 (질문에 답변, 정보 추가)
+- MODIFY_PARAGRAPH: 특정 문단 수정 (N번째, 마지막 등)
+- DELETE_PARAGRAPH: 특정 문단 삭제
+- CHANGE_TONE: 톤/분위기 변경 (감성적, 전문적, 캐주얼 등)
+- CHANGE_HEADING: 제목만 변경
+- CHANGE_IMAGE: 이미지 변경 요청
+- FULL_REWRITE: 전체 다시 작성 ("처음부터", "다시 써줘" 등 명시적 표현)
+
+중요: 질문 형태의 요청("~뭐가 있어?", "~어때?", "~추천해줘")은 APPEND_CONTENT입니다.
+중요: "바꿔줘"가 포함되어도 톤/분위기 관련이면 CHANGE_TONE입니다.
+중요: FULL_REWRITE는 "처음부터", "완전히 새로", "다 지우고" 같은 명시적 표현이 있을 때만 선택합니다.
+
+사용자 요청: {message}
+
+JSON 형식으로 답변하세요:
+{{
+  "intent": "선택한_의도",
+  "target_paragraph": null,
+  "confidence": 0.9
+}}
+"""
+
+# Step 2-1: 내용 추가 프롬프트 (APPEND_CONTENT)
+APPEND_CONTENT_PROMPT = """
+당신은 매거진 섹션 편집 AI입니다.
+사용자의 요청에 맞는 새로운 내용을 기존 콘텐츠 뒤에 추가하세요.
+
+현재 섹션 내용:
+{existing_content}
+
+사용자 요청: {message}
+
+규칙:
+1. 기존 내용을 그대로 유지하세요.
+2. 요청에 맞는 새로운 문단을 기존 내용 뒤에 추가하세요.
+3. HTML 태그를 사용하세요: <p>, <h3>, <strong>, <ul><li>
+4. 새로 추가하는 부분에는 적절한 소제목(<h3>)을 붙이세요.
+5. 한국어로 작성하세요.
+
+출력: 기존 내용 + 새로 추가된 내용 (전체 HTML)
+"""
+
+# Step 2-2: 톤 변경 프롬프트 (CHANGE_TONE)
+CHANGE_TONE_PROMPT = """
+현재 섹션 내용:
+{existing_content}
+
+사용자가 원하는 톤: {message}
+
+규칙:
+1. 내용의 핵심 정보는 모두 유지하세요.
+2. 문장 표현과 어조만 변경하세요.
+3. 문단 구조(개수, 순서)를 유지하세요.
+4. HTML 태그 구조를 유지하세요.
+
+톤 가이드:
+- "감성적으로": 은유, 비유, 감정 표현 추가
+- "전문적으로": 객관적, 데이터 중심, 격식체
+- "캐주얼하게": 구어체, 친근한 표현
+- "짧게": 핵심만 남기고 압축
+- "길게": 부연 설명, 예시 추가
+
+출력: 톤이 변경된 전체 HTML 콘텐츠
+"""
+
+# Step 2-3: 전체 재작성 프롬프트 (FULL_REWRITE)
+FULL_REWRITE_PROMPT = """
+현재 섹션 제목: {heading}
+사용자 요청: {message}
+
+규칙:
+1. 전체 내용을 새로 작성하세요.
+2. Content length: 500-1500 characters (Korean)
+3. HTML 태그 사용: <p>, <h3>, <blockquote>, <strong>, <ul><li>
+4. 정보가 풍부하고 구체적으로 작성하세요.
+
+출력: 완전히 새로운 HTML 콘텐츠
+"""
+
+# Legacy prompt (for backward compatibility)
 SECTION_EDIT_PROMPT = """
 You are editing a SINGLE section of a M:ine magazine.
 Modify the content based on the user's instruction while maintaining quality.
@@ -141,6 +226,7 @@ Modify the content based on the user's instruction while maintaining quality.
 3. Content length: 500-1500 characters (Korean)
 4. Use HTML tags: <p>, <h3>, <blockquote>, <strong>, <ul><li>, <br>
 5. Maintain or improve the sophisticated tone
+6. PRESERVE existing content and ADD to it (don't replace unless explicitly asked)
 
 [OUTPUT JSON]
 {
@@ -155,7 +241,8 @@ Modify the content based on the user's instruction while maintaining quality.
 [CRITICAL]
 - NEVER change image_url
 - ALWAYS output valid HTML content
-- FOCUS on user's instruction
+- PRESERVE existing content by default
+- Only do FULL rewrite if user explicitly says "처음부터", "다시 써줘"
 """
 
 SECTION_REGENERATE_PROMPT = """
@@ -184,4 +271,5 @@ User Instruction: {instruction}
     "caption": null
 }
 """
+
 
