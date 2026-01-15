@@ -16,6 +16,9 @@ accelerate          # Model acceleration
 torch==2.1.0        # PyTorch (pinned for compatibility)
 huggingface_hub==0.21.0  # Pinned for diffusers compatibility
 
+# --- Logging ---
+logtail-python      # Better Stack (Logtail) logging
+
 # --- Testing ---
 pytest              # Testing framework
 httpx               # Async HTTP client for testing
