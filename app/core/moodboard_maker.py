@@ -81,12 +81,15 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
     print(f"✨ SDXL Prompt: {sd_prompt}")
 
     if not sd_prompt:
+        print("❌ Failed to generate prompt from LLM")
         return None
 
     # 2. Generate Image (Local SDXL)
+    print(f"⏳ Generating image with SDXL...")
     image_url = local_diffusion_client.generate_image(sd_prompt)
     
     if not image_url:
+        print("❌ Failed to generate image from Local SDXL")
         return None
         
     print(f"✅ Moodboard Generated (Data URI)")

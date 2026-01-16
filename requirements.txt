@@ -4,17 +4,18 @@ uvicorn[standard]   # ASGI 서버
 
 # --- AI & Data ---
 openai              # OpenAI API (또는 google-generativeai)
+google-generativeai # Google Gemini API
 beautifulsoup4      # HTML 파싱 (크롤링)
 requests            # HTTP 요청 (크롤링)
 tavily-python
 # --- Config ---
 python-dotenv       # .env 파일 로드용
 pydantic-settings   # 설정 관리
-diffusers==0.25.0   # Stable Diffusion (pinned for compatibility)
+diffusers>=0.29.0   # Updated for compatibility with newer huggingface_hub
 transformers        # Hugging Face Transformers
 accelerate          # Model acceleration
-torch==2.1.0        # PyTorch (pinned for compatibility)
-huggingface_hub==0.21.0  # Pinned for diffusers compatibility
+torch>=2.4.0        # PyTorch (relaxed for Python 3.13 compatibility)
+huggingface_hub>=0.24.0  # Newer version without cached_download
 
 # --- Logging ---
 logtail-python      # Better Stack (Logtail) logging

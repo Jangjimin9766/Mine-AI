@@ -66,6 +66,8 @@ class LocalDiffusionClient:
             
             print(f"⏳ Loading Stable Diffusion XL model to {device.upper()} (This may take a while on first run)...")
             try:
+                # 무조건 이미 다운로드된 5GB fp16 파일을 읽어오도록 설정
+                # (CPU에서도 읽기는 가능하며, 실행 직전에 float32로 변환하여 호환성을 확보함)
                 self.pipe = DiffusionPipeline.from_pretrained(
                     self.model_id,
                     torch_dtype=torch.float16,
@@ -73,7 +75,9 @@ class LocalDiffusionClient:
                     variant="fp16"
                 )
                 
-                self.pipe.to(device)
+                # CPU라면 float16 연산이 불가능하므로 float32로 변환하여 이동
+                target_dtype = torch.float32 if device == "cpu" else torch.float16
+                self.pipe.to(device=device, dtype=target_dtype)
                 
                 # Optional: Memory optimization
                 # self.pipe.enable_attention_slicing()
@@ -97,7 +101,7 @@ class LocalDiffusionClient:
             print(f"🎨 Generating image locally with prompt: {prompt[:50]}...")
             
             # Generate
-            image = self.pipe(prompt=prompt, num_inference_steps=30).images[0]
+            image = self.pipe(prompt=prompt, num_inference_steps=10).images[0]
             
             # Convert to Base64
             buffered = BytesIO()

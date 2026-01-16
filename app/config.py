@@ -10,7 +10,8 @@ class Settings(BaseSettings):
         extra='ignore'
     )
 
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str = "" # [변경] Gemini로 전환하면서 선택사항으로 변경
+    GEMINI_API_KEY: str      # [추가] Gemini API 키
     SPRING_API_URL: str = "http://localhost:8080"
     
     # 검색용 키 추가
