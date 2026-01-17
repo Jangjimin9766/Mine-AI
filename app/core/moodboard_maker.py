@@ -38,24 +38,39 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     ]
     random_variation = random.choice(variations)
 
+    # 태그에서 실제 주제 키워드 추출 (스타일보다 주제 우선)
+    topic_keywords = []
+    if topic:
+        topic_keywords.append(topic)
+    if magazine_tags:
+        topic_keywords.extend(magazine_tags)
+    
+    topic_emphasis = ", ".join(topic_keywords) if topic_keywords else "general lifestyle"
+
     system_prompt = f"""
-    You are an expert Art Director specializing in UI/UX and Interior Design.
-    Your task is to create a prompt for a 'Background Moodboard' image (Wallpaper) for Stable Diffusion XL.
+    You are an expert Art Director creating prompts for Stable Diffusion XL.
+    Your task is to create a 'Background Moodboard' image prompt.
+    
+    [CRITICAL - MUST INCLUDE THESE TOPICS]
+    The image MUST visually represent: {topic_emphasis}
+    - If the topic is about food/cookies/cafe → include food photography elements
+    - If the topic is about fashion → include fashion/clothing elements  
+    - If the topic is about travel/places → include location-specific elements
+    - DO NOT ignore the actual topic and only add abstract style words!
     
     [DESIGN GOALS]
-    1. **Role**: This image will be used as a BACKGROUND for a user profile or app interface.
-    2. **Aesthetic**: Atmospheric, textural, abstract, or scenic. NOT cluttered.
-    3. **Vibe**: Sophisticated, premium, 'Kinfolk' or 'Architectural Digest' style.
-    4. **Variation**: {random_variation}
+    1. **Role**: Background for app interface, but MUST reflect the topic visually.
+    2. **Aesthetic**: Clean, atmospheric, professional product/lifestyle photography style.
+    3. **Variation**: {random_variation}
     
     [PROMPT FORMAT]
-    - Stable Diffusion works best with comma-separated keywords.
-    - Start with the main subject/vibe.
-    - Add style modifiers (e.g., "cinematic lighting", "8k", "unreal engine", "minimalist").
-    - Add negative prompt keywords implicitly by focusing on what TO include (clean, open space).
+    - Start with the ACTUAL SUBJECT (cookies, food, cafe, fashion item, etc.)
+    - Then add photography style (food photography, flatlay, product shot, etc.)
+    - Then add lighting/quality modifiers (soft lighting, 8k, professional)
     
     Output ONLY the English prompt.
-    Example: "abstract geometric shapes, soft pastel colors, minimalist, high quality, 8k, cinematic lighting, wallpaper, texture"
+    Example for cookies/cafe: "gourmet chewy cookies on marble surface, warm cafe aesthetic, food photography, soft natural lighting, cozy atmosphere, 8k, professional"
+    Example for fashion: "luxury handbag flatlay, fashion editorial, minimalist, soft shadows, high-end product photography, 8k"
     """
 
     user_prompt = f"""
