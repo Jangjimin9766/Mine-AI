@@ -53,44 +53,70 @@ class LocalDiffusionClient:
     def __init__(self):
         self.pipe = None
         self.model_id = "stabilityai/stable-diffusion-xl-base-1.0"
+        self.device = None
+        self._load_attempted = False
+        self._load_error = None
         # Lazy loading: 모델은 처음 요청이 들어올 때 로드합니다. (서버 시작 시간 단축)
 
-    def _load_model(self):
-        if self.pipe is None:
-            # Device selection logic
-            device = "cpu"
-            if torch.cuda.is_available():
-                device = "cuda"
-            elif torch.backends.mps.is_available():
-                device = "mps"
+    def _load_model(self) -> bool:
+        """모델 로드. 성공 시 True, 실패 시 False 반환."""
+        # 이미 로드 시도했으면 재시도 안 함 (에러 반복 방지)
+        if self._load_attempted:
+            return self.pipe is not None
+        
+        self._load_attempted = True
+        
+        # Device selection logic
+        self.device = "cpu"
+        if torch.cuda.is_available():
+            self.device = "cuda"
+        elif torch.backends.mps.is_available():
+            self.device = "mps"
+        
+        print(f"⏳ Loading Stable Diffusion XL model to {self.device.upper()} (This may take a while on first run)...")
+        try:
+            self.pipe = DiffusionPipeline.from_pretrained(
+                self.model_id,
+                torch_dtype=torch.float16,
+                use_safetensors=True,
+                variant="fp16"
+            )
             
-            print(f"⏳ Loading Stable Diffusion XL model to {device.upper()} (This may take a while on first run)...")
-            try:
-                self.pipe = DiffusionPipeline.from_pretrained(
-                    self.model_id,
-                    torch_dtype=torch.float16,
-                    use_safetensors=True,
-                    variant="fp16"
-                )
-                
-                self.pipe.to(device)
-                
-                # Optional: Memory optimization
-                # self.pipe.enable_attention_slicing()
-                
-                print(f"✅ Model loaded successfully on {device.upper()}.")
-            except Exception as e:
-                print(f"❌ Failed to load model: {e}")
-                self.pipe = None
+            self.pipe.to(self.device)
+            
+            # Optional: Memory optimization
+            # self.pipe.enable_attention_slicing()
+            
+            print(f"✅ Model loaded successfully on {self.device.upper()}.")
+            return True
+        except Exception as e:
+            self._load_error = str(e)
+            print(f"❌ Failed to load model: {e}")
+            import traceback
+            traceback.print_exc()
+            self.pipe = None
+            return False
+    
+    def is_ready(self) -> bool:
+        """모델이 로드되어 준비된 상태인지 확인"""
+        return self.pipe is not None
+    
+    def get_status(self) -> dict:
+        """현재 상태 정보 반환"""
+        return {
+            "loaded": self.pipe is not None,
+            "load_attempted": self._load_attempted,
+            "device": self.device,
+            "error": self._load_error
+        }
 
     def generate_image(self, prompt: str) -> str:
         """
         Generate image using local Stable Diffusion XL.
-        Returns: Data URI (Base64)
+        Returns: Data URI (Base64) on success, None on failure
         """
-        self._load_model()
-        
-        if self.pipe is None:
+        if not self._load_model():
+            print(f"⚠️ SDXL model not available. Status: {self.get_status()}")
             return None
 
         try:
@@ -104,10 +130,14 @@ class LocalDiffusionClient:
             image.save(buffered, format="PNG")
             img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
             
+            print(f"✅ Image generated successfully")
             return f"data:image/png;base64,{img_str}"
             
         except Exception as e:
             print(f"❌ Local Generation Error: {e}")
+            import traceback
+            traceback.print_exc()
             return None
+
 
 local_diffusion_client = LocalDiffusionClient()

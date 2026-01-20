@@ -72,7 +72,22 @@ def handler(event):
         elif action == "edit_section":
             return handle_edit_section(data)
         elif action == "health":
-            return {"status": "healthy", "message": "M:ine AI Serverless is running"}
+            # 상세 헬스체크 - API 설정 상태 포함
+            from app.core.llm_client import llm_client
+            try:
+                from app.core.local_diffusion_client import local_diffusion_client
+                diffusion_status = local_diffusion_client.get_status()
+            except:
+                diffusion_status = {"loaded": False, "error": "Import failed"}
+            
+            return {
+                "status": "healthy", 
+                "message": "M:ine AI Serverless is running",
+                "config_status": {
+                    "openai_configured": llm_client.is_configured(),
+                    "diffusion_status": diffusion_status
+                }
+            }
         else:
             return {"error": f"Unknown action: {action}"}
             
@@ -114,6 +129,11 @@ def handle_create_magazine(data: dict) -> dict:
 def handle_create_moodboard(data: dict) -> dict:
     """
     Handle moodboard creation request.
+    Returns structured response with success indicator.
+    
+    On success: {"image_url": "...", "description": "...", "success": True}
+    On fallback: {"image_url": "fallback_url", ..., "success": False, "error_type": "..."}
+    On error: {"error": "...", "success": False}
     """
     logger.info("🎨 [1/4] Moodboard handler started")
     logger.info(f"🎨 [1/4] Data received: {data}")
@@ -131,19 +151,34 @@ def handle_create_moodboard(data: dict) -> dict:
             magazine_tags=data.get("magazine_tags"),
             magazine_titles=data.get("magazine_titles")
         )
-        logger.info(f"🎨 [4/4] Result: {result is not None}")
         
+        # 결과 검증 (None 체크 + image_url 존재 여부)
         if not result:
             logger.warning("🎨 [4/4] Result is None, returning error")
-            return {"error": "Failed to generate moodboard"}
+            return {
+                "error": "Failed to generate moodboard - no result returned",
+                "success": False,
+                "image_url": "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200"  # Fallback
+            }
         
-        logger.info("🎨 [4/4] Success! Returning result")
+        # success 필드 확인 (새로운 응답 형식)
+        if result.get("success") is False:
+            logger.warning(f"🎨 [4/4] Moodboard used fallback: {result.get('error_type')}")
+            # 여전히 image_url은 있으므로 클라이언트에서 사용 가능
+        else:
+            logger.info("🎨 [4/4] Success! Generated with SDXL")
+        
         return result
         
     except Exception as e:
         logger.error(f"❌ Moodboard Error: {e}")
         logger.error(f"📋 Traceback:\n{traceback.format_exc()}")
-        return {"error": str(e), "traceback": traceback.format_exc()}
+        return {
+            "error": str(e), 
+            "success": False,
+            "traceback": traceback.format_exc(),
+            "image_url": "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200"  # Fallback
+        }
 
 
 def handle_edit_magazine(data: dict) -> dict:

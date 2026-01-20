@@ -82,31 +82,74 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
 
     return llm_client.generate_text(system_prompt, user_prompt)
 
+# 기본 Fallback 이미지 (SDXL 실패 시 사용)
+FALLBACK_MOODBOARD_IMAGES = [
+    "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200",  # Gradient
+    "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200",  # Abstract
+    "https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1200",  # Gradient 2
+]
+
+
 def generate_moodboard(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None) -> dict:
     """
     Orchestrates the moodboard generation process using Stable Diffusion.
+    Returns structured response with success indicator and fallback on failure.
+    
+    Returns:
+        On success: {"image_url": "...", "description": "...", "success": True}
+        On failure: {"error": "...", "error_type": "...", "success": False, "fallback_url": "..."}
     """
+    import random
+    
     # 토픽이 없으면 태그나 타이틀로 대체 토픽 설정 (로깅용)
     display_topic = topic or (magazine_titles[0] if magazine_titles else "User Profile")
     
     print(f"🎨 Generating Background Moodboard (SDXL) for: {display_topic}")
 
     # 1. Generate Prompt
-    sd_prompt = generate_moodboard_prompt(topic, user_mood, user_interests, magazine_tags, magazine_titles)
-    print(f"✨ SDXL Prompt: {sd_prompt}")
+    try:
+        sd_prompt = generate_moodboard_prompt(topic, user_mood, user_interests, magazine_tags, magazine_titles)
+        print(f"✨ SDXL Prompt: {sd_prompt}")
+    except Exception as e:
+        print(f"❌ Prompt generation failed: {e}")
+        sd_prompt = None
 
     if not sd_prompt:
-        return None
+        fallback_url = random.choice(FALLBACK_MOODBOARD_IMAGES)
+        return {
+            "error": "Failed to generate prompt - LLM may not be configured",
+            "error_type": "PROMPT_GENERATION_FAILED",
+            "success": False,
+            "fallback_url": fallback_url,
+            # 호환성을 위해 image_url도 fallback으로 제공
+            "image_url": fallback_url,
+            "description": f"Fallback image for: {display_topic}"
+        }
 
     # 2. Generate Image (Local SDXL)
-    image_url = local_diffusion_client.generate_image(sd_prompt)
+    try:
+        image_url = local_diffusion_client.generate_image(sd_prompt)
+    except Exception as e:
+        print(f"❌ Image generation exception: {e}")
+        traceback.print_exc()
+        image_url = None
     
     if not image_url:
-        return None
+        fallback_url = random.choice(FALLBACK_MOODBOARD_IMAGES)
+        return {
+            "error": "Failed to generate image - SDXL model may not be loaded",
+            "error_type": "IMAGE_GENERATION_FAILED",
+            "success": False,
+            "fallback_url": fallback_url,
+            # 호환성을 위해 image_url도 fallback으로 제공
+            "image_url": fallback_url,
+            "description": sd_prompt
+        }
         
     print(f"✅ Moodboard Generated (Data URI)")
 
     return {
-        "image_url": image_url, # This will be a Data URI (base64)
-        "description": sd_prompt
+        "image_url": image_url,  # This will be a Data URI (base64)
+        "description": sd_prompt,
+        "success": True
     }
