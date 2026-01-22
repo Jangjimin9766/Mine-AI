@@ -49,28 +49,45 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
 
     system_prompt = f"""
     You are an expert Art Director creating prompts for Stable Diffusion XL.
-    Your task is to create a 'Background Moodboard' image prompt.
+    Your task is to create a 'Background Moodboard' image prompt for M:ine magazine.
     
     [CRITICAL - MUST INCLUDE THESE TOPICS]
     The image MUST visually represent: {topic_emphasis}
-    - If the topic is about food/cookies/cafe → include food photography elements
-    - If the topic is about fashion → include fashion/clothing elements  
-    - If the topic is about travel/places → include location-specific elements
+    - If the topic is about food/cookies/cafe → include food photography elements (actual food items visible)
+    - If the topic is about fashion → include fashion/clothing elements (garments, accessories visible)
+    - If the topic is about travel/places → include location-specific elements (landmarks, architecture, scenery)
+    - If the topic is about art/design → include artistic elements (paintings, sculptures, design objects)
+    - If the topic is about technology → include tech elements (devices, interfaces, modern aesthetics)
     - DO NOT ignore the actual topic and only add abstract style words!
+    - The subject matter MUST be clearly visible and recognizable
     
     [DESIGN GOALS]
-    1. **Role**: Background for app interface, but MUST reflect the topic visually.
-    2. **Aesthetic**: Clean, atmospheric, professional product/lifestyle photography style.
+    1. **Role**: Background for app interface, but MUST reflect the topic visually and clearly.
+    2. **Aesthetic**: Clean, atmospheric, professional product/lifestyle photography style - premium magazine quality.
     3. **Variation**: {random_variation}
+    4. **Mood**: Match the user mood if provided - Classic (timeless, elegant), Fun (vibrant, energetic), Minimal (clean, sparse), Bold (dramatic, impactful)
     
-    [PROMPT FORMAT]
-    - Start with the ACTUAL SUBJECT (cookies, food, cafe, fashion item, etc.)
-    - Then add photography style (food photography, flatlay, product shot, etc.)
-    - Then add lighting/quality modifiers (soft lighting, 8k, professional)
+    [PROMPT FORMAT - FOLLOW THIS STRUCTURE]
+    1. ACTUAL SUBJECT (cookies, food, cafe, fashion item, travel destination, etc.) - Be specific
+    2. COMPOSITION (flatlay, product shot, lifestyle scene, architectural detail, etc.)
+    3. PHOTOGRAPHY STYLE (food photography, fashion editorial, travel photography, product photography, etc.)
+    4. LIGHTING (soft natural lighting, dramatic shadows, warm ambient light, etc.)
+    5. ATMOSPHERE/MOOD (cozy, sophisticated, minimalist, luxurious, etc.)
+    6. QUALITY MODIFIERS (8k, professional, high-end, premium, etc.)
     
-    Output ONLY the English prompt.
-    Example for cookies/cafe: "gourmet chewy cookies on marble surface, warm cafe aesthetic, food photography, soft natural lighting, cozy atmosphere, 8k, professional"
-    Example for fashion: "luxury handbag flatlay, fashion editorial, minimalist, soft shadows, high-end product photography, 8k"
+    [QUALITY REQUIREMENTS]
+    - Be specific about the subject (not just "food" but "gourmet cookies" or "artisan coffee")
+    - Include composition guidance (flatlay, close-up, wide shot, etc.)
+    - Specify lighting conditions for mood
+    - Add quality modifiers for premium look
+    - Keep it concise but descriptive (50-80 words)
+    
+    Output ONLY the English prompt. No explanations, no JSON, just the prompt text.
+    
+    Examples:
+    - Cookies/cafe: "gourmet chewy cookies arranged on marble surface, warm cafe aesthetic, food photography, soft natural lighting, cozy atmosphere, minimalist composition, 8k, professional"
+    - Fashion: "luxury handbag flatlay on neutral background, fashion editorial style, minimalist composition, soft shadows, high-end product photography, premium quality, 8k"
+    - Travel: "modern architecture detail from Tokyo, travel photography, clean composition, natural daylight, sophisticated urban aesthetic, professional, 8k"
     """
 
     user_prompt = f"""

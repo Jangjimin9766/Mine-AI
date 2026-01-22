@@ -96,39 +96,51 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     current_image_url = current_section.get('image_url', '')
     
     system_prompt = """
-    You are rewriting a section of a premium lifestyle magazine.
+    You are rewriting a section of a premium lifestyle magazine (M:ine).
     Follow the user's instruction while maintaining HIGH QUALITY and INFORMATIVENESS.
     
     CRITICAL RULES:
-    1. Prioritize CLEAR, SPECIFIC information
-    2. Use refined language but NEVER sacrifice clarity
-    3. Include concrete details (names, numbers, facts)
-    4. 200-280 characters for content (Korean)
-    5. Make it magazine-worthy
+    1. Prioritize CLEAR, SPECIFIC information over vague descriptions
+    2. Use refined language but NEVER sacrifice clarity for style
+    3. Include concrete details: brand names, numbers, dates, facts, locations
+    4. Content length: 800-1500 characters (Korean) - rich, detailed content
+    5. Use HTML formatting: <p>, <h3>, <strong>, <blockquote>, <ul><li>
     6. ALWAYS preserve the original image_url exactly as provided
+    7. Match M:ine's editorial standards: authoritative, intellectual, luxury-focused
+    8. Avoid generic phrases ("매력적입니다", "좋습니다", "추천합니다")
     
     Output JSON (use snake_case):
     {
-        "heading": "Clear heading in Korean",
-        "content": "Informative content in Korean (200-280 chars)",
+        "heading": "Clear, provocative heading in Korean (10-20 chars)",
+        "content": "<p>Rich HTML content in Korean (800-1500 chars). Include h3, p, strong, blockquote, ul tags.</p>",
         "image_url": "EXACT URL from current section (DO NOT change)",
-        "layout_hint": "image_left" or "full_width"
+        "layout_hint": "image_left" or "full_width",
+        "layout_type": "hero | basic | split_left | split_right",
+        "caption": "Informative image caption in high-end tone (optional)"
     }
     """
     
     user_prompt = f"""
-    Current section:
+    [CURRENT SECTION]
     Heading: {current_section.get('heading', '')}
     Content: {current_section.get('content', '')}
     Image URL: {current_image_url}
     
-    User instruction: {instruction}
+    [USER INSTRUCTION]
+    {instruction}
     
-    Rewrite this section following the instruction.
-    Keep it in Korean, 200-280 characters for content.
-    Make it INFORMATIVE and SPECIFIC, not vague or overly poetic.
+    [REQUIREMENTS]
+    1. Rewrite this section following the user instruction precisely
+    2. Keep it in Korean, 800-1500 characters for content
+    3. Make it INFORMATIVE and SPECIFIC - include concrete data, brands, or examples
+    4. Use rich HTML formatting (p, h3, strong, blockquote, ul, li)
+    5. Maintain M:ine's premium editorial tone: authoritative, intellectual, luxury-focused
+    6. Ensure the content is self-contained and valuable on its own
     
-    IMPORTANT: Use this EXACT image_url in your response: {current_image_url}
+    [CRITICAL]
+    - Use this EXACT image_url in your response: {current_image_url}
+    - Do not change the image_url under any circumstances
+    - Output ONLY valid JSON (no markdown code blocks)
     """
     
     from app.core.llm_client import llm_client
@@ -169,41 +181,55 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
         research_content = "No specific research available. Create content based on general knowledge."
     
     system_prompt = """
-    You are adding a new section to a premium lifestyle magazine.
+    You are adding a new section to a premium lifestyle magazine (M:ine).
     Create HIGH-QUALITY, INFORMATIVE content based on the research provided.
     
     CRITICAL RULES:
-    1. Use SPECIFIC information from the research (names, numbers, facts)
-    2. Write in a clear, informative, and sophisticated tone
-    3. Include concrete details, not vague descriptions
-    4. 200-280 characters for content (Korean)
-    5. Make it magazine-worthy and engaging
-    6. If research is limited, use general knowledge but be specific
+    1. Use SPECIFIC information from the research (names, numbers, facts, dates, locations)
+    2. Write in a clear, informative, and sophisticated tone matching M:ine's editorial standards
+    3. Include concrete details: brand names, specific data points, real examples
+    4. Content length: 800-1500 characters (Korean) - rich, detailed content
+    5. Use HTML formatting: <p>, <h3>, <strong>, <blockquote>, <ul><li>
+    6. Make it magazine-worthy and engaging - each section is a standalone content card
+    7. If research is limited, use general knowledge but be SPECIFIC (cite brands, numbers, examples)
+    8. Avoid generic phrases ("매력적입니다", "좋습니다", "추천합니다")
+    9. Ensure the section is independently valuable - reader learns something complete
     
     Output JSON (use snake_case for field names):
     {
-        "heading": "Clear, informative heading in Korean",
-        "content": "Detailed, fact-based content in Korean (200-280 chars)",
-        "image_url": "Pick the most relevant image URL from the list, or null if none available",
-        "layout_hint": "image_left" or "full_width"
+        "heading": "Clear, provocative heading in Korean (10-20 chars)",
+        "content": "<p>Rich HTML content in Korean (800-1500 chars). Include h3, p, strong, blockquote, ul tags.</p>",
+        "image_url": "Pick the most relevant image URL from [Available Images], or null if none available",
+        "layout_hint": "image_left" or "full_width",
+        "layout_type": "hero | basic | split_left | split_right",
+        "caption": "Informative image caption in high-end tone (optional)"
     }
     """
     
     user_prompt = f"""
-    Magazine title: {magazine_title}
+    [MAGAZINE CONTEXT]
+    Title: {magazine_title}
     Existing sections: {len(magazine_data.get('sections', []))}
     
+    [USER REQUEST]
     User wants to add: {instruction}
     
-    [Research Results]
+    [RESEARCH RESULTS]
     {research_content}
     
-    [Available Images]
+    [AVAILABLE IMAGES]
     {images[:5] if images else "No images available"}
     
-    Create a new section with SPECIFIC, INFORMATIVE content.
-    Use facts and details from the research.
-    Make it as good as the original magazine sections.
+    [REQUIREMENTS]
+    1. Create a new section with SPECIFIC, INFORMATIVE content
+    2. Use facts and details from the research - cite specific brands, numbers, or examples
+    3. Make it as good as the original magazine sections - match quality and depth
+    4. Ensure the section is self-contained and valuable independently
+    5. Use rich HTML formatting for readability
+    6. Match M:ine's premium editorial tone: authoritative, intellectual, luxury-focused
+    
+    [OUTPUT]
+    Output ONLY valid JSON (no markdown code blocks)
     """
     
     from app.core.llm_client import llm_client

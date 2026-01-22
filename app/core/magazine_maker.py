@@ -54,19 +54,34 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
     system_prompt = MAGAZINE_SYSTEM_PROMPT_V3
 
     user_prompt = f"""
-    Topic: {topic}
+    [TOPIC]
+    {topic}
+    
     {interest_context}
     {mood_context}
     
-    [Research Material]
+    [RESEARCH MATERIAL]
     {deep_content[:3000]}
     
-    [Available Images]
+    [AVAILABLE IMAGES]
     {json.dumps(images, ensure_ascii=False)}
     
-    Create a magazine article that delivers CLEAR, USEFUL INFORMATION in a sophisticated, refined style.
-    Think premium magazine, not poetry book.
-    Generate at least 4 sections with variety in layout_type.
+    [CREATION GUIDELINES]
+    1. Create a magazine article that delivers CLEAR, USEFUL INFORMATION in a sophisticated, refined style.
+    2. Think premium magazine (like Monocle, Kinfolk, Cereal), not poetry book or blog post.
+    3. Generate at least 4 diverse sections (maximum 6) with variety in layout_type.
+    4. Each section must be independently valuable - a reader should learn something complete from each card.
+    5. Use concrete data, brand names, and specific examples from the research material when available.
+    6. Connect the topic to user interests naturally when relevant, but prioritize informative value.
+    7. Match the user mood style ({user_mood if user_mood else 'sophisticated'}) in tone while maintaining editorial quality.
+    8. Ensure each section has a clear narrative arc: context → analysis → insight.
+    
+    [OUTPUT REQUIREMENTS]
+    - Output ONLY valid JSON (no markdown code blocks)
+    - Include thought_process field explaining your editorial strategy
+    - Use rich HTML formatting in content fields
+    - Select appropriate images from [AVAILABLE IMAGES]
+    - Vary layout_type across sections for visual rhythm
     """
 
     print(f"🧠 AI Crafting V2 magazine with CoT (Thinking...)...")
@@ -105,21 +120,20 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         if not section.get('layout_hint'):
             section['layout_hint'] = 'image_left'
 
-    # 4. [부록] 매거진과 1:1 매칭되는 무드보드 생성 (Local SDXL)
-    from app.core.moodboard_maker import generate_moodboard
+    # 4. [부록] 매거진과 1:1 매칭되는 무드보드 생성 (Mocked for speed and stability)
+    # from app.core.moodboard_maker import generate_moodboard
     
-    print(f"🎨 Generating matching moodboard for magazine: {result_json.get('title')}")
+    print(f"🎨 Mocking moodboard for magazine: {result_json.get('title')}")
     
-    moodboard_data = generate_moodboard(
-        topic=topic,
-        user_interests=user_interests,
-        magazine_tags=result_json.get('tags', []),
-        magazine_titles=[result_json.get('title', 'Untitled')]
-    )
+    moodboard_data = {
+        "image_url": "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200",
+        "description": "Mocked moodboard for performance",
+        "success": True
+    }
     
     if moodboard_data:
         result_json['moodboard'] = moodboard_data
-        print(f"✅ Moodboard attached to magazine")
+        print(f"✅ Mocked Moodboard attached to magazine")
     
     print(f"✅ Magazine with moodboard created: {len(result_json.get('sections', []))} sections")
     
