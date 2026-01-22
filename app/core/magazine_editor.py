@@ -11,6 +11,10 @@ def analyze_user_intent(user_message: str, magazine_data: dict) -> AgentIntent:
     system_prompt = f"""
     You are an AI editor assistant for M:ine magazine.
     Analyze the user's request and determine what action to take.
+
+    [DOMAIN CONTEXT]
+    **Current Magazine Topic**: {magazine_data.get('title', 'N/A')}
+    Always interpret the user's message within the context of this Topic. Do NOT confuse terms with unrelated fields (e.g., if topic is Wine, interpret "Potential" as Aging Potential, not games).
     
     Available actions:
     - "regenerate_section": Rewrite a specific section
@@ -96,51 +100,48 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     current_image_url = current_section.get('image_url', '')
     
     system_prompt = """
-    You are rewriting a section of a premium lifestyle magazine (M:ine).
-    Follow the user's instruction while maintaining HIGH QUALITY and INFORMATIVENESS.
+    You are rewriting a section of a premium lifestyle magazine.
+    Follow the user's instruction while maintaining HIGH-DENSITY, INFORMATIVE content.
     
-    CRITICAL RULES:
-    1. Prioritize CLEAR, SPECIFIC information over vague descriptions
-    2. Use refined language but NEVER sacrifice clarity for style
-    3. Include concrete details: brand names, numbers, dates, facts, locations
-    4. Content length: 800-1500 characters (Korean) - rich, detailed content
-    5. Use HTML formatting: <p>, <h3>, <strong>, <blockquote>, <ul><li>
-    6. ALWAYS preserve the original image_url exactly as provided
-    7. Match M:ine's editorial standards: authoritative, intellectual, luxury-focused
-    8. Avoid generic phrases ("매력적입니다", "좋습니다", "추천합니다")
+    [EDITORIAL STANDARDS]
+    1. **Hyper-Specificity**: Use concrete brand names, numbers, historical facts, and technical data.
+    2. **Insightful Narrative**: Don't just list facts. Explain the *significance* and *context*.
+    3. **Tone**: Refined, sophisticated, and authoritative formal Korean (습니다/입니다).
     
-    Output JSON (use snake_case):
+    [HTML FORMATTING RULES]
+    - <h3>: Section-level subheadings (Use at least 1-2 to break long text)
+    - <p>: Detailed paragraphs (2-3 sentences each)
+    - <strong>: Technical terms or key findings
+    - <blockquote>: Powerful quotes or striking statistics
+    - <ul><li>: Structured data or lists (only for 3+ items)
+    
+    [CRITICAL CONSTRAINTS]
+    - **Content Length**: 800-1,500 characters (Korean) including HTML tags.
+    - **Image URL**: ALWAYS preserve the original image_url exactly as provided.
+    - **No Vague Statements**: Avoid generic praise; prove value with evidence.
+    
+    Output JSON (snake_case):
     {
-        "heading": "Clear, provocative heading in Korean (10-20 chars)",
-        "content": "<p>Rich HTML content in Korean (800-1500 chars). Include h3, p, strong, blockquote, ul tags.</p>",
-        "image_url": "EXACT URL from current section (DO NOT change)",
-        "layout_hint": "image_left" or "full_width",
-        "layout_type": "hero | basic | split_left | split_right",
-        "caption": "Informative image caption in high-end tone (optional)"
+        "heading": "Clear, brand-like heading",
+        "content": "<p>High-quality HTML content...</p>",
+        "image_url": "EXACT URL provided",
+        "layout_hint": "image_left | full_width"
     }
     """
     
     user_prompt = f"""
-    [CURRENT SECTION]
+    Current section:
     Heading: {current_section.get('heading', '')}
     Content: {current_section.get('content', '')}
     Image URL: {current_image_url}
     
-    [USER INSTRUCTION]
-    {instruction}
+    User instruction: {instruction}
     
-    [REQUIREMENTS]
-    1. Rewrite this section following the user instruction precisely
-    2. Keep it in Korean, 800-1500 characters for content
-    3. Make it INFORMATIVE and SPECIFIC - include concrete data, brands, or examples
-    4. Use rich HTML formatting (p, h3, strong, blockquote, ul, li)
-    5. Maintain M:ine's premium editorial tone: authoritative, intellectual, luxury-focused
-    6. Ensure the content is self-contained and valuable on its own
+    Rewrite this section following the instruction.
+    Keep it in Korean, 800-1500 characters for content.
+    Make it INFORMATIVE and SPECIFIC, not vague or overly poetic.
     
-    [CRITICAL]
-    - Use this EXACT image_url in your response: {current_image_url}
-    - Do not change the image_url under any circumstances
-    - Output ONLY valid JSON (no markdown code blocks)
+    IMPORTANT: Use this EXACT image_url in your response: {current_image_url}
     """
     
     from app.core.llm_client import llm_client
@@ -181,55 +182,51 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
         research_content = "No specific research available. Create content based on general knowledge."
     
     system_prompt = """
-    You are adding a new section to a premium lifestyle magazine (M:ine).
-    Create HIGH-QUALITY, INFORMATIVE content based on the research provided.
+    You are adding a new section to a premium lifestyle magazine.
+    Create a high-density, authoritative editorial based on the provided research.
     
-    CRITICAL RULES:
-    1. Use SPECIFIC information from the research (names, numbers, facts, dates, locations)
-    2. Write in a clear, informative, and sophisticated tone matching M:ine's editorial standards
-    3. Include concrete details: brand names, specific data points, real examples
-    4. Content length: 800-1500 characters (Korean) - rich, detailed content
-    5. Use HTML formatting: <p>, <h3>, <strong>, <blockquote>, <ul><li>
-    6. Make it magazine-worthy and engaging - each section is a standalone content card
-    7. If research is limited, use general knowledge but be SPECIFIC (cite brands, numbers, examples)
-    8. Avoid generic phrases ("매력적입니다", "좋습니다", "추천합니다")
-    9. Ensure the section is independently valuable - reader learns something complete
+    [EDITORIAL STANDARDS]
+    1. **Data-Driven**: Use specific information from [Research Results] (numbers, names, specs).
+    2. **Depth**: Provide context and background. Connect the new section to the magazine's theme.
+    3. **Visual Structure**: Use HTML tags to create a structured, readable layout.
     
-    Output JSON (use snake_case for field names):
+    [HTML FORMATTING RULES]
+    - <h3>: Section-level subheadings (Mandatory for sections over 1000 chars)
+    - <p>: Descriptive paragraphs
+    - <strong>: Key technical terms or emphasize points
+    - <blockquote>: Quotes from research or core insights
+    - <ul><li>: Clear lists for facts or features
+    
+    [CRITICAL RULES]
+    - **Length**: 800-1,500 characters (Korean).
+    - **Persona**: Editor-in-Chief with deep domain knowledge.
+    - **Originality**: Do not repeat existing section topics. Bring a fresh perspective.
+    
+    Output JSON (snake_case):
     {
-        "heading": "Clear, provocative heading in Korean (10-20 chars)",
-        "content": "<p>Rich HTML content in Korean (800-1500 chars). Include h3, p, strong, blockquote, ul tags.</p>",
-        "image_url": "Pick the most relevant image URL from [Available Images], or null if none available",
-        "layout_hint": "image_left" or "full_width",
-        "layout_type": "hero | basic | split_left | split_right",
-        "caption": "Informative image caption in high-end tone (optional)"
+        "heading": "Sophisticated heading",
+        "content": "<p>Masterpiece HTML content...</p>",
+        "image_url": "Pick relevant URL or null",
+        "layout_hint": "image_left | full_width"
     }
     """
     
     user_prompt = f"""
-    [MAGAZINE CONTEXT]
-    Title: {magazine_title}
+    Magazine title: {magazine_title}
     Existing sections: {len(magazine_data.get('sections', []))}
     
-    [USER REQUEST]
     User wants to add: {instruction}
     
-    [RESEARCH RESULTS]
+    [Research Results]
     {research_content}
     
-    [AVAILABLE IMAGES]
+    [Available Images]
     {images[:5] if images else "No images available"}
     
-    [REQUIREMENTS]
-    1. Create a new section with SPECIFIC, INFORMATIVE content
-    2. Use facts and details from the research - cite specific brands, numbers, or examples
-    3. Make it as good as the original magazine sections - match quality and depth
-    4. Ensure the section is self-contained and valuable independently
-    5. Use rich HTML formatting for readability
-    6. Match M:ine's premium editorial tone: authoritative, intellectual, luxury-focused
-    
-    [OUTPUT]
-    Output ONLY valid JSON (no markdown code blocks)
+    Create a new section with SPECIFIC, INFORMATIVE content.
+    Keep it in Korean, 800-1500 characters for content.
+    Use facts and details from the research.
+    Make it as good as the original magazine sections.
     """
     
     from app.core.llm_client import llm_client
@@ -281,7 +278,7 @@ def strip_markdown_codeblocks(content: str) -> str:
     return content.strip()
 
 
-def edit_section_content(section_data: dict, message: str) -> dict:
+def edit_section_content(section_data: dict, message: str, topic: str = "Magazine Content") -> dict:
     """
     섹션 레벨 상호작용: 의도 분류 기반 섹션 수정
     
@@ -291,15 +288,16 @@ def edit_section_content(section_data: dict, message: str) -> dict:
     Args:
         section_data: 현재 섹션 데이터
         message: 사용자 수정 요청
+        topic: 잡지의 전체 주제 (할루시네이션 방지용)
     
     Returns:
         Spring이 기대하는 형식의 응답
     """
     from app.core.llm_client import llm_client
     from app.core.prompts import (
-        INTENT_CLASSIFICATION_PROMPT,
-        APPEND_CONTENT_PROMPT,
-        CHANGE_TONE_PROMPT,
+        INTENT_CLASSIFICATION_PROMPT_V2,  # V1 → V2로 업그레이드!
+        APPEND_CONTENT_PROMPT_V2,         # V1 → V2로 업그레이드!
+        CHANGE_TONE_PROMPT_V2,            # V1 → V2로 업그레이드!
         FULL_REWRITE_PROMPT,
         SECTION_EDIT_PROMPT
     )
@@ -313,9 +311,13 @@ def edit_section_content(section_data: dict, message: str) -> dict:
     original_caption = section_data.get('caption', '')
     
     try:
-        # Step 1: 의도 분류
-        print(f"✏️ [1/3] Classifying intent for: {message[:50]}...")
-        intent_prompt = INTENT_CLASSIFICATION_PROMPT.format(message=message)
+        # Step 1: 의도 분류 (V2 프롬프트 사용 - 더 세밀한 분류)
+        print(f"✏️ [1/3] Classifying intent (V2) for topic '{topic}': {message[:50]}...")
+        intent_prompt = INTENT_CLASSIFICATION_PROMPT_V2.format(
+            topic=topic,
+            existing_content=original_content,
+            message=message
+        )
         intent_result = llm_client.generate_json(
             "You are an intent classifier. Output valid JSON only.",
             intent_prompt,
@@ -329,7 +331,7 @@ def edit_section_content(section_data: dict, message: str) -> dict:
         new_content = original_content
         new_heading = original_heading
         
-        if intent == 'APPEND_CONTENT':
+        if intent in ['ADD_INFORMATION', 'ADD_EXAMPLES', 'APPEND_CONTENT']:
             # 이미지 검색 (Tavily 사용)
             from app.core.searcher import search_with_tavily
             import json
@@ -342,8 +344,9 @@ def edit_section_content(section_data: dict, message: str) -> dict:
                 print(f"⚠️ Image search failed: {e}")
                 available_images = "[]"
             
-            # 기존 내용 유지 + 새 내용 추가
-            append_prompt = APPEND_CONTENT_PROMPT.format(
+            # 기존 내용 유지 + 새 내용 추가 (V2 프롬프트 - 더 명확한 제약)
+            append_prompt = APPEND_CONTENT_PROMPT_V2.format(
+                topic=topic,
                 existing_content=original_content,
                 message=message,
                 available_images=available_images
@@ -351,19 +354,20 @@ def edit_section_content(section_data: dict, message: str) -> dict:
             new_content = llm_client.generate_text(
                 "You are a magazine editor. Output HTML content only. Include images using <img> tags.",
                 append_prompt,
-                temperature=0.7
+                temperature=0.6
             )
             
-        elif intent == 'CHANGE_TONE':
-            # 정보 유지 + 톤만 변경
-            tone_prompt = CHANGE_TONE_PROMPT.format(
+        elif intent in ['CHANGE_TONE_CASUAL', 'CHANGE_TONE_FORMAL', 'CHANGE_TONE_EMOTIONAL', 'CHANGE_TONE']:
+            # 정보 유지 + 톤만 변경 (V2 프롬프트 - 정보 손실 방지 강화)
+            tone_prompt = CHANGE_TONE_PROMPT_V2.format(
+                topic=topic,
                 existing_content=original_content,
                 message=message
             )
             new_content = llm_client.generate_text(
                 "You are a magazine editor. Output HTML content only.",
                 tone_prompt,
-                temperature=0.7
+                temperature=0.6
             )
             
         elif intent == 'FULL_REWRITE':
@@ -401,6 +405,30 @@ def edit_section_content(section_data: dict, message: str) -> dict:
                 # BeautifulSoup 없으면 fallback
                 new_content = original_content
                 
+        elif intent == 'SIMPLIFY':
+            # 간단하게 (V2의 CHANGE_TONE 프롬프트 재사용)
+            tone_prompt = CHANGE_TONE_PROMPT_V2.format(
+                existing_content=original_content,
+                message="간단하게, 짧게, 쉽게"
+            )
+            new_content = llm_client.generate_text(
+                "You are a magazine editor. Output HTML content only.",
+                tone_prompt,
+                temperature=0.6
+            )
+            
+        elif intent == 'EXPAND':
+            # 자세하게 (V2의 CHANGE_TONE 프롬프트 재사용)
+            tone_prompt = CHANGE_TONE_PROMPT_V2.format(
+                existing_content=original_content,
+                message="더 자세하게, 길게, 깊이있게"
+            )
+            new_content = llm_client.generate_text(
+                "You are a magazine editor. Output HTML content only.",
+                tone_prompt,
+                temperature=0.7
+            )
+                
         else:
             # 기본: APPEND_CONTENT와 동일하게 처리
             from app.core.searcher import search_with_tavily
@@ -414,7 +442,7 @@ def edit_section_content(section_data: dict, message: str) -> dict:
                 print(f"⚠️ Image search failed: {e}")
                 available_images = "[]"
             
-            append_prompt = APPEND_CONTENT_PROMPT.format(
+            append_prompt = APPEND_CONTENT_PROMPT_V2.format(
                 existing_content=original_content,
                 message=message,
                 available_images=available_images
@@ -422,7 +450,7 @@ def edit_section_content(section_data: dict, message: str) -> dict:
             new_content = llm_client.generate_text(
                 "You are a magazine editor. Output HTML content only. Include images using <img> tags.",
                 append_prompt,
-                temperature=0.7
+                temperature=0.6
             )
         
         print(f"✏️ [3/3] Content updated successfully")
@@ -482,4 +510,3 @@ def delete_section(magazine_data: dict, section_index: int) -> dict:
         "success": True,
         "section_index": section_index
     }
-

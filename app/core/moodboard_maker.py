@@ -48,46 +48,31 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     topic_emphasis = ", ".join(topic_keywords) if topic_keywords else "general lifestyle"
 
     system_prompt = f"""
-    You are an expert Art Director creating prompts for Stable Diffusion XL.
-    Your task is to create a 'Background Moodboard' image prompt for M:ine magazine.
+    You are an award-winning Art Director and Senior Photographer.
+    Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's moodboard.
     
-    [CRITICAL - MUST INCLUDE THESE TOPICS]
-    The image MUST visually represent: {topic_emphasis}
-    - If the topic is about food/cookies/cafe → include food photography elements (actual food items visible)
-    - If the topic is about fashion → include fashion/clothing elements (garments, accessories visible)
-    - If the topic is about travel/places → include location-specific elements (landmarks, architecture, scenery)
-    - If the topic is about art/design → include artistic elements (paintings, sculptures, design objects)
-    - If the topic is about technology → include tech elements (devices, interfaces, modern aesthetics)
-    - DO NOT ignore the actual topic and only add abstract style words!
-    - The subject matter MUST be clearly visible and recognizable
+    [SUBJECT-SPECIFIC FOCUS (MANDATORY)]
+    The image MUST clearly feature elements of: {topic_emphasis}
+    - **Food/Cafe**: Detail-oriented food photography. Focus on textures (steam, moisture, crumbs). Artisan ceramics.
+    - **Fashion/Beauty**: High-fashion editorial look. Focus on fabric textures (silk, wool, leather) and luxury accessories.
+    - **Travel/Architecture**: Atmospheric location shots. Focus on lighting, scale, and unique architectural details.
+    - **Art/Design**: Abstract or conceptual visuals. Focus on color harmony, shadow play, and artistic objects.
+    - **Tech/Minimal**: Futuristic and clean. Focus on sleek surfaces, light-ray effects, and UI-inspired aesthetics.
     
-    [DESIGN GOALS]
-    1. **Role**: Background for app interface, but MUST reflect the topic visually and clearly.
-    2. **Aesthetic**: Clean, atmospheric, professional product/lifestyle photography style - premium magazine quality.
-    3. **Variation**: {random_variation}
-    4. **Mood**: Match the user mood if provided - Classic (timeless, elegant), Fun (vibrant, energetic), Minimal (clean, sparse), Bold (dramatic, impactful)
+    [PHOTOGRAPHY PARAMETERS]
+    1. **Subject**: Specific, high-definition subject related to the Topic ({topic_emphasis}).
+    2. **Composition**: Choose most effective (Flatlay, Extreme Close-up, Wide landscape, Golden ratio).
+    3. **Lighting**: Cinematic lighting (Volumetric light, Soft natural dawn light, Dramatic REMBRANDT shadows).
+    4. **Camera/Film**: 85mm lens for products, 24mm for landscapes. High-speed film grain (minimal), crisp focus.
+    5. **Style**: Premium magazine editorial style (Kinfolk, Magazine B, Vogue quality).
     
-    [PROMPT FORMAT - FOLLOW THIS STRUCTURE]
-    1. ACTUAL SUBJECT (cookies, food, cafe, fashion item, travel destination, etc.) - Be specific
-    2. COMPOSITION (flatlay, product shot, lifestyle scene, architectural detail, etc.)
-    3. PHOTOGRAPHY STYLE (food photography, fashion editorial, travel photography, product photography, etc.)
-    4. LIGHTING (soft natural lighting, dramatic shadows, warm ambient light, etc.)
-    5. ATMOSPHERE/MOOD (cozy, sophisticated, minimalist, luxurious, etc.)
-    6. QUALITY MODIFIERS (8k, professional, high-end, premium, etc.)
+    [PROMPT STRUCTURE]
+    [Subject Detail], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: 8k, photorealistic, mastery, masterpiece]
     
-    [QUALITY REQUIREMENTS]
-    - Be specific about the subject (not just "food" but "gourmet cookies" or "artisan coffee")
-    - Include composition guidance (flatlay, close-up, wide shot, etc.)
-    - Specify lighting conditions for mood
-    - Add quality modifiers for premium look
-    - Keep it concise but descriptive (50-80 words)
-    
-    Output ONLY the English prompt. No explanations, no JSON, just the prompt text.
-    
-    Examples:
-    - Cookies/cafe: "gourmet chewy cookies arranged on marble surface, warm cafe aesthetic, food photography, soft natural lighting, cozy atmosphere, minimalist composition, 8k, professional"
-    - Fashion: "luxury handbag flatlay on neutral background, fashion editorial style, minimalist composition, soft shadows, high-end product photography, premium quality, 8k"
-    - Travel: "modern architecture detail from Tokyo, travel photography, clean composition, natural daylight, sophisticated urban aesthetic, professional, 8k"
+    [CRITICAL CONSTRAINTS]
+    - Output ONLY the prompt text.
+    - Do NOT use abstract words only. The Topic MUST be the hero of the image.
+    - Ensure the mood aligns with: {user_mood or "Sophisticated"}
     """
 
     user_prompt = f"""

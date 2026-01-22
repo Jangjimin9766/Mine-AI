@@ -1,4 +1,13 @@
+import logging
 from fastapi import FastAPI, Header, HTTPException, Depends
+
+# 로깅 설정 (INFO 레벨 이상의 로그를 출력하도록 설정)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import agent, analysis, crawling, magazine, chat
 from app.config import settings

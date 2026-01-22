@@ -15,7 +15,7 @@ def chat_with_magazine(request: MagazineChatRequest):
     매거진 내에서 AI 에이전트와 대화하며 내용 수정
     """
     try:
-        # 1. 사용자 의도 분석
+        # 1. 사용자 의도 분석 (내부에서 magazine_data로부터 토픽 추출)
         intent = analyze_user_intent(request.user_message, request.magazine_data)
         
         # 2. 액션 수행

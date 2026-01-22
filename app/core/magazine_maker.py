@@ -1,7 +1,7 @@
 from app.core.llm_client import llm_client
 import json
 from app.core.searcher import search_with_tavily, scrape_with_jina
-from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V3
+from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V4  # V3 → V4로 변경
 
 def generate_magazine_content(topic: str, user_interests: list = None, user_mood: str = None):
     print(f"🎨 Magazine Editor started for: {topic}")
@@ -50,48 +50,39 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         if not deep_content:
             deep_content = search_results[0]['content']
 
-    # 3. [편집] LLM에게 매거진 작성 요청 (V3 프롬프트 - 독립 콘텐츠 카드 + HTML 태그)
-    system_prompt = MAGAZINE_SYSTEM_PROMPT_V3
+    # 3. [편집] LLM에게 매거진 작성 요청 (V4 프롬프트 - 더 구체적이고 품질 높게)
+    system_prompt = MAGAZINE_SYSTEM_PROMPT_V4  # V3에서 V4로 업그레이드!
 
     user_prompt = f"""
-    [TOPIC]
-    {topic}
-    
+    Topic: {topic}
     {interest_context}
     {mood_context}
     
-    [RESEARCH MATERIAL]
+    [Research Material]
     {deep_content[:3000]}
     
-    [AVAILABLE IMAGES]
+    [Available Images]
     {json.dumps(images, ensure_ascii=False)}
     
-    [CREATION GUIDELINES]
-    1. Create a magazine article that delivers CLEAR, USEFUL INFORMATION in a sophisticated, refined style.
-    2. Think premium magazine (like Monocle, Kinfolk, Cereal), not poetry book or blog post.
-    3. Generate at least 4 diverse sections (maximum 6) with variety in layout_type.
-    4. Each section must be independently valuable - a reader should learn something complete from each card.
-    5. Use concrete data, brand names, and specific examples from the research material when available.
-    6. Connect the topic to user interests naturally when relevant, but prioritize informative value.
-    7. Match the user mood style ({user_mood if user_mood else 'sophisticated'}) in tone while maintaining editorial quality.
-    8. Ensure each section has a clear narrative arc: context → analysis → insight.
+    Create a premium magazine article with these requirements:
+    - At least 4-6 sections with clear hierarchy
+    - Each section must have 3+ concrete facts/examples
+    - Use specific numbers, names, locations (not vague statements)
+    - First section should be layout_type "hero"
+    - Mix of split_left, split_right, and basic layouts
+    - Sophisticated Korean (습니다/입니다 formal tone)
     
-    [OUTPUT REQUIREMENTS]
-    - Output ONLY valid JSON (no markdown code blocks)
-    - Include thought_process field explaining your editorial strategy
-    - Use rich HTML formatting in content fields
-    - Select appropriate images from [AVAILABLE IMAGES]
-    - Vary layout_type across sections for visual rhythm
+    Remember: Readers should learn something valuable, not just be entertained.
     """
 
-    print(f"🧠 AI Crafting V2 magazine with CoT (Thinking...)...")
+    print(f"🧠 AI Crafting V4 magazine with enhanced quality standards...")
     
-    # llm_client 사용
+    # llm_client 사용 (안정성과 창의성의 균형을 위해 0.7로 설정)
     result_json = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
     
     # [CoT 확인] 에디터의 생각 읽기
     if result_json.get('thought_process'):
-        print(f"🤔 Editor's Thought: {result_json['thought_process']}")
+        print(f"🤔 Editor's Thought: {result_json['thought_process'][:100]}...")
         # 클라이언트에게는 굳이 생각을 보낼 필요가 없다면 삭제 (Spring DTO 호환성)
         del result_json['thought_process']
     
@@ -120,20 +111,21 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         if not section.get('layout_hint'):
             section['layout_hint'] = 'image_left'
 
-    # 4. [부록] 매거진과 1:1 매칭되는 무드보드 생성 (Mocked for speed and stability)
-    # from app.core.moodboard_maker import generate_moodboard
+    # 4. [부록] 매거진과 1:1 매칭되는 무드보드 생성 (Local SDXL)
+    from app.core.moodboard_maker import generate_moodboard
     
-    print(f"🎨 Mocking moodboard for magazine: {result_json.get('title')}")
+    print(f"🎨 Generating matching moodboard for magazine: {result_json.get('title')}")
     
-    moodboard_data = {
-        "image_url": "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200",
-        "description": "Mocked moodboard for performance",
-        "success": True
-    }
+    moodboard_data = generate_moodboard(
+        topic=topic,
+        user_interests=user_interests,
+        magazine_tags=result_json.get('tags', []),
+        magazine_titles=[result_json.get('title', 'Untitled')]
+    )
     
     if moodboard_data:
         result_json['moodboard'] = moodboard_data
-        print(f"✅ Mocked Moodboard attached to magazine")
+        print(f"✅ Moodboard attached to magazine")
     
     print(f"✅ Magazine with moodboard created: {len(result_json.get('sections', []))} sections")
     

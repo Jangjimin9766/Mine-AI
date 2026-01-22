@@ -37,18 +37,34 @@ def search_with_tavily(query: str):
         print(f"⚠️ Tavily API key not configured, using fallback")
         return [], FALLBACK_IMAGES
     
+    # 검색어 정교화: 주제와 무관한 게임/이미지 노이즈 방지
+    # 예: "잠재력" -> "와인 숙성 잠재력", "패션 스타일" 등 도메인 명시
+    clean_query = query
+    if any(k in query for k in ['잠재력', '레벨', '각성', '강화']):
+        # 현재는 간단하게 처리하지만, 필요시 도메인 컨텍스트를 받아 결합 가능
+        pass 
+    
     try:
         # search_depth="advanced": 좀 더 깊이 있게 검색
         # include_images=True: 이미지도 같이 찾아줌 (M:ine에 필수!)
         response = tavily.search(
-            query=query,
+            query=clean_query,
             search_depth="advanced",
             include_images=True,
-            max_results=3
+            max_results=5
         )
         
         results = response.get('results', [])
         images = response.get('images', [])
+        
+        # 이미지 필터링 로직: 게임 위키나 불필요한 도메인 제외 시도
+        filtered_images = []
+        for img in images:
+            if any(noise in img.lower() for noise in ['wikia', 'fandom', 'game', 'screenshot', 'awakening']):
+                continue
+            filtered_images.append(img)
+        
+        images = filtered_images
         
         # 이미지가 없으면 플레이스홀더 사용
         if not images or len(images) == 0:
