@@ -166,7 +166,7 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     print(f"🔍 Searching for: {search_query}")
     
     try:
-        search_results, images = search_with_tavily(search_query)
+        search_results, images = search_with_tavily(search_query, topic=magazine_title)
     except Exception as e:
         print(f"⚠️ Search failed: {e}, using fallback")
         search_results, images = [], []
@@ -338,7 +338,7 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
             
             print(f"🔍 Searching images for: {message[:30]}...")
             try:
-                _, images = search_with_tavily(message)
+                _, images = search_with_tavily(message, topic=topic)
                 available_images = json.dumps(images[:5], ensure_ascii=False) if images else "[]"
             except Exception as e:
                 print(f"⚠️ Image search failed: {e}")
@@ -436,7 +436,7 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
             
             print(f"🔍 Searching images for: {message[:30]}...")
             try:
-                _, images = search_with_tavily(message)
+                _, images = search_with_tavily(message, topic=topic)
                 available_images = json.dumps(images[:5], ensure_ascii=False) if images else "[]"
             except Exception as e:
                 print(f"⚠️ Image search failed: {e}")

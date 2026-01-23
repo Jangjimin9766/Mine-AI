@@ -1,0 +1,197 @@
+
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <title>나파 밸리의 컬트 와인: 기술과 전통의 교차점</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Outfit:wght@300;400;700;900&display=swap');
+
+            :root {
+                --bg-color: #ffffff;
+                --text-main: #111111;
+                --text-sub: #666666;
+                --font-sans: 'Outfit', 'Apple SD Gothic Neo', sans-serif;
+                --font-serif: 'Nanum Myeongjo', 'Batang', serif;
+                --side-padding: 80px;
+            }
+
+            body { 
+                font-family: var(--font-sans); 
+                line-height: 1.6; 
+                max-width: 1200px; 
+                margin: 0 auto; 
+                padding: 0; 
+                background: var(--bg-color); 
+                color: var(--text-main); 
+                -webkit-font-smoothing: antialiased;
+            }
+
+            header { 
+                text-align: left; 
+                padding: 120px var(--side-padding) 60px var(--side-padding); 
+            }
+
+            .cover-img-container {
+                padding: 0 var(--side-padding);
+                margin-top: 40px;
+            }
+
+            .cover-img { 
+                width: 100%; 
+                height: 700px; 
+                object-fit: cover; 
+                filter: grayscale(10%) contrast(1.05);
+            }
+
+            h1 { 
+                font-size: 6rem; 
+                font-weight: 900; 
+                line-height: 0.95; 
+                letter-spacing: -4px; 
+                margin: 0 0 40px 0; 
+                text-transform: uppercase; 
+                word-break: keep-all;
+            }
+
+            .main-title { display: block; }
+            .sub-title-inline { 
+                display: block; 
+                font-size: 2.4rem; 
+                color: var(--text-sub); 
+                font-weight: 300; 
+                margin-top: 15px; 
+                letter-spacing: -1px; 
+                text-transform: none;
+                font-family: var(--font-serif);
+                font-style: italic;
+            }
+
+            .subtitle { 
+                font-family: var(--font-serif);
+                font-size: 1.4rem; 
+                color: #333; 
+                line-height: 1.5; 
+                margin: 60px 0 0 0; 
+                max-width: 700px; 
+                border-top: 1px solid #000; 
+                padding-top: 40px; 
+                letter-spacing: -0.5px;
+            }
+
+            .tags { margin-top: 50px; display: flex; gap: 15px; }
+            .tag { font-size: 0.85rem; color: #999; text-transform: uppercase; letter-spacing: 2px; }
+
+            .intro { 
+                font-family: var(--font-serif);
+                font-size: 1.2rem; 
+                margin: 0 var(--side-padding) 120px var(--side-padding); 
+                color: #444; 
+                line-height: 1.9; 
+                max-width: 800px;
+            }
+
+            .section { 
+                margin: 0 var(--side-padding) 150px var(--side-padding); 
+                padding-top: 80px;
+                border-top: 1px solid #f0f0f0;
+            }
+
+            .section h2 { 
+                font-size: 2.8rem; 
+                font-weight: 800; 
+                margin-bottom: 50px; 
+                letter-spacing: -2px; 
+            }
+
+            .content { 
+                font-family: var(--font-serif);
+                font-size: 1.2rem; 
+                color: #222; 
+                line-height: 2.0; 
+                max-width: 850px;
+            }
+
+            .content h3 { 
+                font-family: var(--font-sans);
+                font-size: 1.8rem; 
+                margin: 60px 0 25px 0; 
+                font-weight: 800;
+            }
+
+            .content blockquote { 
+                margin: 80px 0; 
+                padding: 0 0 0 40px; 
+                border-left: 1px solid #000; 
+                font-size: 1.8rem; 
+                font-weight: 300; 
+                font-style: italic; 
+                line-height: 1.4;
+            }
+
+            .image-container { margin: 60px 0; }
+            .image-container img { width: 100%; height: auto; object-fit: cover; }
+            .caption { font-size: 0.85rem; color: #999; margin-top: 15px; text-transform: uppercase; }
+
+            @media (max-width: 768px) {
+                :root { --side-padding: 30px; }
+                h1 { font-size: 3.5rem; }
+                .sub-title-inline { font-size: 1.8rem; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="cover-img-container">
+            <img src="https://mine-moodboard-bucket.s3.ap-southeast-2.amazonaws.com/moodboards/f11dc998-5a9d-4682-8abf-4b7308156c43.png" class="cover-img">
+        </div>
+        <header>
+            <h1><span class="main-title">나파 밸리의 컬트 와인</span><span class="sub-title-inline">기술과 전통의 교차점</span></h1>
+            <p class="subtitle">미국 와인산업의 성장과 혁신</p>
+            <div class="tags"><span class="tag">#와인</span> <span class="tag">#나파 밸리</span> <span class="tag">#컬트 와인</span></div>
+        </header>
+        
+        <div class="intro">미국 나파 밸리에서 탄생한 컬트 와인의 성장 이야기를 통해 현대 와인산업의 새로운 트렌드와 기술적 혁신을 살펴봅니다.</div>
+    
+        <div class="section">
+            <h2>미국 와인산업의 혁신</h2>
+            <div class="image-container">
+                <img src="https://wine21.speedgabia.com/NEWS_MST/froala/202310/20231017142141760502.jpeg" alt="나파 밸리의 와인 양조 시설" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
+                <p class="caption">나파 밸리의 와인 양조 시설</p>
+            </div>
+            <div class="content"><p>미국의 나파 밸리는 와인산업에서 기술과 전통이 만나는 곳입니다. 자본가들의 투자와 혁신적인 기술력이 결합하여 고품질의 와인을 양조하는데 기여하고 있습니다.</p></div>
+        </div>
+        
+        <div class="section">
+            <h2>컬트 와인의 탄생</h2>
+            <div class="image-container">
+                <img src="https://wine21.speedgabia.com/NEWS_MST/froala/202310/20231017142623841068.jpeg" alt="컬트 와인 시음 이벤트" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
+                <p class="caption">컬트 와인 시음 이벤트</p>
+            </div>
+            <div class="content"><p>나파 밸리에서 탄생한 컬트 와인은 소수 생산량으로 한정된 와인으로, 높은 품질과 독특한 맛으로 와인 애호가들 사이에서 큰 사랑을 받고 있습니다.</p></div>
+        </div>
+        
+        <div class="section">
+            <h2>와인산업의 미래</h2>
+            <div class="image-container">
+                <img src="https://wine21.speedgabia.com/NEWS_MST/TITLE/17000/17657.png" alt="미국 와인산업 혁신" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
+                <p class="caption">미국 와인산업 혁신</p>
+            </div>
+            <div class="content"><p>미국 와인산업은 과학기술과 혁신을 통해 더욱 발전하고 있습니다. 나파 밸리를 중심으로 한 혁신적인 양조 기술은 세계적인 와인 시장에서 주목받고 있습니다.</p></div>
+        </div>
+        
+        <div class="section">
+            <h2>와인 평론가들의 시선</h2>
+            <div class="image-container">
+                <img src="https://image.fnnews.com/resource/media/image/2024/05/27/202405271547193886_l.png" alt="와인 평론가들" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
+                <p class="caption">와인 평론가들</p>
+            </div>
+            <div class="content"><p>로버트 파커, 제임스 서클린과 같은 와인 평론가들의 점수는 미국 와인의 품질 향상과 세계적인 인지도 상승에 기여하며, 나파 밸리 와인의 경쟁력을 높이고 있습니다.</p></div>
+        </div>
+        
+    </body>
+    </html>
+    

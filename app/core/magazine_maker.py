@@ -41,7 +41,7 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         print(f"🎭 User mood: {user_mood}")
 
     # 1. [취재] Tavily로 정보와 이미지 수집
-    search_results, images = search_with_tavily(topic)
+    search_results, images = search_with_tavily(topic, topic=topic)
     
     # 2. [정독] 상위 1개 글 정독 (Jina)
     deep_content = ""

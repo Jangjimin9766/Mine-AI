@@ -15,12 +15,12 @@ def _get_tavily_client():
         _tavily_client = TavilyClient(api_key=api_key)
     return _tavily_client
 
-def search_with_tavily(query: str):
+def search_with_tavily(query: str, topic: str = None):
     """
     Tavily를 이용해 검색하고, AI가 읽기 좋은 답변과 이미지를 가져옵니다.
     이미지가 없으면 플레이스홀더 이미지를 사용합니다.
     """
-    print(f"🔎 Tavily Searching for: {query}")
+    print(f"🔎 Tavily Searching for: {query} (Topic: {topic})")
     
     # 플레이스홀더 이미지 (Tavily 실패 시 사용)
     FALLBACK_IMAGES = [
@@ -37,12 +37,14 @@ def search_with_tavily(query: str):
         print(f"⚠️ Tavily API key not configured, using fallback")
         return [], FALLBACK_IMAGES
     
-    # 검색어 정교화: 주제와 무관한 게임/이미지 노이즈 방지
-    # 예: "잠재력" -> "와인 숙성 잠재력", "패션 스타일" 등 도메인 명시
+    # 검색어 정교화: 주제와 무관한 게임/이미지 노이즈 방지 (도메인 앵커링)
     clean_query = query
-    if any(k in query for k in ['잠재력', '레벨', '각성', '강화']):
-        # 현재는 간단하게 처리하지만, 필요시 도메인 컨텍스트를 받아 결합 가능
-        pass 
+    if topic:
+        # 중의적 키워드가 있을 경우 주제를 결합하여 도메인 고정
+        ambiguous_keywords = ['잠재력', '레벨', '각성', '강화', '아이템', '스킬', '공략', '티어']
+        if any(k in query for k in ambiguous_keywords):
+            clean_query = f"{topic} {query}"
+            print(f"⚓ Domain Anchoring applied: {clean_query}")
     
     try:
         # search_depth="advanced": 좀 더 깊이 있게 검색
@@ -57,10 +59,17 @@ def search_with_tavily(query: str):
         results = response.get('results', [])
         images = response.get('images', [])
         
-        # 이미지 필터링 로직: 게임 위키나 불필요한 도메인 제외 시도
+        # 이미지 필터링 로직: 게임 위키나 불필요한 도메인 제외 시도 (할루시네이션 방지)
         filtered_images = []
+        noise_domains = [
+            'wikia', 'fandom', 'game', 'screenshot', 'awakening', 
+            'inven', 'ruliweb', 'dcinside', 'namu.wiki', 'strategywiki',
+            'mobiware', 'appstore', 'play.google'
+        ]
+        
         for img in images:
-            if any(noise in img.lower() for noise in ['wikia', 'fandom', 'game', 'screenshot', 'awakening']):
+            img_lower = img.lower()
+            if any(noise in img_lower for noise in noise_domains):
                 continue
             filtered_images.append(img)
         
@@ -68,7 +77,7 @@ def search_with_tavily(query: str):
         
         # 이미지가 없으면 플레이스홀더 사용
         if not images or len(images) == 0:
-            print(f"⚠️ No images found, using fallback images")
+            print(f"⚠️ No images found after filtering, using fallback images")
             images = FALLBACK_IMAGES
         
         # 최소 5개 이미지 보장

@@ -44,7 +44,7 @@ Section 2-3 (BODY - layout_type: "split_left" or "split_right"):
   * Opening statement (thesis)
   * 2-3 supporting facts/examples
   * Practical insight or application
-- Length: 800-1200 chars each
+- Length: 800-1500 chars each (Mandatory minimum 800)
 - Example topics: 
   * "도쿄 vs 오사카: 데이터로 본 여행 스타일 차이"
   * "현지인이 추천한 숨은 맛집 3곳 (가격대별)"
@@ -52,13 +52,13 @@ Section 2-3 (BODY - layout_type: "split_left" or "split_right"):
 Section 4 (DEPTH - layout_type: "basic"):
 - Role: Go deeper into one interesting angle
 - Content: Expert perspective, historical context, or trend analysis
-- Length: 1000-1500 chars
+- Length: 1000-1500 chars (Mandatory minimum 1000)
 - Must include: At least one quote or statistic
 
 Section 5-6 (PRACTICAL/CLOSER - layout_type: "basic"):
 - Role: Give actionable takeaways
 - Content: How-to steps, recommendations, or summary
-- Length: 600-800 chars
+- Length: 800-1200 chars (Mandatory minimum 800)
 - Format: Use <ul><li> for lists when showing options/steps
 
 [HTML CONTENT FORMATTING GUIDE]
