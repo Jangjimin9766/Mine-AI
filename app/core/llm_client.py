@@ -7,6 +7,21 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+# ========== Custom Exceptions ==========
+class LLMClientError(Exception):
+    """LLM 클라이언트 관련 기본 예외"""
+    pass
+
+class APIKeyNotConfiguredError(LLMClientError):
+    """API 키가 설정되지 않았을 때 발생"""
+    pass
+
+class LLMGenerationError(LLMClientError):
+    """LLM 응답 생성 실패 시 발생"""
+    pass
+
+
 class LLMClient:
     def __init__(self):
         self.openai_client = None
@@ -55,6 +70,10 @@ class LLMClient:
                 self.gemini_model = None
         else:
             logger.info("ℹ️ GEMINI_API_KEY not set. Gemini will not be available.")
+
+    def is_configured(self) -> bool:
+        """API 키가 올바르게 설정되어 있는지 확인 (OpenAI 또는 Gemini 중 하나라도 설정되어 있으면 True)"""
+        return bool(self.openai_client or self.gemini_model)
 
     def generate_text(self, system_prompt: str, user_prompt: str, temperature: float = 0.7) -> str:
         """

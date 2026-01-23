@@ -408,6 +408,7 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
         elif intent == 'SIMPLIFY':
             # 간단하게 (V2의 CHANGE_TONE 프롬프트 재사용)
             tone_prompt = CHANGE_TONE_PROMPT_V2.format(
+                topic=topic,
                 existing_content=original_content,
                 message="간단하게, 짧게, 쉽게"
             )
@@ -420,6 +421,7 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
         elif intent == 'EXPAND':
             # 자세하게 (V2의 CHANGE_TONE 프롬프트 재사용)
             tone_prompt = CHANGE_TONE_PROMPT_V2.format(
+                topic=topic,
                 existing_content=original_content,
                 message="더 자세하게, 길게, 깊이있게"
             )
@@ -443,6 +445,7 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
                 available_images = "[]"
             
             append_prompt = APPEND_CONTENT_PROMPT_V2.format(
+                topic=topic,
                 existing_content=original_content,
                 message=message,
                 available_images=available_images
