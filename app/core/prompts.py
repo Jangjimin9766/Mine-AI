@@ -332,14 +332,14 @@ Analyze the user's message within the context of the Magazine Topic ({topic}). D
 
 [OUTPUT FORMAT]
 ```json
-{
+{{
   "intent": "INTENT_NAME",
   "confidence": 0.85,
   "reasoning": "User used '좀 더 편하게' which indicates casual tone change without content modification",
   "target_paragraph": null,
   "preserve_content": true,
   "search_needed": false
-}
+}}
 ```
 
 Now analyze: {message}
