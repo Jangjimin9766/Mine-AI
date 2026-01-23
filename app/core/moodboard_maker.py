@@ -130,6 +130,7 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
 
     # 2. Generate Image (Local SDXL)
     try:
+        print("🖼️ Generating image with SDXL...")
         image_url = local_diffusion_client.generate_image(sd_prompt)
     except Exception as e:
         print(f"❌ Image generation exception: {e}")
