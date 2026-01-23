@@ -311,8 +311,12 @@ def handle_edit_section(data: dict) -> dict:
         logger.info(f"✏️ [2/3] Editing section: {section_data.get('heading', 'N/A')[:30]}")
         logger.info(f"✏️ [2/3] User request: {message[:50]}...")
         
+        # 매거진 주제 추출 (할루시네이션 방지를 위해 topic 전달)
+        magazine_title = data.get("magazine_title", "")  # Spring에서 전달받음
+        topic = magazine_title if magazine_title else section_data.get('heading', 'Magazine Content')
+        
         # 섹션 레벨 편집 수행
-        result = edit_section_content(section_data, message)
+        result = edit_section_content(section_data, message, topic=topic)
         
         logger.info(f"✏️ [3/3] Result success: {result.get('success', False)}")
         

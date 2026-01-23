@@ -48,29 +48,31 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     topic_emphasis = ", ".join(topic_keywords) if topic_keywords else "general lifestyle"
 
     system_prompt = f"""
-    You are an expert Art Director creating prompts for Stable Diffusion XL.
-    Your task is to create a 'Background Moodboard' image prompt.
+    You are an award-winning Art Director and Senior Photographer.
+    Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's moodboard.
     
-    [CRITICAL - MUST INCLUDE THESE TOPICS]
-    The image MUST visually represent: {topic_emphasis}
-    - If the topic is about food/cookies/cafe → include food photography elements
-    - If the topic is about fashion → include fashion/clothing elements  
-    - If the topic is about travel/places → include location-specific elements
-    - DO NOT ignore the actual topic and only add abstract style words!
+    [SUBJECT-SPECIFIC FOCUS (MANDATORY)]
+    The image MUST clearly feature elements of: {topic_emphasis}
+    - **Food/Cafe**: Detail-oriented food photography. Focus on textures (steam, moisture, crumbs). Artisan ceramics.
+    - **Fashion/Beauty**: High-fashion editorial look. Focus on fabric textures (silk, wool, leather) and luxury accessories.
+    - **Travel/Architecture**: Atmospheric location shots. Focus on lighting, scale, and unique architectural details.
+    - **Art/Design**: Abstract or conceptual visuals. Focus on color harmony, shadow play, and artistic objects.
+    - **Tech/Minimal**: Futuristic and clean. Focus on sleek surfaces, light-ray effects, and UI-inspired aesthetics.
     
-    [DESIGN GOALS]
-    1. **Role**: Background for app interface, but MUST reflect the topic visually.
-    2. **Aesthetic**: Clean, atmospheric, professional product/lifestyle photography style.
-    3. **Variation**: {random_variation}
+    [PHOTOGRAPHY PARAMETERS]
+    1. **Subject**: Specific, high-definition subject related to the Topic ({topic_emphasis}).
+    2. **Composition**: Choose most effective (Flatlay, Extreme Close-up, Wide landscape, Golden ratio).
+    3. **Lighting**: Cinematic lighting (Volumetric light, Soft natural dawn light, Dramatic REMBRANDT shadows).
+    4. **Camera/Film**: 85mm lens for products, 24mm for landscapes. High-speed film grain (minimal), crisp focus.
+    5. **Style**: Premium magazine editorial style (Kinfolk, Magazine B, Vogue quality).
     
-    [PROMPT FORMAT]
-    - Start with the ACTUAL SUBJECT (cookies, food, cafe, fashion item, etc.)
-    - Then add photography style (food photography, flatlay, product shot, etc.)
-    - Then add lighting/quality modifiers (soft lighting, 8k, professional)
+    [PROMPT STRUCTURE]
+    [Subject Detail], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: 8k, photorealistic, mastery, masterpiece]
     
-    Output ONLY the English prompt.
-    Example for cookies/cafe: "gourmet chewy cookies on marble surface, warm cafe aesthetic, food photography, soft natural lighting, cozy atmosphere, 8k, professional"
-    Example for fashion: "luxury handbag flatlay, fashion editorial, minimalist, soft shadows, high-end product photography, 8k"
+    [CRITICAL CONSTRAINTS]
+    - Output ONLY the prompt text.
+    - Do NOT use abstract words only. The Topic MUST be the hero of the image.
+    - Ensure the mood aligns with: {user_mood or "Sophisticated"}
     """
 
     user_prompt = f"""
@@ -128,6 +130,7 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
 
     # 2. Generate Image (Local SDXL)
     try:
+        print("🖼️ Generating image with SDXL...")
         image_url = local_diffusion_client.generate_image(sd_prompt)
     except Exception as e:
         print(f"❌ Image generation exception: {e}")

@@ -35,4 +35,12 @@ ENV/
 .idea/
 .vscode/
 
+# Test/Debug outputs (generated magazine files)
+my_magazine.json
+saved_magazine.html
+preview_magazine*.html
+magazine_*.html
+list_response.json
+magazine_demo*.html
+
 

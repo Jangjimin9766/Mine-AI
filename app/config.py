@@ -10,11 +10,12 @@ class Settings(BaseSettings):
         extra='ignore'
     )
 
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
     SPRING_API_URL: str = "http://localhost:8080"
     
     # 검색용 키 추가
-    TAVILY_API_KEY: str
+    TAVILY_API_KEY: str = ""
     JINA_API_KEY: str = "" # 선택 사항이라 기본값 비워둠
     
     # 보안 키

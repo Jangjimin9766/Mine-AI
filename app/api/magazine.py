@@ -27,19 +27,28 @@ def handle_magazine_request(request: UnifiedMagazineRequest):
 
 def handle_create_magazine(request: UnifiedMagazineRequest):
     """매거진 생성"""
+    print(f"🚀 [Python] handle_create_magazine started for topic: {request.topic}")
     if not request.topic:
         raise HTTPException(status_code=400, detail="topic is required for create_magazine")
     
-    magazine_data = generate_magazine_content(
-        topic=request.topic,
-        user_interests=request.user_interests,
-        user_mood=request.user_mood
-    )
-    
-    if not magazine_data:
-        raise HTTPException(status_code=500, detail="Failed to generate magazine")
-    
-    return magazine_data
+    try:
+        magazine_data = generate_magazine_content(
+            topic=request.topic,
+            user_interests=request.user_interests,
+            user_mood=request.user_mood
+        )
+        
+        if not magazine_data:
+            print("❌ [Python] generate_magazine_content returned None")
+            raise HTTPException(status_code=500, detail="Failed to generate magazine")
+        
+        print(f"✅ [Python] Magazine generated successfully. Title: {magazine_data.get('title')}")
+        return magazine_data
+    except Exception as e:
+        print(f"❌ [Python] Exception in handle_create_magazine: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def handle_edit_magazine(request: UnifiedMagazineRequest):
@@ -113,7 +122,9 @@ def handle_edit_section(request: UnifiedMagazineRequest):
         raise HTTPException(status_code=400, detail="section_data is required for edit_section")
     
     try:
-        result = edit_section_content(request.section_data, request.message)
+        # 잡지 데이터에서 주제 추출
+        topic = request.section_data.get('magazine_title') or request.topic or "Magazine Content"
+        result = edit_section_content(request.section_data, request.message, topic=topic)
         return result
     except Exception as e:
         return {

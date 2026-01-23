@@ -2,6 +2,8 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 from app.main import app
 
+from app.config import settings
+
 client = TestClient(app)
 
 @patch("app.core.llm_client.llm_client.generate_text")
@@ -13,7 +15,7 @@ def test_create_moodboard(mock_generate_image, mock_generate_text):
 
     response = client.post(
         "/api/magazine/moodboard",
-        headers={"x-api-key": "mine-secret-key-1234"},
+        headers={"x-api-key": settings.PYTHON_API_KEY},
         json={
             "topic": None,
             "user_mood": "Sophisticated",

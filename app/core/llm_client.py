@@ -1,7 +1,11 @@
-from openai import OpenAI
-from app.config import settings
 import json
-import traceback
+import logging
+import os
+import openai
+import google.generativeai as genai
+from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 # ========== Custom Exceptions ==========
@@ -20,110 +24,149 @@ class LLMGenerationError(LLMClientError):
 
 class LLMClient:
     def __init__(self):
-        # 지연 초기화를 위해 None으로 시작
-        self._client = None
-        self.default_model = "gpt-3.5-turbo"
+        self.openai_client = None
+        self.gemini_model = None
+        self._initialize_clients()
 
-    def _get_client(self):
-        """OpenAI 클라이언트를 지연 초기화하여 반환"""
-        if self._client is None:
-            api_key = settings.OPENAI_API_KEY
-            if not api_key or api_key == "test-key":
-                return None  # 테스트 환경에서는 None 반환
-            self._client = OpenAI(api_key=api_key)
-        return self._client
-    
+    def _initialize_clients(self):
+        # Initialize OpenAI if key exists (PRIORITY)
+        if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY.strip():
+            try:
+                self.openai_client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+                logger.info("✅ OpenAI client initialized successfully.")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize OpenAI client: {e}")
+        else:
+            logger.warning("⚠️ OPENAI_API_KEY not set or empty. OpenAI will not be available.")
+
+        # Initialize Gemini if key exists
+        if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
+            try:
+                genai.configure(api_key=settings.GEMINI_API_KEY)
+                # Try multiple model names in order of preference
+                # Note: Use models that work with v1beta API
+                # gemini-pro is the most stable and widely supported
+                gemini_models = [
+                    'gemini-1.5-flash',  # Fast, highly capable, follows instructions well
+                    'gemini-1.5-pro',    # Most capable model
+                    'gemini-pro',        # Legacy fallback
+                ]
+                
+                for model_name in gemini_models:
+                    try:
+                        self.gemini_model = genai.GenerativeModel(model_name)
+                        logger.info(f"✅ Gemini client initialized (model: {model_name}).")
+                        break
+                    except Exception as e:
+                        logger.warning(f"Failed to initialize {model_name}: {e}")
+                        continue
+                
+                if not self.gemini_model:
+                    logger.error(f"❌ All Gemini models failed. Tried: {gemini_models}")
+                    logger.error("Please check your GEMINI_API_KEY and available models.")
+                    logger.error("You can check available models at: https://ai.google.dev/models/gemini")
+            except Exception as e:
+                logger.error(f"❌ Failed to configure Gemini: {e}")
+                self.gemini_model = None
+        else:
+            logger.info("ℹ️ GEMINI_API_KEY not set. Gemini will not be available.")
+
     def is_configured(self) -> bool:
-        """API 키가 올바르게 설정되어 있는지 확인"""
-        api_key = settings.OPENAI_API_KEY
-        return api_key and api_key != "test-key"
+        """API 키가 올바르게 설정되어 있는지 확인 (OpenAI 또는 Gemini 중 하나라도 설정되어 있으면 True)"""
+        return bool(self.openai_client or self.gemini_model)
 
-    def generate_text(self, system_prompt: str, user_prompt: str, temperature: float = 0.7, raise_on_error: bool = False) -> str:
+    def generate_text(self, system_prompt: str, user_prompt: str, temperature: float = 0.7) -> str:
         """
-        일반적인 텍스트 생성 (요약, 채팅, 태깅 등)
-        
-        Args:
-            raise_on_error: True이면 에러 발생 시 예외를 던짐. False이면 빈 문자열 반환.
+        Generates text using the available LLM provider.
+        Strategy: If Gemini is available, use it first (for users without OpenAI).
+        Otherwise, use OpenAI as the standard/default.
+        Falls back to the other if the first one fails.
         """
-        client = self._get_client()
-        if client is None:
-            error_msg = "OpenAI API key not configured. Check OPENAI_API_KEY in .env"
-            print(f"⚠️ {error_msg}")
-            if raise_on_error:
-                raise APIKeyNotConfiguredError(error_msg)
-            return ""
+        # Strategy: If both are available, try Gemini first (for users who prefer Gemini)
+        # If only one is available, use that one
+        # If the first fails, fallback to the other
         
-        try:
-            response = client.chat.completions.create(
-                model=self.default_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=temperature,
-            )
-            result = response.choices[0].message.content.strip()
-            if not result:
-                print("⚠️ LLM returned empty response")
-            return result
-        except Exception as e:
-            error_msg = f"LLM Text Generation Error: {e}"
-            print(f"❌ {error_msg}")
-            print(f"📋 Traceback: {traceback.format_exc()}")
-            if raise_on_error:
-                raise LLMGenerationError(error_msg) from e
-            return ""
+        # Try Gemini first if available (for users who have Gemini but not OpenAI)
+        if self.gemini_model:
+            try:
+                # Re-initialize model with system_instruction for better directive adherence
+                model_name = getattr(self.gemini_model, 'model_name', 'gemini-pro').split('/')[-1]
+                model_with_instr = genai.GenerativeModel(
+                    model_name=model_name,
+                    system_instruction=system_prompt
+                )
+                
+                response = model_with_instr.generate_content(
+                    user_prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=temperature,
+                        max_output_tokens=8192
+                    )
+                )
+                if not response.text:
+                    raise ValueError("Gemini returned empty response")
+                return response.text
+            except Exception as e:
+                logger.error(f"❌ Gemini generation failed: {e}")
+                logger.info("Falling back to OpenAI...")
 
-    def generate_json(self, system_prompt: str, user_prompt: str, temperature: float = 0.7, raise_on_error: bool = False) -> dict:
+        # Fallback to OpenAI (standard/default) if Gemini failed or not available
+        if self.openai_client:
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=temperature
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                logger.error(f"❌ OpenAI generation failed: {e}")
+                raise e
+
+        # No client available
+        error_msg = "No LLM client configured. "
+        if not settings.OPENAI_API_KEY or not settings.OPENAI_API_KEY.strip():
+            error_msg += "OPENAI_API_KEY is missing or empty. "
+        if not settings.GEMINI_API_KEY or not settings.GEMINI_API_KEY.strip():
+            error_msg += "GEMINI_API_KEY is missing or empty. "
+        error_msg += "Please set at least one API key in .env file."
+        raise ValueError(error_msg)
+
+    def generate_json(self, system_prompt: str, user_prompt: str, temperature: float = 0.7) -> dict:
         """
-        JSON 포맷 강제 생성 (매거진 데이터 생성용)
-        
-        Args:
-            raise_on_error: True이면 에러 발생 시 예외를 던짐. False이면 빈 딕셔너리 반환.
+        Generates a JSON response and ensures it is valid.
         """
-        client = self._get_client()
-        if client is None:
-            error_msg = "OpenAI API key not configured. Check OPENAI_API_KEY in .env"
-            print(f"⚠️ {error_msg}")
-            if raise_on_error:
-                raise APIKeyNotConfiguredError(error_msg)
-            return {}
+        text_response = self.generate_text(system_prompt, user_prompt, temperature)
         
+        # Strip markdown code blocks if present
+        cleaned_response = text_response.strip()
+        if "```" in cleaned_response:
+            # Handle ```json ... ``` or just ``` ... ```
+            import re
+            json_pattern = r"```(?:json)?\s*(.*?)\s*```"
+            match = re.search(json_pattern, cleaned_response, re.DOTALL)
+            if match:
+                cleaned_response = match.group(1)
+            else:
+                # Fallback: remove symbols manually if regex fails
+                cleaned_response = cleaned_response.replace("```json", "").replace("```", "").strip()
+
         try:
-            response = client.chat.completions.create(
-                model=self.default_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=temperature,
-                response_format={"type": "json_object"}
-            )
-            
-            content = response.choices[0].message.content
-            if not content:
-                print("⚠️ LLM returned empty JSON response")
-                if raise_on_error:
-                    raise LLMGenerationError("LLM returned empty JSON response")
-                return {}
-            
-            result = json.loads(content)
-            return result
+            return json.loads(cleaned_response)
         except json.JSONDecodeError as e:
-            error_msg = f"LLM JSON Parse Error: {e}"
-            print(f"❌ {error_msg}")
-            print(f"📋 Raw content: {content[:500] if content else 'None'}")
-            if raise_on_error:
-                raise LLMGenerationError(error_msg) from e
-            return {}
-        except Exception as e:
-            error_msg = f"LLM JSON Generation Error: {e}"
-            print(f"❌ {error_msg}")
-            print(f"📋 Traceback: {traceback.format_exc()}")
-            if raise_on_error:
-                raise LLMGenerationError(error_msg) from e
-            return {}
+            logger.error(f"Failed to parse JSON response. Raw output: {text_response}")
+            # Final attempt: extract anything that looks like a JSON object
+            try:
+                import re
+                json_match = re.search(r'\{.*\}', cleaned_response, re.DOTALL)
+                if json_match:
+                    return json.loads(json_match.group())
+            except:
+                pass
+            raise e
 
-
-# 싱글톤 인스턴스 생성 (어디서든 llm_client만 임포트하면 됨)
+# Export a single instance
 llm_client = LLMClient()

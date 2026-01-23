@@ -26,7 +26,10 @@ jobs:
     - name: Run tests
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+        PYTHON_API_KEY: "mine-secret-key-1234"
+        PYTHONPATH: .
       run: |
         pytest
 
