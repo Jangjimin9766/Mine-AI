@@ -44,30 +44,112 @@ def generate_preview(magazine_id, token, base_url="http://52.63.142.228:8080"):
         <meta charset="UTF-8">
         <title>{data.get('title', 'Magazine Preview')}</title>
         <style>
-            body {{ font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; line-height: 1.7; max-width: 900px; margin: 0 auto; padding: 40px 20px; background: #f4f4f4; color: #222; }}
-            header {{ text-align: center; padding: 60px 0; border-bottom: 3px solid #000; background: #fff; margin-bottom: 40px; border-radius: 8px 8px 0 0; position: relative; }}
-            h1 {{ font-size: 3.5rem; margin-bottom: 15px; letter-spacing: -1px; line-height: 1.2; text-transform: none; }}
-            .main-title {{ display: block; font-weight: 800; color: #000; }}
-            .sub-title-inline {{ display: block; font-size: 2.2rem; color: #444; margin-top: 10px; font-weight: 400; }}
-            .subtitle {{ font-style: italic; color: #555; font-size: 1.4rem; margin-bottom: 20px; }}
-            .intro {{ font-size: 1.2rem; margin: 40px 0; background: #fff; padding: 30px; border-left: 8px solid #000; line-height: 1.8; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }}
-            .section {{ margin-bottom: 80px; background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); overflow: hidden; }}
-            .section h2 {{ font-size: 2.2rem; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-top: 0; color: #000; }}
-            .content {{ font-size: 1.1rem; color: #333; line-height: 1.8; }}
-            .content h3 {{ font-size: 1.5rem; margin-top: 30px; color: #111; border-left: 4px solid #333; padding-left: 15px; }}
-            .content p {{ margin: 20px 0; }}
-            .content strong {{ color: #000; font-weight: 800; background: linear-gradient(120deg, #fff3b0 0%, #fff3b0 100%); background-repeat: no-repeat; background-size: 100% 30%; background-position: 0 80%; }}
-            .content blockquote {{ font-size: 1.3rem; border-left: 5px solid #000; margin: 30px 0; padding: 20px 30px; color: #444; font-style: italic; background: #f9f9f9; }}
-            .content ul {{ padding-left: 20px; }}
-            .content li {{ margin-bottom: 10px; }}
-            .image-container {{ position: relative; margin: 30px 0; text-align: center; background: #eee; border-radius: 8px; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #ddd; }}
-            img {{ max-width: 100%; max-height: 600px; object-fit: contain; border-radius: 4px; }}
-            .caption {{ font-size: 0.95rem; color: #777; margin-top: 15px; font-style: italic; }}
-            .tag {{ display: inline-block; background: #222; color: #fff; padding: 6px 15px; border-radius: 50px; font-size: 0.85rem; margin-right: 8px; font-weight: 600; text-transform: none; letter-spacing: normal; }}
-            .cover-img {{ width: 100%; height: 400px; object-fit: cover; border-radius: 8px; margin-bottom: 30px; }}
+            :root {{
+                --bg-color: #2b2d2e;
+                --card-bg: #3d3f40;
+                --text-main: #ffffff;
+                --text-sub: #a0a0a0;
+                --accent: #4a90e2;
+            }}
+            body {{ 
+                font-family: 'Apple SD Gothic Neo', 'Pretendard', sans-serif; 
+                line-height: 1.6; 
+                max-width: 1200px; 
+                margin: 0 auto; 
+                padding: 40px; 
+                background: var(--bg-color); 
+                color: var(--text-main); 
+            }}
+            header {{ 
+                text-align: left; 
+                padding: 40px 0; 
+                display: flex; 
+                flex-direction: column; 
+                gap: 20px;
+                border-bottom: 1px solid #444;
+                margin-bottom: 40px;
+            }}
+            .cover-img {{ 
+                width: 100%; 
+                height: 500px; 
+                object-fit: cover; 
+                border-radius: 16px; 
+                box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            }}
+            h1 {{ font-size: 3rem; margin: 0; font-weight: 800; letter-spacing: -1.5px; }}
+            .subtitle {{ font-size: 1.25rem; color: var(--text-sub); margin: 0; }}
+            .intro {{ 
+                font-size: 1.2rem; 
+                color: #ddd; 
+                margin: 40px 0; 
+                padding: 30px; 
+                background: rgba(255,255,255,0.05); 
+                border-radius: 12px;
+                line-height: 1.8;
+            }}
+            .grid-container {{
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+                gap: 30px;
+            }}
+            .card {{ 
+                background: var(--card-bg); 
+                border-radius: 20px; 
+                overflow: hidden; 
+                box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+                transition: transform 0.3s ease;
+                display: flex;
+                flex-direction: column;
+                position: relative;
+            }}
+            .card:hover {{ transform: translateY(-10px); }}
+            .card-image-container {{
+                width: 100%;
+                height: 240px;
+                background: #444;
+                overflow: hidden;
+                position: relative;
+            }}
+            .card-image-container img {{
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }}
+            .card-content {{ padding: 25px; }}
+            .card-heading {{ 
+                font-size: 1.4rem; 
+                font-weight: 700; 
+                margin-bottom: 15px; 
+                line-height: 1.3;
+            }}
+            .card-text {{ 
+                font-size: 1rem; 
+                color: #ccc; 
+                display: -webkit-box;
+                -webkit-line-clamp: 4;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }}
+            .tag {{ 
+                background: rgba(255,255,255,0.1); 
+                color: #eee; 
+                padding: 4px 12px; 
+                border-radius: 6px; 
+                font-size: 0.8rem; 
+                margin-right: 6px;
+            }}
+            blockquote {{ 
+                margin: 20px 0;
+                padding: 15px 20px;
+                background: rgba(0,0,0,0.2);
+                border-left: 4px solid var(--accent);
+                font-style: italic;
+                color: #eee;
+            }}
+            strong {{ color: var(--accent); font-weight: 700; }}
         </style>
     </head>
-    <body style="background:#f4f4f4">
+    <body>
         <header>
             <img src="{cover_url}" class="cover-img">
             <h1>{title_html}</h1>
@@ -76,28 +158,29 @@ def generate_preview(magazine_id, token, base_url="http://52.63.142.228:8080"):
         </header>
         
         <div class="intro">{intro_text}</div>
+        <div class="grid-container">
     """
     
-    # Add Sections
+    # Add Sections as Cards
     for section in sorted(data.get('sections', []), key=lambda x: x.get('displayOrder', 0)):
         img_url = section.get('imageUrl') or ""
-        caption = section.get('caption')
-        caption_text = "" if not caption or str(caption).lower() == 'none' else str(caption)
-        caption_html = f'<p class="caption">{caption_text}</p>' if caption_text else ''
+        heading = section.get('heading', '')
+        content = section.get('content', '')
         
         html_template += f"""
-        <div class="section">
-            <h2>{section.get('heading', '')}</h2>
-            <div class="image-container">
-                <img src="{img_url}" alt="{caption_text}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
-                {caption_html}
+        <div class="card">
+            <div class="card-image-container">
+                <img src="{img_url}" onerror="this.src='https://via.placeholder.com/400x300?text=Image+Loading...';">
             </div>
-            <div class="content">{section.get('content', '')}</div>
+            <div class="card-content">
+                <div class="card-heading">{heading}</div>
+                <div class="card-text">{content}</div>
+            </div>
         </div>
         """
         
     html_template += """
+        </div> <!-- End grid-container -->
     </body>
     </html>
     """

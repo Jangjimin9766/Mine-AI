@@ -1,5 +1,6 @@
 from app.core.llm_client import llm_client
 from app.core.local_diffusion_client import local_diffusion_client
+from app.core.prompts import MOODBOARD_SYSTEM_PROMPT
 import traceback
 
 def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None) -> str:
@@ -47,33 +48,12 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     
     topic_emphasis = ", ".join(topic_keywords) if topic_keywords else "general lifestyle"
 
-    system_prompt = f"""
-    You are an award-winning Art Director and Senior Photographer.
-    Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's moodboard.
-    
-    [SUBJECT-SPECIFIC FOCUS (MANDATORY)]
-    The image MUST clearly feature elements of: {topic_emphasis}
-    - **Food/Cafe**: Detail-oriented food photography. Focus on textures (steam, moisture, crumbs). Artisan ceramics.
-    - **Fashion/Beauty**: High-fashion editorial look. Focus on fabric textures (silk, wool, leather) and luxury accessories.
-    - **Travel/Architecture**: Atmospheric location shots. Focus on lighting, scale, and unique architectural details.
-    - **Art/Design**: Abstract or conceptual visuals. Focus on color harmony, shadow play, and artistic objects.
-    - **Tech/Minimal**: Futuristic and clean. Focus on sleek surfaces, light-ray effects, and UI-inspired aesthetics.
-    
-    [PHOTOGRAPHY PARAMETERS]
-    1. **Subject**: Specific, high-definition subject related to the Topic ({topic_emphasis}).
-    2. **Composition**: Choose most effective (Flatlay, Extreme Close-up, Wide landscape, Golden ratio).
-    3. **Lighting**: Cinematic lighting (Volumetric light, Soft natural dawn light, Dramatic REMBRANDT shadows).
-    4. **Camera/Film**: 85mm lens for products, 24mm for landscapes. High-speed film grain (minimal), crisp focus.
-    5. **Style**: Premium magazine editorial style (Kinfolk, Magazine B, Vogue quality).
-    
-    [PROMPT STRUCTURE]
-    [Subject Detail], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: 8k, photorealistic, mastery, masterpiece]
-    
-    [CRITICAL CONSTRAINTS]
-    - Output ONLY the prompt text.
-    - Do NOT use abstract words only. The Topic MUST be the hero of the image.
-    - Ensure the mood aligns with: {user_mood or "Sophisticated"}
-    """
+    system_prompt = MOODBOARD_SYSTEM_PROMPT.format(
+        topic=topic_emphasis,
+        mood=user_mood or "Sophisticated",
+        interests=", ".join(user_interests) if user_interests else "N/A",
+        keywords=", ".join(magazine_tags) if magazine_tags else "N/A"
+    )
 
     user_prompt = f"""
     [User Context]

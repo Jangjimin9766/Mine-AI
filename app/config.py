@@ -24,5 +24,8 @@ class Settings(BaseSettings):
     # Logtail (Better Stack) 로깅
     LOGTAIL_SOURCE_TOKEN: str = ""  # Better Stack에서 발급받은 토큰
     LOGTAIL_HOST: str = "s1876389.eu-nbg-2.betterstackdata.com"  # Ingesting host
+    
+    # 하이브리드 이미지 생성 설정
+    REMOTE_IMAGE_SERVER_URL: str = ""  # 예: "https://your-ngrok-url.ngrok-free.app/generate"
 
 settings = Settings()

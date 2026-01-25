@@ -100,25 +100,26 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     current_image_url = current_section.get('image_url', '')
     
     system_prompt = """
-    You are rewriting a section of a premium lifestyle magazine.
-    Follow the user's instruction while maintaining HIGH-DENSITY, INFORMATIVE content.
+    You are rewriting a section of a high-end lifestyle magazine (M:ine).
+    Follow the user's instruction while maintaining TOP-TIER EDITORIAL quality.
     
-    [EDITORIAL STANDARDS]
+    [EDITORIAL STANDARDS (V5.2)]
     1. **Hyper-Specificity**: Use concrete brand names, numbers, historical facts, and technical data.
-    2. **Insightful Narrative**: Don't just list facts. Explain the *significance* and *context*.
-    3. **Tone**: Refined, sophisticated, and authoritative formal Korean (습니다/입니다).
+    2. **Lexical Precision**: Avoid clichés. Use "미학적인", "본질적인", "큐레이션된", "압도적인".
+    3. **Atmospheric Depth**: Describe textures, lighting, and mood to match a premium dark UI.
+    4. **Tone**: Authoritative yet calm, formal '습니다' style.
     
     [HTML FORMATTING RULES]
-    - <h3>: Section-level subheadings (Use at least 1-2 to break long text)
-    - <p>: Detailed paragraphs (2-3 sentences each)
+    - <h3>: Section-level subheadings (Mandatory to break long text)
+    - <p>: Detailed paragraphs (Minimum 2-3 sentences each)
     - <strong>: Technical terms or key findings
-    - <blockquote>: Powerful quotes or striking statistics
-    - <ul><li>: Structured data or lists (only for 3+ items)
+    - <blockquote>: Powerful quotes or striking statistics (Use for high impact)
+    - <ul><li>: Structured data or lists (Use for 3+ items)
     
     [CRITICAL CONSTRAINTS]
     - **Content Length**: 800-1,500 characters (Korean) including HTML tags.
     - **Image URL**: ALWAYS preserve the original image_url exactly as provided.
-    - **No Vague Statements**: Avoid generic praise; prove value with evidence.
+    - **No Vague Statements**: Prove value with evidence, not generic praise.
     
     Output JSON (snake_case):
     {
@@ -182,25 +183,26 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
         research_content = "No specific research available. Create content based on general knowledge."
     
     system_prompt = """
-    You are adding a new section to a premium lifestyle magazine.
+    You are adding a new section to a high-end lifestyle magazine (M:ine).
     Create a high-density, authoritative editorial based on the provided research.
     
-    [EDITORIAL STANDARDS]
-    1. **Data-Driven**: Use specific information from [Research Results] (numbers, names, specs).
-    2. **Depth**: Provide context and background. Connect the new section to the magazine's theme.
-    3. **Visual Structure**: Use HTML tags to create a structured, readable layout.
+    [EDITORIAL STANDARDS (V5.2)]
+    1. **Data-Driven**: Use specific information from [Research Results] (numbers, names, technical specs).
+    2. **Lexical Precision**: Use sophisticated terms like "본질적인", "큐레이션", "미학적 완성도".
+    3. **Atmospheric Depth**: Provide sensory context and cultural background.
+    4. **Visual Rhythm**: Use HTML tags to create a structured, premium card layout.
     
     [HTML FORMATTING RULES]
-    - <h3>: Section-level subheadings (Mandatory for sections over 1000 chars)
-    - <p>: Descriptive paragraphs
-    - <strong>: Key technical terms or emphasize points
-    - <blockquote>: Quotes from research or core insights
-    - <ul><li>: Clear lists for facts or features
+    - <h3>: Section-level subheadings (Mandatory for professional hierarchy)
+    - <p>: Descriptive paragraphs (Min 2-3 sentences)
+    - <strong>: Key technical terms or emphasize critical data points
+    - <blockquote>: Quotes from research or powerful editorial insights
+    - <ul><li>: Clear lists for facts, specs, or features (for 3+ items)
     
     [CRITICAL RULES]
     - **Length**: 800-1,500 characters (Korean).
-    - **Persona**: Editor-in-Chief with deep domain knowledge.
-    - **Originality**: Do not repeat existing section topics. Bring a fresh perspective.
+    - **Persona**: Editor-in-Chief with deep domain expertise and refined taste.
+    - **Originality**: Do not repeat existing topics. Bring a fresh, high-end perspective.
     
     Output JSON (snake_case):
     {
@@ -293,11 +295,10 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
     Returns:
         Spring이 기대하는 형식의 응답
     """
-    from app.core.llm_client import llm_client
     from app.core.prompts import (
-        INTENT_CLASSIFICATION_PROMPT_V2,  # V1 → V2로 업그레이드!
-        APPEND_CONTENT_PROMPT_V2,         # V1 → V2로 업그레이드!
-        CHANGE_TONE_PROMPT_V2,            # V1 → V2로 업그레이드!
+        INTENT_CLASSIFICATION_PROMPT_V3,
+        APPEND_CONTENT_PROMPT_V2,
+        CHANGE_TONE_PROMPT_V3,
         FULL_REWRITE_PROMPT,
         SECTION_EDIT_PROMPT
     )
@@ -311,15 +312,15 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
     original_caption = section_data.get('caption', '')
     
     try:
-        # Step 1: 의도 분류 (V2 프롬프트 사용 - 더 세밀한 분류)
-        print(f"✏️ [1/3] Classifying intent (V2) for topic '{topic}': {message[:50]}...")
-        intent_prompt = INTENT_CLASSIFICATION_PROMPT_V2.format(
+        # Step 1: 의도 분류 (V3 프롬프트 사용)
+        print(f"✏️ [1/3] Classifying intent (V3) for topic '{topic}': {message[:50]}...")
+        intent_prompt = INTENT_CLASSIFICATION_PROMPT_V3.format(
             topic=topic,
             existing_content=original_content,
             message=message
         )
         intent_result = llm_client.generate_json(
-            "You are an intent classifier. Output valid JSON only.",
+            "You are a sophisticated editorial strategist. Output valid JSON only.",
             intent_prompt,
             temperature=0.3
         )
@@ -357,15 +358,15 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
                 temperature=0.6
             )
             
-        elif intent in ['CHANGE_TONE_CASUAL', 'CHANGE_TONE_FORMAL', 'CHANGE_TONE_EMOTIONAL', 'CHANGE_TONE']:
-            # 정보 유지 + 톤만 변경 (V2 프롬프트 - 정보 손실 방지 강화)
-            tone_prompt = CHANGE_TONE_PROMPT_V2.format(
+        elif intent in ['TONE_ELEVATE', 'TONE_HUMANIZE', 'TONE_CINEMATIC', 'CHANGE_TONE']:
+            # 정보 유지 + 톤만 변경 (V3 프롬프트 사용)
+            tone_prompt = CHANGE_TONE_PROMPT_V3.format(
                 topic=topic,
                 existing_content=original_content,
                 message=message
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only.",
+                "You are an expert magazine editor. Output HTML content only.",
                 tone_prompt,
                 temperature=0.6
             )
@@ -396,39 +397,39 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
             try:
                 from bs4 import BeautifulSoup
                 soup = BeautifulSoup(original_content, 'html.parser')
-                paragraphs = soup.find_all(['p', 'h3', 'ul', 'ol'])
-                target_idx = intent_result.get('target_paragraph', -1)
-                if target_idx is not None and 0 <= target_idx < len(paragraphs):
-                    paragraphs[target_idx].decompose()
+                # 삭제 가능한 요소들 추출
+                elements = soup.find_all(['p', 'h3', 'blockquote', 'ul', 'ol', 'img'])
+                target_idx = intent_result.get('target_paragraph')
+                
+                # LLM이 'last' 등을 보낼 경우 처리
+                if isinstance(target_idx, str):
+                    if 'last' in target_idx.lower() or '마지막' in target_idx:
+                        target_idx = len(elements) - 1
+                
+                if target_idx is not None and 0 <= int(target_idx) < len(elements):
+                    elements[int(target_idx)].decompose()
+                    print(f"🗑️ Deleted element at index {target_idx}")
+                
                 new_content = str(soup)
-            except ImportError:
-                # BeautifulSoup 없으면 fallback
+            except Exception as e:
+                print(f"⚠️ Deletion failed: {e}")
                 new_content = original_content
                 
-        elif intent == 'SIMPLIFY':
-            # 간단하게 (V2의 CHANGE_TONE 프롬프트 재사용)
+        elif intent in ['SIMPLIFY', 'EXPAND']:
+            # 간단하게/자세하게 (V2의 CHANGE_TONE 프롬프트 재사용)
+            instruction_map = {
+                'SIMPLIFY': "핵심 정보는 유지하되, 문장을 더 짧고 간결하게 다듬어줘. 불필요한 수식어는 제거해.",
+                'EXPAND': "현재 내용을 바탕으로 더 깊이 있는 정보와 구체적인 사례를 추가해서 풍성하게 만들어줘."
+            }
             tone_prompt = CHANGE_TONE_PROMPT_V2.format(
                 topic=topic,
                 existing_content=original_content,
-                message="간단하게, 짧게, 쉽게"
+                message=instruction_map.get(intent, message)
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only.",
+                "You are an expert magazine editor. Output HTML content only.",
                 tone_prompt,
                 temperature=0.6
-            )
-            
-        elif intent == 'EXPAND':
-            # 자세하게 (V2의 CHANGE_TONE 프롬프트 재사용)
-            tone_prompt = CHANGE_TONE_PROMPT_V2.format(
-                topic=topic,
-                existing_content=original_content,
-                message="더 자세하게, 길게, 깊이있게"
-            )
-            new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only.",
-                tone_prompt,
-                temperature=0.7
             )
                 
         else:
