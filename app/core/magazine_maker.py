@@ -1,7 +1,7 @@
 from app.core.llm_client import llm_client
 import json
 from app.core.searcher import search_with_tavily, scrape_with_jina
-from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V5  # V4 → V5로 변경
+from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V7  # V6 → V7로 업그레이드
 
 def generate_magazine_content(topic: str, user_interests: list = None, user_mood: str = None):
     print(f"🎨 Magazine Editor started for: {topic}")
@@ -50,8 +50,8 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         if not deep_content:
             deep_content = search_results[0]['content']
 
-    # 3. [편집] LLM에게 매거진 작성 요청 (V5 프롬프트 - 하이엔드 큐레이션 및 정보 밀도 강화)
-    system_prompt = MAGAZINE_SYSTEM_PROMPT_V5  # V4에서 V5로 업그레이드!
+    # 3. [편집] LLM에게 매거진 작성 요청 (V7 프롬프트 - 멀티 페르소나 협업 추론 적용)
+    system_prompt = MAGAZINE_SYSTEM_PROMPT_V7  # V6에서 V7로 업그레이드!
 
     user_prompt = f"""
     Topic: {topic}
@@ -75,7 +75,7 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
     Remember: Readers should learn something valuable, not just be entertained.
     """
 
-    print(f"🧠 AI Crafting V4 magazine with enhanced quality standards...")
+    print(f"🧠 AI Crafting V7 magazine with Multi-Persona Collaboration...")
     
     # llm_client 사용 (안정성과 창의성의 균형을 위해 0.7로 설정)
     result_json = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
