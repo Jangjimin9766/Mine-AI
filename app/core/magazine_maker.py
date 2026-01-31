@@ -66,13 +66,13 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
     
     Create a premium magazine article with these requirements:
     - At least 4-6 sections with clear hierarchy
-    - Each section must have 3+ concrete facts/examples
+    - **CRITICAL: Each section MUST have 3 distinct paragraphs (<p>).**
+    - **CRITICAL: Embed <img> tags INSIDE the content HTML between paragraphs.**
     - Use specific numbers, names, locations (not vague statements)
     - First section should be layout_type "hero"
-    - Mix of split_left, split_right, and basic layouts
     - Sophisticated Korean (습니다/입니다 formal tone)
     
-    Remember: Readers should learn something valuable, not just be entertained.
+    Remember: Structure should be [Para 1] -> [Img] -> [Para 2] -> [Img] -> [Para 3].Readers should feel they are reading a rich, illustrated article.
     """
 
     print(f"🧠 AI Crafting V4 magazine with enhanced quality standards...")
