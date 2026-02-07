@@ -36,124 +36,221 @@ def generate_preview(magazine_id, token, base_url="http://52.63.142.228:8080"):
     cover_url = data.get('coverImageUrl') or data.get('cover_image_url') or ""
     intro_text = data.get('introduction') or ""
 
-    # --- HTML Template (Reverting to 43's Magazine B Style) ---
+    # --- HTML Template (Premium Glassmorphism & Typography) ---
     html_template = f"""
     <!DOCTYPE html>
     <html lang="ko">
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{data.get('title', 'Magazine Preview')}</title>
+        <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
         <style>
             :root {{
-                --bg-color: #2b2d2e;
-                --card-bg: #3d3f40;
-                --text-main: #ffffff;
-                --text-sub: #a0a0a0;
-                --accent: #4a90e2;
+                --bg-color: #0f1011;
+                --card-bg: rgba(45, 47, 49, 0.7);
+                --text-main: #f5f5f7;
+                --text-sub: #86868b;
+                --accent: #5e5ce6;
+                --glass-border: rgba(255, 255, 255, 0.1);
             }}
             body {{ 
-                font-family: 'Apple SD Gothic Neo', 'Pretendard', sans-serif; 
-                line-height: 1.6; 
-                max-width: 1200px; 
+                font-family: 'Pretendard', sans-serif; 
+                line-height: 1.7; 
+                max-width: 1300px; 
                 margin: 0 auto; 
-                padding: 40px; 
+                padding: 60px 20px; 
                 background: var(--bg-color); 
                 color: var(--text-main); 
+                -webkit-font-smoothing: antialiased;
             }}
             header {{ 
                 text-align: left; 
-                padding: 40px 0; 
+                padding: 60px 0; 
                 display: flex; 
                 flex-direction: column; 
-                gap: 20px;
-                border-bottom: 1px solid #444;
-                margin-bottom: 40px;
+                gap: 30px;
+                border-bottom: 1px solid var(--glass-border);
+                margin-bottom: 60px;
             }}
             .cover-img {{ 
                 width: 100%; 
-                height: 500px; 
+                height: 600px; 
                 object-fit: cover; 
-                border-radius: 16px; 
-                box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+                border-radius: 24px; 
+                box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+                border: 1px solid var(--glass-border);
             }}
-            h1 {{ font-size: 3rem; margin: 0; font-weight: 800; letter-spacing: -1.5px; }}
-            .subtitle {{ font-size: 1.25rem; color: var(--text-sub); margin: 0; }}
+            h1 {{ 
+                font-size: 4rem; 
+                margin: 0; 
+                font-weight: 800; 
+                letter-spacing: -2px; 
+                line-height: 1.1;
+                background: linear-gradient(180deg, #fff 0%, #aaa 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }}
+            .main-title {{ display: block; }}
+            .sub-title-inline {{ 
+                font-size: 2.5rem; 
+                font-weight: 400; 
+                color: var(--text-sub); 
+                -webkit-text-fill-color: var(--text-sub);
+                display: block;
+                margin-top: 10px;
+            }}
+            .subtitle-row {{ font-size: 1.5rem; color: var(--text-sub); margin: 0; opacity: 0.8; }}
             .intro {{ 
-                font-size: 1.2rem; 
-                color: #ddd; 
-                margin: 40px 0; 
-                padding: 30px; 
-                background: rgba(255,255,255,0.05); 
-                border-radius: 12px;
-                line-height: 1.8;
+                font-size: 1.25rem; 
+                color: #e0e0e0; 
+                margin: 60px 0; 
+                padding: 40px; 
+                background: var(--card-bg);
+                backdrop-filter: blur(20px);
+                border: 1px solid var(--glass-border);
+                border-radius: 20px;
+                line-height: 1.9;
+                max-width: 900px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            }}
+            .tags {{ display: flex; gap: 10px; flex-wrap: wrap; }}
+            .tag {{ 
+                background: rgba(255,255,255,0.08); 
+                color: #fff; 
+                padding: 6px 16px; 
+                border-radius: 100px; 
+                font-size: 0.9rem; 
+                border: 1px solid var(--glass-border);
             }}
             .grid-container {{
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-                gap: 30px;
+                grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+                gap: 40px;
             }}
             .card {{ 
                 background: var(--card-bg); 
-                border-radius: 20px; 
+                backdrop-filter: blur(15px);
+                border-radius: 28px; 
                 overflow: hidden; 
-                box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-                transition: transform 0.3s ease;
+                border: 1px solid var(--glass-border);
+                transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
                 display: flex;
                 flex-direction: column;
-                position: relative;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.2);
             }}
-            .card:hover {{ transform: translateY(-10px); }}
+            .card:hover {{ 
+                transform: translateY(-8px); 
+                border-color: rgba(255,255,255,0.3);
+                box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+            }}
+
+            /* Layout Specific Styles */
+            .card.hero {{
+                grid-column: 1 / -1;
+                flex-direction: row;
+                height: 500px;
+            }}
+            .card.hero .card-image-container {{
+                width: 60%;
+                height: 100%;
+                border-bottom: none;
+                border-right: 1px solid var(--glass-border);
+            }}
+            .card.hero .card-content {{
+                width: 40%;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }}
+
+            .card.split_left {{
+                flex-direction: row;
+                grid-column: 1 / -1;
+                height: 400px;
+            }}
+            .card.split_left .card-image-container {{
+                width: 45%;
+                height: 100%;
+                border-bottom: none;
+                border-right: 1px solid var(--glass-border);
+            }}
+
+            .card.split_right {{
+                flex-direction: row-reverse;
+                grid-column: 1 / -1;
+                height: 400px;
+            }}
+            .card.split_right .card-image-container {{
+                width: 45%;
+                height: 100%;
+                border-bottom: none;
+                border-left: 1px solid var(--glass-border);
+            }}
+
+            @media (max-width: 900px) {{
+                .card.hero, .card.split_left, .card.split_right {{
+                    flex-direction: column !important;
+                    height: auto;
+                }}
+                .card.hero .card-image-container, 
+                .card.split_left .card-image-container, 
+                .card.split_right .card-image-container {{
+                    width: 100%;
+                    height: 300px;
+                }}
+            }}
             .card-image-container {{
                 width: 100%;
-                height: 240px;
-                background: #444;
+                height: 280px;
                 overflow: hidden;
-                position: relative;
+                border-bottom: 1px solid var(--glass-border);
             }}
             .card-image-container img {{
                 width: 100%;
                 height: 100%;
                 object-fit: cover;
+                transition: transform 0.6s ease;
             }}
-            .card-content {{ padding: 25px; }}
+            .card:hover .card-image-container img {{ transform: scale(1.1); }}
+            .card-content {{ padding: 35px; flex-grow: 1; }}
             .card-heading {{ 
-                font-size: 1.4rem; 
+                font-size: 1.6rem; 
                 font-weight: 700; 
-                margin-bottom: 15px; 
+                margin-bottom: 20px; 
                 line-height: 1.3;
+                color: #fff;
             }}
             .card-text {{ 
-                font-size: 1rem; 
-                color: #ccc; 
-                display: -webkit-box;
-                -webkit-line-clamp: 4;
-                -webkit-box-orient: vertical;
-                overflow: hidden;
+                font-size: 1.05rem; 
+                color: #b0b0b0; 
+                line-height: 1.8;
             }}
-            .tag {{ 
-                background: rgba(255,255,255,0.1); 
-                color: #eee; 
-                padding: 4px 12px; 
-                border-radius: 6px; 
-                font-size: 0.8rem; 
-                margin-right: 6px;
-            }}
-            blockquote {{ 
-                margin: 20px 0;
-                padding: 15px 20px;
-                background: rgba(0,0,0,0.2);
-                border-left: 4px solid var(--accent);
+            .card-text h3 {{ font-size: 1.2rem; color: #fff; margin-top: 25px; }}
+            .card-text strong {{ color: var(--accent); }}
+            .card-text blockquote {{ 
+                margin: 25px 0;
+                padding: 15px 25px;
+                background: rgba(0,0,0,0.3);
+                border-left: 5px solid var(--accent);
                 font-style: italic;
                 color: #eee;
+                border-radius: 0 10px 10px 0;
             }}
-            strong {{ color: var(--accent); font-weight: 700; }}
+            .card-text ul {{ padding-left: 20px; }}
+            .card-text li {{ margin-bottom: 10px; }}
+            
+            ::-webkit-scrollbar {{ width: 10px; }}
+            ::-webkit-scrollbar-track {{ background: var(--bg-color); }}
+            ::-webkit-scrollbar-thumb {{ background: #333; border-radius: 5px; }}
+            ::-webkit-scrollbar-thumb:hover {{ background: #444; }}
         </style>
     </head>
     <body>
         <header>
             <img src="{cover_url}" class="cover-img">
             <h1>{title_html}</h1>
-            <p class="subtitle">{data.get('subtitle', '')}</p>
+            <p class="subtitle-row">{data.get('subtitle', '')}</p>
             <div class="tags">{tags_html}</div>
         </header>
         
@@ -166,15 +263,17 @@ def generate_preview(magazine_id, token, base_url="http://52.63.142.228:8080"):
         img_url = section.get('imageUrl') or ""
         heading = section.get('heading', '')
         content = section.get('content', '')
+        layout_type = section.get('layoutType') or section.get('layout_type', 'basic')
         
         html_template += f"""
-        <div class="card">
+        <div class="card {layout_type}">
             <div class="card-image-container">
-                <img src="{img_url}" onerror="this.src='https://via.placeholder.com/400x300?text=Image+Loading...';">
+                <img src="{img_url}" onerror="this.src='https://via.placeholder.com/800x600?text=Mine+AI+Visual';">
             </div>
             <div class="card-content">
                 <div class="card-heading">{heading}</div>
                 <div class="card-text">{content}</div>
+                {"<p class='caption' style='font-size: 0.85rem; color: var(--text-sub); margin-top: 20px; font-style: italic;'>— " + section.get('caption') + "</p>" if section.get('caption') else ""}
             </div>
         </div>
         """

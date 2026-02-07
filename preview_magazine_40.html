@@ -1,93 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
 
-    <!DOCTYPE html>
-    <html lang="ko">
-    <head>
-        <meta charset="UTF-8">
-        <title>프리미엄 겨울 코트 브랜드 비교</title>
-        <style>
-            body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; line-height: 1.7; max-width: 900px; margin: 0 auto; padding: 40px 20px; background: #f4f4f4; color: #222; }
-            header { text-align: center; padding: 60px 0; border-bottom: 3px solid #000; background: #fff; margin-bottom: 40px; border-radius: 8px 8px 0 0; }
-            h1 { font-size: 3.5rem; margin-bottom: 15px; letter-spacing: -1px; }
-            .subtitle { font-style: italic; color: #555; font-size: 1.4rem; margin-bottom: 20px; }
-            .intro { font-size: 1.2rem; margin: 40px 0; background: #fff; padding: 30px; border-left: 8px solid #000; line-height: 1.8; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-            .section { margin-bottom: 80px; background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); overflow: hidden; }
-            .section h2 { font-size: 2.2rem; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-top: 0; color: #000; }
-            .content { font-size: 1.1rem; color: #333; }
-            .content h3 { font-size: 1.5rem; margin-top: 30px; color: #111; border-left: 4px solid #333; padding-left: 15px; }
-            .content p { margin: 20px 0; }
-            .content strong { color: #000; font-weight: 800; background: linear-gradient(120deg, #fff3b0 0%, #fff3b0 100%); background-repeat: no-repeat; background-size: 100% 30%; background-position: 0 80%; }
-            .content blockquote { font-size: 1.3rem; border-left: 5px solid #000; margin: 30px 0; padding: 20px 30px; color: #444; font-style: italic; background: #f9f9f9; }
-            .content ul { padding-left: 20px; }
-            .content li { margin-bottom: 10px; }
-            .image-container { position: relative; margin: 30px 0; text-align: center; background: #eee; border-radius: 8px; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #ddd; }
-            img { max-width: 100%; max-height: 600px; object-fit: contain; border-radius: 4px; }
-            .caption { font-size: 0.95rem; color: #777; margin-top: 15px; font-style: italic; }
-            .tag { display: inline-block; background: #222; color: #fff; padding: 6px 15px; border-radius: 50px; font-size: 0.85rem; margin-right: 8px; font-weight: 600; }
-            .cover-img { width: 100%; height: 400px; object-fit: cover; border-radius: 8px; margin-bottom: 30px; }
-        </style>
-    </head>
-    <body>
-        <header>
-            <img src="https://mine-moodboard-bucket.s3.ap-southeast-2.amazonaws.com/moodboards/eeaabbc0-e267-4329-ba9f-1036b9a8c1c4.png" class="cover-img">
-            <h1>프리미엄 겨울 코트 브랜드 비교</h1>
-            <p class="subtitle">퀄리티와 스타일의 만남</p>
-            <div class="tags">
-                <span class="tag">#프리미엄</span> <span class="tag">#겨울 코트</span> <span class="tag">#브랜드</span>
-            </div>
-        </header>
-        
-        <div class="intro">
-            가격 대비 탁월한 품질을 자랑하는 겨울 코트 브랜드를 소개합니다. 세련된 스타일과 실용성을 겸비한 최고의 선택지들을 만나보세요.
+<head>
+    <meta charset="UTF-8">
+    <title>프리미엄 겨울 코트 브랜드 비교</title>
+    <style>
+        body {
+            font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            line-height: 1.7;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f4f4f4;
+            color: #222;
+        }
+
+        header {
+            text-align: center;
+            padding: 60px 0;
+            border-bottom: 3px solid #000;
+            background: #fff;
+            margin-bottom: 40px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 15px;
+            letter-spacing: -1px;
+        }
+
+        .subtitle {
+            font-style: italic;
+            color: #555;
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+        }
+
+        .intro {
+            font-size: 1.2rem;
+            margin: 40px 0;
+            background: #fff;
+            padding: 30px;
+            border-left: 8px solid #000;
+            line-height: 1.8;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .section {
+            margin-bottom: 80px;
+            background: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        .section h2 {
+            font-size: 2.2rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 15px;
+            margin-top: 0;
+            color: #000;
+        }
+
+        .content {
+            font-size: 1.1rem;
+            color: #333;
+        }
+
+        .content h3 {
+            font-size: 1.5rem;
+            margin-top: 30px;
+            color: #111;
+            border-left: 4px solid #333;
+            padding-left: 15px;
+        }
+
+        .content p {
+            margin: 20px 0;
+        }
+
+        .content strong {
+            color: #000;
+            font-weight: 800;
+            background: linear-gradient(120deg, #fff3b0 0%, #fff3b0 100%);
+            background-repeat: no-repeat;
+            background-size: 100% 30%;
+            background-position: 0 80%;
+        }
+
+        .content blockquote {
+            font-size: 1.3rem;
+            border-left: 5px solid #000;
+            margin: 30px 0;
+            padding: 20px 30px;
+            color: #444;
+            font-style: italic;
+            background: #f9f9f9;
+        }
+
+        .content ul {
+            padding-left: 20px;
+        }
+
+        .content li {
+            margin-bottom: 10px;
+        }
+
+        .image-container {
+            position: relative;
+            margin: 30px 0;
+            text-align: center;
+            background: #eee;
+            border-radius: 8px;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ddd;
+        }
+
+        img {
+            max-width: 100%;
+            max-height: 600px;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+
+        .caption {
+            font-size: 0.95rem;
+            color: #777;
+            margin-top: 15px;
+            font-style: italic;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #222;
+            color: #fff;
+            padding: 6px 15px;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            margin-right: 8px;
+            font-weight: 600;
+        }
+
+        .cover-img {
+            width: 100%;
+            height: 400px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <img src="https://mine-moodboard-bucket.s3.ap-southeast-2.amazonaws.com/moodboards/eeaabbc0-e267-4329-ba9f-1036b9a8c1c4.png"
+            class="cover-img">
+        <h1>프리미엄 겨울 코트 브랜드 비교</h1>
+        <p class="subtitle">퀄리티와 스타일의 만남</p>
+        <div class="tags">
+            <span class="tag">#프리미엄</span> <span class="tag">#겨울 코트</span> <span class="tag">#브랜드</span>
         </div>
-    
-        <div class="section">
-            <h2>가격 대비 퀄리티 최고</h2>
-            <div class="image-container">
-                <img src="https://cphoto.asiae.co.kr/listimglink/4/2021101808352870044_1634513728.jpg" alt="출처: Asiae.co.kr" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
-                <p class="caption">출처: Asiae.co.kr</p>
-            </div>
-            <div class="content">
-                <p>프리미엄 겨울 코트를 찾는다면, 가격 대비 최상의 퀄리티를 자랑하는 브랜드가 필수입니다. 이번 시즌을 빛낼 최고의 선택들을 만나보세요.</p>
-            </div>
+    </header>
+
+    <div class="intro">
+        가격 대비 탁월한 품질을 자랑하는 겨울 코트 브랜드를 소개합니다. 세련된 스타일과 실용성을 겸비한 최고의 선택지들을 만나보세요.
+    </div>
+
+    <div class="section">
+        <h2>가격 대비 퀄리티 최고</h2>
+        <div class="image-container">
+            <img src="https://cphoto.asiae.co.kr/listimglink/4/2021101808352870044_1634513728.jpg" alt="출처: Asiae.co.kr"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
+            <p class="caption">출처: Asiae.co.kr</p>
         </div>
-        
-        <div class="section">
-            <h2>실용적인 디자인과 세련된 스타일</h2>
-            <div class="image-container">
-                <img src="https://image.galleria.co.kr/C00001/fckeditor/tempgoodsdesc/202310/1697886864393.jpg" alt="출처: Galleria.co.kr" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
-                <p class="caption">출처: Galleria.co.kr</p>
-            </div>
-            <div class="content">
-                <p>코트는 퀄리티 뿐만 아니라 디자인도 중요합니다. 실용적이면서도 세련된 스타일을 지닌 브랜드들을 소개합니다. 겨울을 따뜻하게 보낼 수 있는 완벽한 선택지들입니다.</p>
-            </div>
+        <div class="content">
+            <p>프리미엄 겨울 코트를 찾는다면, 가격 대비 최상의 퀄리티를 자랑하는 브랜드가 필수입니다. 이번 시즌을 빛낼 최고의 선택들을 만나보세요.</p>
         </div>
-        
-        <div class="section">
-            <h2>트렌드를 리드하는 럭셔리 브랜드</h2>
-            <div class="image-container">
-                <img src="https://image.enuri.info/webimage_300/19203200000/19203220000/19203227340" alt="출처: Enuri.info" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
-                <p class="caption">출처: Enuri.info</p>
-            </div>
-            <div class="content">
-                <p>겨울 패션의 트렌드를 선도하는 럭셔리 브랜드들을 만나보세요. 세련된 디자인과 탁월한 퀄리티로 겨울 스타일링을 완성하세요.</p>
-            </div>
+    </div>
+
+    <div class="section">
+        <h2>실용적인 디자인과 세련된 스타일</h2>
+        <div class="image-container">
+            <img src="https://image.galleria.co.kr/C00001/fckeditor/tempgoodsdesc/202310/1697886864393.jpg"
+                alt="출처: Galleria.co.kr"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
+            <p class="caption">출처: Galleria.co.kr</p>
         </div>
-        
-        <div class="section">
-            <h2>편안함과 스타일을 동시에</h2>
-            <div class="image-container">
-                <img src="https://postfiles.pstatic.net/MjAyMjExMDVfMTY4/MDAxNjY3NjQwNTE3NzA5.pcQnri8YWgz6r7qt2OMQtVG2l2JakU87q4KMV7ag0YMg.SsM4H7QcsFnLAxNcBR1mm0n6kVtSmtz6ufGw91uqbeEg.JPEG.juhye__/IMG_4073.JPG?type=w966" alt="출처: Pstatic.net" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
-                <p class="caption">출처: Pstatic.net</p>
-            </div>
-            <div class="content">
-                <p>겨울 코트는 편안함과 스타일을 모두 갖춰야 합니다. 이를 충족시키는 최고의 브랜드들을 소개합니다. 겨울의 추위를 이겨내는 스타일 아이템들을 만나보세요.</p>
-            </div>
+        <div class="content">
+            <p>코트는 퀄리티 뿐만 아니라 디자인도 중요합니다. 실용적이면서도 세련된 스타일을 지닌 브랜드들을 소개합니다. 겨울을 따뜻하게 보낼 수 있는 완벽한 선택지들입니다.</p>
         </div>
-        
-    </body>
-    </html>
-    
+    </div>
+
+    <div class="section">
+        <h2>트렌드를 리드하는 럭셔리 브랜드</h2>
+        <div class="image-container">
+            <img src="https://image.enuri.info/webimage_300/19203200000/19203220000/19203227340" alt="출처: Enuri.info"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
+            <p class="caption">출처: Enuri.info</p>
+        </div>
+        <div class="content">
+            <p>겨울 패션의 트렌드를 선도하는 럭셔리 브랜드들을 만나보세요. 세련된 디자인과 탁월한 퀄리티로 겨울 스타일링을 완성하세요.</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>편안함과 스타일을 동시에</h2>
+        <div class="image-container">
+            <img src="https://postfiles.pstatic.net/MjAyMjExMDVfMTY4/MDAxNjY3NjQwNTE3NzA5.pcQnri8YWgz6r7qt2OMQtVG2l2JakU87q4KMV7ag0YMg.SsM4H7QcsFnLAxNcBR1mm0n6kVtSmtz6ufGw91uqbeEg.JPEG.juhye__/IMG_4073.JPG?type=w966"
+                alt="출처: Pstatic.net"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
+            <p class="caption">출처: Pstatic.net</p>
+        </div>
+        <div class="content">
+            <p>겨울 코트는 편안함과 스타일을 모두 갖춰야 합니다. 이를 충족시키는 최고의 브랜드들을 소개합니다. 겨울의 추위를 이겨내는 스타일 아이템들을 만나보세요.</p>
+        </div>
+    </div>
+
+</body>
+
+</html>

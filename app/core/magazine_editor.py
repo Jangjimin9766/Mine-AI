@@ -4,86 +4,26 @@ from app.models.chat import AgentIntent
 
 def analyze_user_intent(user_message: str, magazine_data: dict) -> AgentIntent:
     """
-    사용자 메시지를 분석하여 의도 파악
+    사용자 메시지를 분석하여 의도 파악 (V5 고도화 버전)
     """
     num_sections = len(magazine_data.get('sections', []))
+    content_summary = f"Topic: {magazine_data.get('title', 'N/A')}. Sections: {num_sections}"
     
-    system_prompt = f"""
-    You are an AI editor assistant for M:ine magazine.
-    Analyze the user's request and determine what action to take.
-
-    [DOMAIN CONTEXT]
-    **Current Magazine Topic**: {magazine_data.get('title', 'N/A')}
-    Always interpret the user's message within the context of this Topic. Do NOT confuse terms with unrelated fields (e.g., if topic is Wine, interpret "Potential" as Aging Potential, not games).
+    from app.core.prompts import INTENT_CLASSIFICATION_PROMPT_V5
     
-    Available actions:
-    - "regenerate_section": Rewrite a specific section
-    - "add_section": Add a new section
-    - "delete_section": Remove a section
-    - "change_tone": Change the overall tone
-    
-    CRITICAL RULES:
-    1. You MUST always include the "instruction" field with specific details
-    2. For Korean ordinal numbers, convert correctly:
-       - "첫 번째" or "첫번째" or "1번째" = index 0
-       - "두 번째" or "두번째" or "2번째" = index 1
-       - "세 번째" or "세번째" or "3번째" = index 2
-    3. Current magazine has {num_sections} sections (indices 0 to {num_sections - 1})
-    4. If section index is out of range, set target_section_index to null
-    
-    Respond in JSON:
-    {{
-        "action": "regenerate_section",
-        "target_section_index": 0,
-        "instruction": "Make it more emotional and poetic",
-        "response_message": "첫 번째 섹션을 더 감성적으로 수정했습니다."
-    }}
-    
-    For "add_section":
-    {{
-        "action": "add_section",
-        "target_section_index": null,
-        "instruction": "Add a section about 009's album recommendations",
-        "response_message": "009의 앨범 추천 섹션을 추가했습니다."
-    }}
-    
-    For "delete_section":
-    {{
-        "action": "delete_section",
-        "target_section_index": 1,
-        "instruction": "Remove the second section",
-        "response_message": "두 번째 섹션을 삭제했습니다."
-    }}
-    """
-    
-    user_prompt = f"""
-    User message: {user_message}
-    
-    Current magazine structure:
-    - Title: {magazine_data.get('title', 'N/A')}
-    - Number of sections: {num_sections}
-    - Section headings: {[f"{i+1}. {s.get('heading', '')}" for i, s in enumerate(magazine_data.get('sections', []))]}
-    
-    Analyze the user's intent and provide the action to take.
-    REMEMBER: 
-    - Always include the "instruction" field
-    - Convert Korean ordinals correctly (첫 번째 = 0, 두 번째 = 1)
-    - Validate section index is within range [0, {num_sections - 1}]
-    """
+    system_prompt = "You are a world-class magazine editorial board. Output valid JSON only."
+    user_prompt = INTENT_CLASSIFICATION_PROMPT_V5.format(
+        message=user_message,
+        content_summary=content_summary
+    )
     
     result = llm_client.generate_json(system_prompt, user_prompt, temperature=0.3)
     
-    # Ensure instruction field exists
+    # Mapping old actions to AgentIntent if necessary, but we'll try to stick to existing model
+    # Current AgentIntent fields: action, target_section_index, instruction, response_message
     if 'instruction' not in result:
         result['instruction'] = user_message
-    
-    # Validate section index
-    if result.get('target_section_index') is not None:
-        idx = result['target_section_index']
-        if idx < 0 or idx >= num_sections:
-            print(f"⚠️ Warning: Section index {idx} out of range [0, {num_sections-1}]")
-            result['target_section_index'] = None
-    
+        
     return AgentIntent(**result)
 
 
@@ -99,15 +39,13 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     current_section = sections[section_index]
     current_image_url = current_section.get('image_url', '')
     
-    from app.core.prompts import SECTION_REGENERATE_PROMPT_V6
+    from app.core.prompts import SECTION_REGENERATE_PROMPT_V7
     
     system_prompt = "You are a world-class magazine editor. Output valid JSON only."
-    user_prompt = SECTION_REGENERATE_PROMPT_V6.format(
+    user_prompt = SECTION_REGENERATE_PROMPT_V7.format(
         magazine_topic=magazine_data.get('title', ''),
         section_heading=current_section.get('heading', ''),
-        existing_content=current_section.get('content', ''),
-        instruction=instruction,
-        image_url=current_image_url
+        instruction=instruction
     )
     
     new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
@@ -146,10 +84,10 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     else:
         research_content = "No specific research available. Create content based on general knowledge."
     
-    from app.core.prompts import ADD_SECTION_PROMPT_V6
+    from app.core.prompts import ADD_SECTION_PROMPT_V7
     
     system_prompt = "You are an Editor-in-Chief. Output valid JSON only."
-    user_prompt = ADD_SECTION_PROMPT_V6.format(
+    user_prompt = ADD_SECTION_PROMPT_V7.format(
         magazine_title=magazine_title,
         instruction=instruction,
         research_results=research_content,
@@ -269,14 +207,17 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
                 print(f"⚠️ Image search failed: {e}")
                 available_images = "[]"
             
-            # 기존 내용 유지 + 새 내용 추가 (V3 프롬프트)
-            append_prompt = APPEND_CONTENT_PROMPT_V3.format(
+            # 기존 내용 유지 + 새 내용 추가 (V4 프롬프트)
+            from app.core.prompts import APPEND_CONTENT_PROMPT_V4
+            
+            append_prompt = APPEND_CONTENT_PROMPT_V4.format(
+                heading=original_heading,
                 existing_content=original_content,
                 message=message,
                 available_images=available_images
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only. Include images using <img> tags.",
+                "You are the Research Lead for M:ine magazine. Output HTML only. Do NOT include <img> tags.",
                 append_prompt,
                 temperature=0.6
             )
@@ -295,13 +236,14 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
             )
             
         elif intent == 'FULL_REWRITE':
-            # 전체 재작성 (명시적 요청 시에만)
-            rewrite_prompt = FULL_REWRITE_PROMPT.format(
+            # 전체 재작성 (V2 프롬프트 적용)
+            from app.core.prompts import FULL_REWRITE_PROMPT_V2
+            rewrite_prompt = FULL_REWRITE_PROMPT_V2.format(
                 heading=original_heading,
                 message=message
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only.",
+                "You are the Editor-in-Chief of M:ine. Output premium HTML only.",
                 rewrite_prompt,
                 temperature=0.7
             )
@@ -368,14 +310,14 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
                 print(f"⚠️ Image search failed: {e}")
                 available_images = "[]"
             
-            append_prompt = APPEND_CONTENT_PROMPT_V2.format(
-                topic=topic,
+            append_prompt = APPEND_CONTENT_PROMPT_V4.format(
+                heading=original_heading,
                 existing_content=original_content,
                 message=message,
                 available_images=available_images
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only. Include images using <img> tags.",
+                "You are a magazine editor. Output HTML content only. Do NOT include <img> tags.",
                 append_prompt,
                 temperature=0.6
             )

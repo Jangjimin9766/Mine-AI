@@ -85,10 +85,10 @@ python tools/magazine_preview.py --id [매거진ID] --token "내토큰"
 git add .
 
 # 2. 커밋 메시지 작성
-git commit -m "fix: promtest_cij2 및 고품질 이미지 생성 로직 적용"
+git commit -m "feat: CIJ3 프롬프트 고도화 및 품질 개선"
 
 # 3. 브랜치를 서버(GitHub)로 업로드 (Push)
-git push origin feature/[작업중인-브랜치-이름]
+git push origin CIJ3_py
 ```
 
 > [!NOTE]
@@ -103,12 +103,12 @@ git push origin feature/[작업중인-브랜치-이름]
 ### STEP A. 데스크탑에서 할 일 (Push)
 ```bash
 # 1. 새 브랜치 생성 및 이동
-git checkout -b feature/promtest-cij2-work
+git checkout -b CIJ3_py
 
 # 2. 작업 내용 저장 및 서버 업로드
 git add .
-git commit -m "feat: V7 프롬프트 고도화 및 환경 세팅 완료"
-git push origin feature/promtest-cij2-work
+git commit -m "feat: CIJ3 프롬프트 고도화 및 환경 세팅 완료"
+git push origin CIJ3_py
 ```
 
 ### STEP B. 노트북에서 할 일 (Pull)
@@ -117,7 +117,7 @@ git push origin feature/promtest-cij2-work
 git fetch origin
 
 # 2. 서버에 올라온 브랜치를 그대로 가져오기
-git checkout feature/promtest-cij2-work
+git checkout CIJ3_py
 ```
 
 > [!TIP]

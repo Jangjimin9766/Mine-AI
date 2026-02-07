@@ -100,11 +100,25 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         result_json['cover_image_url'] = images[0]
         print(f"⚠️ Fixed cover_image_url to: {images[0]}")
     
-    # 섹션 이미지 검증 및 display_order 추가
+    # 섹션 이미지 검증 및 레이아웃 교차 최적화
+    split_count = 0
     for i, section in enumerate(result_json.get('sections', [])):
         if not section.get('image_url') or not section['image_url'].startswith('http'):
             section['image_url'] = images[min(i + 1, len(images) - 1)]
             print(f"⚠️ Fixed section {i} image_url to: {section['image_url']}")
+        
+        # 레이아웃 교차 로직 (CIJ3: 첫 섹션은 hero, 이후 split_left/right 교차)
+        if i == 0:
+            section['layout_type'] = 'hero'
+            section['layout_hint'] = 'full_width'
+            print(f"✨ Forced section 0 layout_type to: hero")
+        else:
+            # hero가 아닌 경우(1번 섹션부터) split_left와 split_right를 번갈아 가며 할당
+            new_layout = 'split_left' if split_count % 2 == 0 else 'split_right'
+            section['layout_type'] = new_layout
+            split_count += 1
+            print(f"🔄 Fixed section {i} layout_type to: {new_layout}")
+
         # display_order 자동 부여 (그리드 순서)
         section['display_order'] = i
         # layout_hint 기본값 설정
