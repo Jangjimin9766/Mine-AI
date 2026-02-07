@@ -5,14 +5,26 @@ class MoodboardResponse(BaseModel):
     image_url: str
     description: str
 
+
+class Paragraph(BaseModel):
+    """섹션 내 개별 문단 - 소제목, 텍스트, 이미지가 한 세트"""
+    subtitle: str                       # 문단 소제목 (예: "올리브 사라진 올리브영")
+    text: str                           # 문단 본문 (HTML 허용)
+    image_url: Optional[str] = None     # 문단 이미지 URL
+
+
 class MagazineSection(BaseModel):
-    heading: str            # 소제목
-    content: str            # 본문 내용 (HTML 태그 포함 가능)
-    image_url: Optional[str] = None # 들어갈 이미지 URL (없을 수도 있음)
-    layout_type: str = "basic" # 프론트엔드 렌더링 힌트 (예: 'hero', 'quote', 'split_left', 'split_right')
-    layout_hint: Optional[str] = None # 추가 레이아웃 힌트 (예: 'image_left', 'full_width')
-    caption: Optional[str] = None # 이미지 캡션 (선택)
-    display_order: Optional[int] = None # 그리드 내 표시 순서
+    heading: str                                    # 소제목
+    thumbnail_url: Optional[str] = None             # 섹션 썸네일 (커버 이미지)
+    paragraphs: List[Paragraph] = []                # 문단 배열 (기본 3개)
+    layout_type: str = "basic"                      # 프론트엔드 렌더링 힌트
+    layout_hint: Optional[str] = None               # 추가 레이아웃 힌트 (예: 'zigzag')
+    display_order: Optional[int] = None             # 그리드 내 표시 순서
+    
+    # deprecated fields (kept for backward compatibility)
+    content: Optional[str] = None                   # 기존 호환용 - paragraphs 사용 권장
+    image_url: Optional[str] = None                 # 기존 호환용 - thumbnail_url/paragraphs 사용 권장
+    caption: Optional[str] = None                   # 기존 호환용
 
 class Magazine(BaseModel):
     title: str              # 매거진 전체 제목
