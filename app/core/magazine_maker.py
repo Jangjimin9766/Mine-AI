@@ -99,9 +99,25 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
     
     # 섹션 이미지 검증 및 display_order 추가
     for i, section in enumerate(result_json.get('sections', [])):
+        # thumbnail_url 검증 (V4 구조)
+        if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http'):
+            section['thumbnail_url'] = images[min(i, len(images) - 1)]
+            print(f"⚠️ Fixed section {i} thumbnail_url to: {section['thumbnail_url']}")
+        
+        # 레거시 image_url 검증 (V3 호환)
         if not section.get('image_url') or not section['image_url'].startswith('http'):
             section['image_url'] = images[min(i + 1, len(images) - 1)]
             print(f"⚠️ Fixed section {i} image_url to: {section['image_url']}")
+        
+        # V4 paragraphs 배열 내 image_url 검증
+        paragraphs = section.get('paragraphs', [])
+        for j, paragraph in enumerate(paragraphs):
+            if not paragraph.get('image_url') or not paragraph['image_url'].startswith('http'):
+                # 각 문단마다 다른 이미지 할당
+                img_idx = min(i * 3 + j, len(images) - 1)
+                paragraph['image_url'] = images[img_idx]
+                print(f"⚠️ Fixed section {i} paragraph {j} image_url to: {paragraph['image_url']}")
+        
         # display_order 자동 부여 (그리드 순서)
         section['display_order'] = i
         # layout_hint 기본값 설정
