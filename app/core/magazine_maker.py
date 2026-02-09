@@ -113,7 +113,7 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
             print(f"⚠️ Fixed section {i} image_url to: {section['image_url']}")
         
         # V4 paragraphs 배열 내 image_url 검증
-        # 우선순위: 1) AI가 할당한 값 → 2) Tavily 이미지 풀 → 3) Unsplash 검색
+        # 우선순위: 1) AI 생성 영어 키워드(Unsplash) → 2) Tavily 이미지 풀 → 3) Subtitle 검색(Fallback)
         paragraphs = section.get('paragraphs', [])
         for j, paragraph in enumerate(paragraphs):
             current_url = paragraph.get('image_url', '')
@@ -122,20 +122,30 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
             if current_url and current_url.startswith('http'):
                 continue
             
-            # 1차 시도: Tavily에서 가져온 이미지 풀 사용
+            # [NEW] 1순위: AI가 생성한 영어 키워드로 Unsplash 정밀 검색
+            search_keyword = paragraph.get('image_search_keyword')
+            if search_keyword and len(search_keyword) > 2:
+                # 영어 키워드이므로 정확도가 매우 높음
+                found_url = search_unsplash_image(search_keyword)
+                if found_url:
+                    paragraph['image_url'] = found_url
+                    print(f"🎯 Section {i} paragraph {j}: Unsplash matched with '{search_keyword}'")
+                    continue
+
+            # 2순위: Tavily에서 가져온 이미지 풀 사용 (Fallback 1)
             img_idx = min(i * 3 + j, len(images) - 1)
             tavily_url = images[img_idx] if img_idx < len(images) else None
             
             # Tavily 이미지가 유효하면 사용
             if tavily_url and tavily_url.startswith('http') and 'unsplash.com/photo-' not in tavily_url:
                 paragraph['image_url'] = tavily_url
-                print(f"📷 Section {i} paragraph {j}: Tavily image → {tavily_url[:50]}...")
+                print(f"📷 Section {i} paragraph {j}: Tavily image pool used")
             else:
-                # 2차 시도: Unsplash에서 subtitle 기반 검색 (fallback)
+                # 3순위: Unsplash에서 subtitle 기반 검색 (Fallback 2 - 한글일 수 있음)
                 subtitle = paragraph.get('subtitle', '')
                 search_query = f"{topic} {subtitle}" if subtitle else topic
                 paragraph['image_url'] = search_unsplash_image(search_query, tavily_url)
-                print(f"🖼️ Section {i} paragraph {j}: Unsplash fallback → {paragraph['image_url'][:50]}...")
+                print(f"🖼️ Section {i} paragraph {j}: Unsplash fallback search with subtitle")
         
         # display_order 자동 부여 (그리드 순서)
         section['display_order'] = i

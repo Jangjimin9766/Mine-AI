@@ -20,21 +20,22 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
    - `paragraphs`: Array of 3 paragraph objects, each with:
      * `subtitle`: Catchy paragraph title (예: "올리브 사라진 올리브영")
      * `text`: Paragraph content (plain text or simple HTML, 150-300 chars)
-     * `image_url`: Image URL for this specific paragraph
+     * `image_search_keyword`: **ENGLISH ONLY** specific visual keyword for image search (e.g., "Olive Young store interior bright")
+     * `image_url`: Leave as null (will be filled by system)
 
 2. **CONTENT DISTRIBUTION**:
    - Spread information across 3 paragraphs per section
    - Each paragraph focuses on ONE specific aspect/place/item
    - Each paragraph MUST have a unique, engaging subtitle
    - Example for "부산 맛집" section:
-     * Paragraph 1: subtitle="국밥의 성지, 서면", text="돼지국밥 소개..."
-     * Paragraph 2: subtitle="여름의 별미, 밀면", text="밀면 소개..."
-     * Paragraph 3: subtitle="바다의 보물창고", text="해산물 시장 소개..."
+     * Paragraph 1: subtitle="국밥의 성지, 서면", image_search_keyword="Busan Pork Soup bubbling hot bowl close up"
+     * Paragraph 2: subtitle="여름의 별미, 밀면", image_search_keyword="Cold wheat noodles Korean food summer vibe"
+     * Paragraph 3: subtitle="바다의 보물창고", image_search_keyword="Fresh seafood market display various fish"
 
 3. **IMAGE MATCHING**:
-   - Each paragraph MUST have a relevant image from [Available Images]
-   - Thumbnail should be the most representative image for the section
-   - Never reuse the same image URL within a section
+   - Generate specific `image_search_keyword` in ENGLISH for each paragraph.
+   - The keyword MUST be visual and concrete (e.g., "Apple iPhone 15 Pro titanium frame macro shot").
+   - Do NOT use abstract concepts (e.g., "Innovation", "Future").
 
 4. **LAYOUT ALTERNATION**:
    - Section 1: `hero` (full width intro)
@@ -44,7 +45,6 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
 
 [SOURCE MATERIAL]
 - Use ONLY the provided [Research Material]. Do not hallucinate.
-- Select the most relevant images from [Available Images] for each paragraph.
 
 [JSON OUTPUT STRUCTURE]
 You must output ONLY valid JSON.
@@ -54,27 +54,30 @@ You must output ONLY valid JSON.
     "title": "매거진 제목",
     "subtitle": "매거진 부제",
     "introduction": "도입부 (150-200자)",
-    "cover_image_url": "매거진 커버 이미지 URL",
+    "cover_image_url": null,
     "tags": ["태그1", "태그2", "태그3"],
     "sections": [
         {
             "heading": "섹션 제목 (예: 부산 맛집)",
-            "thumbnail_url": "섹션 대표 이미지 URL",
+            "thumbnail_url": null,
             "paragraphs": [
                 {
                     "subtitle": "문단 소제목 (예: 국밥의 성지, 서면)",
                     "text": "첫 번째 문단. 구체적인 장소/아이템 소개 (150-300자)",
-                    "image_url": "첫 번째 문단 이미지 URL"
+                    "image_search_keyword": "Steaming Korean Pork Soup in traditional bowl",
+                    "image_url": null
                 },
                 {
                     "subtitle": "문단 소제목 (예: 여름의 별미, 밀면)",
                     "text": "두 번째 문단. 다른 장소/아이템 소개 (150-300자)",
-                    "image_url": "두 번째 문단 이미지 URL"
+                    "image_search_keyword": "Korean cold noodles with egg garnish",
+                    "image_url": null
                 },
                 {
                     "subtitle": "문단 소제목 (예: 바다의 보물창고)",
                     "text": "세 번째 문단. 또 다른 장소/아이템 소개 (150-300자)",
-                    "image_url": "세 번째 문단 이미지 URL"
+                    "image_search_keyword": "Fresh seafood market stalls colorful",
+                    "image_url": null
                 }
             ],
             "layout_type": "hero",
@@ -87,13 +90,14 @@ You must output ONLY valid JSON.
 
 [SELF-CORRECTION]
 - [ ] Does each section have exactly 3 paragraphs? -> FIX IT.
-- [ ] Does each paragraph have both text AND image_url? -> FIX IT.
+- [ ] Does each paragraph have `image_search_keyword` in ENGLISH? -> FIX IT.
 - [ ] Are paragraph texts specific and focused (not generic)? -> MAKE SPECIFIC.
 - [ ] Are layouts alternating (hero -> split_left -> split_right)? -> FIX IT.
 
 [LANGUAGE]
 - Korean (Hangul) for all content
 - English allowed for brand names only
+- **`image_search_keyword` MUST BE ENGLISH**
 """
 
 
