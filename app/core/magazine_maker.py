@@ -98,6 +98,9 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         print(f"⚠️ Fixed cover_image_url to: {images[0]}")
     
     # 섹션 이미지 검증 및 display_order 추가
+    # Unsplash 클라이언트 임포트 (문단별 정확한 이미지 검색)
+    from app.core.unsplash_client import search_unsplash_image
+    
     for i, section in enumerate(result_json.get('sections', [])):
         # thumbnail_url 검증 (V4 구조)
         if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http'):
@@ -109,14 +112,21 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
             section['image_url'] = images[min(i + 1, len(images) - 1)]
             print(f"⚠️ Fixed section {i} image_url to: {section['image_url']}")
         
-        # V4 paragraphs 배열 내 image_url 검증
+        # V4 paragraphs 배열 내 image_url 검증 (Unsplash로 정확한 이미지 검색)
         paragraphs = section.get('paragraphs', [])
         for j, paragraph in enumerate(paragraphs):
             if not paragraph.get('image_url') or not paragraph['image_url'].startswith('http'):
-                # 각 문단마다 다른 이미지 할당
+                # 1. Unsplash에서 subtitle 기반 정확한 이미지 검색
+                subtitle = paragraph.get('subtitle', '')
+                search_query = f"{topic} {subtitle}" if subtitle else topic
+                
+                # fallback: Tavily에서 가져온 이미지 풀
                 img_idx = min(i * 3 + j, len(images) - 1)
-                paragraph['image_url'] = images[img_idx]
-                print(f"⚠️ Fixed section {i} paragraph {j} image_url to: {paragraph['image_url']}")
+                fallback_url = images[img_idx]
+                
+                # Unsplash 검색 (실패 시 fallback 사용)
+                paragraph['image_url'] = search_unsplash_image(search_query, fallback_url)
+                print(f"🖼️ Section {i} paragraph {j} image: {paragraph['image_url'][:50]}...")
         
         # display_order 자동 부여 (그리드 순서)
         section['display_order'] = i

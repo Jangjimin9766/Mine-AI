@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     
     # 검색용 키 추가
     TAVILY_API_KEY: str = ""
-    JINA_API_KEY: str = "" # 선택 사항이라 기본값 비워둠
+    JINA_API_KEY: str = ""  # 선택 사항이라 기본값 비워둠
+    UNSPLASH_ACCESS_KEY: str = ""  # Unsplash API (문단별 이미지 검색)
     
     # 보안 키
     PYTHON_API_KEY: str = "mine-secret-key-1234"
