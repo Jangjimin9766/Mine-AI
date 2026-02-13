@@ -96,15 +96,34 @@ def search_unsplash_images(queries: list, fallback_urls: list = None) -> list:
 def _clean_query(query: str) -> str:
     """
     검색어를 정제합니다.
-    예: "국밥의 성지, 서면" → "서면 국밥"
+    - 영어 키워드(V4): 콤마로 구분된 경우 첫 번째가 핵심 피사체이므로 유지.
+    - 한글 키워드: 장소, 피사체 순서인 경우 뒤쪽 피사체를 강조.
     """
-    # 콤마가 있으면 뒷부분 우선 사용
+    if not query:
+        return ""
+
+    # 콤마가 있으면 분석
     if "," in query:
-        parts = query.split(",")
-        # 뒷부분 + 앞부분의 핵심 키워드
-        back = parts[-1].strip()
+        parts = [p.strip() for p in query.split(",")]
+        
+        # 영어 키워드인 경우 (알파벳 비율이 높은 경우)
+        is_english = sum(1 for c in query if c.isalpha()) / len(query.strip() or " ") > 0.5
+        
+        if is_english:
+            # 첫 번째 파트(피사체) + 마지막 파트(무드) 조합
+            if len(parts) >= 2:
+                subject = parts[0]
+                style = parts[-1]
+                # 너무 똑같으면 하나만
+                if subject.lower() in style.lower() or style.lower() in subject.lower():
+                    return subject
+                return f"{subject} {style}"
+            return parts[0]
+            
+        # 한글 키워드인 경우 (기존 로직 유지하되 보완)
+        back = parts[-1]
         front_keywords = parts[0].replace("의", " ").replace("에서", " ").strip()
-        # 너무 길면 뒷부분만
+        
         if len(front_keywords) > 10:
             return back
         return f"{back} {front_keywords}"

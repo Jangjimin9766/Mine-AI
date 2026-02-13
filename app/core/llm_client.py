@@ -37,7 +37,7 @@ class LLMClient:
             except Exception as e:
                 logger.error(f"❌ Failed to initialize OpenAI client: {e}")
         else:
-            logger.warning("⚠️ OPENAI_API_KEY not set or empty. OpenAI will not be available.")
+            logger.info("ℹ️ OPENAI_API_KEY not set or empty. OpenAI will not be available.")
 
         # Initialize Gemini if key exists
         if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
@@ -47,8 +47,10 @@ class LLMClient:
                 # Note: Use models that work with v1beta API
                 # gemini-pro is the most stable and widely supported
                 gemini_models = [
-                    'gemini-1.5-flash',  # Fast, highly capable, follows instructions well
-                    'gemini-1.5-pro',    # Most capable model
+                    'gemini-2.0-flash',  # Latest stable
+                    'gemini-flash-latest', # Always points to latest flash
+                    'gemini-pro-latest',   # Always points to latest pro
+                    'gemini-1.5-flash',  # Fallback
                     'gemini-pro',        # Legacy fallback
                 ]
                 

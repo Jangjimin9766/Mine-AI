@@ -69,22 +69,46 @@ def save_preview(magazine_data, filename):
     
     # Add Sections
     for section in sorted(magazine_data.get('sections', []), key=lambda x: x.get('display_order', 0)):
-        img_url = section.get('image_url') or ""
-        caption = section.get('caption')
-        caption_text = "" if not caption or str(caption).lower() == 'none' else str(caption)
-        caption_html = f'<p class="caption">{caption_text}</p>' if caption_text else ''
-        
-        html_template += f"""
+        section_html = f"""
         <div class="section">
             <h2>{section.get('heading', '')}</h2>
+        """
+        
+        # V3 legacy support (single image + content)
+        if section.get('content'):
+            img_url = section.get('image_url') or ""
+            caption = section.get('caption')
+            caption_text = "" if not caption or str(caption).lower() == 'none' else str(caption)
+            caption_html = f'<p class="caption">{caption_text}</p>' if caption_text else ''
+            
+            section_html += f"""
             <div class="image-container">
                 <img src="{img_url}" alt="{caption_text}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                 <p class="img-error" style="display:none; padding:40px; color:#999; font-style:italic;">이미지를 불러올 수 없습니다</p>
                 {caption_html}
             </div>
             <div class="content">{section.get('content', '')}</div>
-        </div>
-        """
+            """
+        
+        # V4 support (multiple paragraphs with zigzag potential)
+        elif section.get('paragraphs'):
+            section_html += '<div class="content">'
+            for p in section.get('paragraphs', []):
+                p_img = p.get('image_url') or ""
+                section_html += f"""
+                <div class="paragraph-item">
+                    <h3>{p.get('subtitle', '')}</h3>
+                    <div class="image-container">
+                        <img src="{p_img}" alt="{p.get('subtitle', '')}" style="max-height: 400px;">
+                        <p class="caption">Keyword: {p.get('image_search_keyword', '')}</p>
+                    </div>
+                    <p>{p.get('text', '')}</p>
+                </div>
+                """
+            section_html += '</div>'
+            
+        section_html += "</div>"
+        html_template += section_html
     
     # Add Moodboard if exists
     if magazine_data.get('moodboard'):
@@ -107,7 +131,29 @@ def save_preview(magazine_data, filename):
         f.write(html_template)
     print(f"✅ Preview saved to: {filename}")
 
+import time
+import argparse
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--case", type=str, choices=["wine", "fashion", "food", "all"], default=None)
+    parser.add_argument("--topic", type=str, help="Custom topic to test")
+    parser.add_argument("--interests", type=str, nargs="+", help="Interests for the custom topic")
+    args = parser.parse_args()
+
+    # If --topic is provided, it takes precedence
+    if args.topic:
+        print(f"\n🚀 Testing Custom Topic: {args.topic}")
+        interests = args.interests or ["Lifestyle", "Trends", "Quality of Life"]
+        try:
+            data = generate_magazine_content(args.topic, interests, "Sophisticated and premium")
+            save_preview(data, "test_magazine_custom.html")
+            print("✨ Custom generation complete!")
+        except Exception as e:
+            print(f"❌ Failed to generate custom topic: {e}")
+        return
+
+    # Standard test cases
     test_cases = [
         {
             "id": "wine",
@@ -129,13 +175,22 @@ def main():
         }
     ]
     
+    selected_case = args.case or "all"
     for case in test_cases:
+        if selected_case != "all" and selected_case != case['id']:
+            continue
+
         print(f"\n🚀 Testing Topic: {case['topic']}")
         try:
             data = generate_magazine_content(case['topic'], case['interests'], case['mood'])
             save_preview(data, f"test_magazine_{case['id']}.html")
+            
+            if selected_case == "all":
+                print("⏱️ Cooling down for 30 seconds to avoid Free Tier rate limits...")
+                time.sleep(30)
         except Exception as e:
             print(f"❌ Failed to generate {case['id']}: {e}")
+            time.sleep(10)
 
 if __name__ == "__main__":
     main()
