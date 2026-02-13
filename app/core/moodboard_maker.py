@@ -51,13 +51,11 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     You are an award-winning Art Director and Senior Photographer.
     Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's moodboard.
     
-    [SUBJECT-SPECIFIC FOCUS (MANDATORY)]
-    The image MUST clearly feature elements of: {topic_emphasis}
-    - **Food/Cafe**: Detail-oriented food photography. Focus on textures (steam, moisture, crumbs). Artisan ceramics.
-    - **Fashion/Beauty**: High-fashion editorial look. Focus on fabric textures (silk, wool, leather) and luxury accessories.
-    - **Travel/Architecture**: Atmospheric location shots. Focus on lighting, scale, and unique architectural details.
-    - **Art/Design**: Abstract or conceptual visuals. Focus on color harmony, shadow play, and artistic objects.
-    - **Tech/Minimal**: Futuristic and clean. Focus on sleek surfaces, light-ray effects, and UI-inspired aesthetics.
+    [CRITICAL: SUBJECT PRIORITY]
+    - The Topic ({topic_emphasis}) is the ABSOLUTE HERO. 
+    - If the topic is a character (e.g., Rilakkuma, Mickey Mouse), the image MUST feature that SPECIFIC character figure or plush toy.
+    - **NO CULTURAL HALLUCINATIONS**: Do not generate generic people or landscapes (e.g., a person in a kimono) just because a character is from a certain country.
+    - If the topic is "Rilakkuma", the prompt must include "Rilakkuma character figure" or "Rilakkuma plush toy" as the central subject.
     
     [PHOTOGRAPHY PARAMETERS]
     1. **Subject**: Specific, high-definition subject related to the Topic ({topic_emphasis}).
@@ -67,7 +65,7 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     5. **Style**: Premium magazine editorial style (Kinfolk, Magazine B, Vogue quality).
     
     [PROMPT STRUCTURE]
-    [Subject Detail], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: 8k, photorealistic, mastery, masterpiece]
+    [Main Subject: Topic Figure/Object], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: 8k, photorealistic, mastery, masterpiece]
     
     [CRITICAL CONSTRAINTS]
     - Output ONLY the prompt text.

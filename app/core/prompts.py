@@ -1,7 +1,7 @@
 # Enhanced System Prompts for Mine-AI
 
 # ==========================================
-# V5: 문단 배열 구조 + 지그재그 레이아웃
+# V4: 문단 배열 구조 + 지그재그 레이아웃
 # ==========================================
 
 MAGAZINE_SYSTEM_PROMPT_V4 = """
@@ -15,33 +15,31 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
 
 [CRITICAL REQUIREMENTS]
 
-1. **SECTION STRUCTURE**:
-   - `thumbnail_url`: Section's representative cover image
-   - `paragraphs`: Array of 3 paragraph objects, each with:
-     * `subtitle`: Catchy paragraph title (예: "올리브 사라진 올리브영")
-     * `text`: Paragraph content (plain text or simple HTML, 150-300 chars)
-     * `image_search_keyword`: **ENGLISH ONLY** specific visual keyword for image search (e.g., "Olive Young store interior bright")
-     * `image_url`: Leave as null (will be filled by system)
+1. **STRUCTURE**:
+   - `cover_image_search_keyword`: **ENGLISH ONLY** premium keyword for the magazine cover
+   - `sections`: Array of sections, each with:
+     * `heading`: Section title
+     * `thumbnail_search_keyword`: **ENGLISH ONLY** premium keyword for the section thumbnail
+     * `paragraphs`: Array of 3 paragraph objects, each with:
+       * `subtitle`: Paragraph title
+       * `text`: Content (150-300 chars)
+       * `image_search_keyword`: **ENGLISH ONLY** premium keyword for paragraph image
 
 2. **CONTENT DISTRIBUTION**:
    - Spread information across 3 paragraphs per section
-   - Each paragraph focuses on ONE specific aspect/place/item
-   - Each paragraph MUST have a unique, engaging subtitle
-   - Example for "부산 맛집" section:
-     * Paragraph 1: subtitle="국밥의 성지, 서면", image_search_keyword="Busan Pork Soup bubbling hot bowl close up"
-     * Paragraph 2: subtitle="여름의 별미, 밀면", image_search_keyword="Cold wheat noodles Korean food summer vibe"
-     * Paragraph 3: subtitle="바다의 보물창고", image_search_keyword="Fresh seafood market display various fish"
+   - Each paragraph MUST focus on ONE specific aspect/place/item
 
-3. **IMAGE MATCHING**:
-   - Generate specific `image_search_keyword` in ENGLISH for each paragraph.
-   - The keyword MUST be visual and concrete (e.g., "Apple iPhone 15 Pro titanium frame macro shot").
-   - Do NOT use abstract concepts (e.g., "Innovation", "Future").
+3. **IMAGE MATCHING & PREMIUM AESTHETICS**:
+   - Generate specific `image_search_keyword` in ENGLISH for EVERY image (Cover, Thumbnail, Paragraph).
+   - **[PREMIUM VISUAL GUIDELINES]**:
+     * Use professional photography terms: "cinematic lighting", "shallow depth of field", "high-end editorial shot", "minimalist composition", "luxury texture".
+     * Example: Instead of "wine glass", use "Luxury wine glass with ruby red wine, cinematic lighting, dark elegant background".
+     * Example: Instead of "Seoul cafe", use "Modern minimalist Seoul cafe interior, warm natural sunlight, wood and stone texture".
+   - The keyword MUST be visual and concrete. Do NOT use abstract concepts.
 
 4. **LAYOUT ALTERNATION**:
    - Section 1: `hero` (full width intro)
-   - Section 2: `split_left`
-   - Section 3: `split_right`
-   - Section 4+: alternate `split_left` / `split_right`
+   - Section 2+: alternate `split_left` / `split_right`
 
 [SOURCE MATERIAL]
 - Use ONLY the provided [Research Material]. Do not hallucinate.
@@ -50,33 +48,23 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
 You must output ONLY valid JSON.
 ```json
 {
-    "thought_process": "Planning sections and distributing content across paragraphs...",
+    "thought_process": "...",
     "title": "매거진 제목",
     "subtitle": "매거진 부제",
     "introduction": "도입부 (150-200자)",
+    "cover_image_search_keyword": "Premium English keyword for cover",
     "cover_image_url": null,
     "tags": ["태그1", "태그2", "태그3"],
     "sections": [
         {
-            "heading": "섹션 제목 (예: 부산 맛집)",
+            "heading": "섹션 제목",
+            "thumbnail_search_keyword": "Premium English keyword for section thumbnail",
             "thumbnail_url": null,
             "paragraphs": [
                 {
-                    "subtitle": "문단 소제목 (예: 국밥의 성지, 서면)",
-                    "text": "첫 번째 문단. 구체적인 장소/아이템 소개 (150-300자)",
-                    "image_search_keyword": "Steaming Korean Pork Soup in traditional bowl",
-                    "image_url": null
-                },
-                {
-                    "subtitle": "문단 소제목 (예: 여름의 별미, 밀면)",
-                    "text": "두 번째 문단. 다른 장소/아이템 소개 (150-300자)",
-                    "image_search_keyword": "Korean cold noodles with egg garnish",
-                    "image_url": null
-                },
-                {
-                    "subtitle": "문단 소제목 (예: 바다의 보물창고)",
-                    "text": "세 번째 문단. 또 다른 장소/아이템 소개 (150-300자)",
-                    "image_search_keyword": "Fresh seafood market stalls colorful",
+                    "subtitle": "문단 소제목",
+                    "text": "문단 내용",
+                    "image_search_keyword": "Premium English visual keyword",
                     "image_url": null
                 }
             ],
@@ -89,15 +77,13 @@ You must output ONLY valid JSON.
 ```
 
 [SELF-CORRECTION]
-- [ ] Does each section have exactly 3 paragraphs? -> FIX IT.
+- [ ] Are keywords using premium modifiers (cinematic, editorial, etc.)? -> ENHANCE THEM.
 - [ ] Does each paragraph have `image_search_keyword` in ENGLISH? -> FIX IT.
-- [ ] Are paragraph texts specific and focused (not generic)? -> MAKE SPECIFIC.
-- [ ] Are layouts alternating (hero -> split_left -> split_right)? -> FIX IT.
+- [ ] Are paragraph texts specific and focused? -> MAKE SPECIFIC.
 
 [LANGUAGE]
 - Korean (Hangul) for all content
-- English allowed for brand names only
-- **`image_search_keyword` MUST BE ENGLISH**
+- **`image_search_keyword` MUST BE ENGLISH with aesthetic modifiers**
 """
 
 
@@ -259,7 +245,7 @@ Analyze the user's message within the context of the Magazine Topic ({topic}). D
   * Examples: "간단하게", "짧게", "쉽게"
   * Action: Reduce length, simplify vocabulary
 
-- EXPAND: Make more detailed/comprehensive
+- EXPAND: Make more detailed/comprehensiver
   * Examples: "더 자세하게", "길게", "깊이있게"
   * Action: Add context, explanations, details
 
@@ -520,7 +506,7 @@ Discard the old content and create a new, high-density editorial section from sc
 - Theme/Headline: {heading}
 - User Instructions: {message}
 - Length: 800-1500 characters (Korean)
-- Formatting REQUIRED: <h3>, <p>, <strong>, <blockquote>, <ul>, <li>
+- Formatting REQUIRED: <h3>, <p>, <strong>, blockquote, <ul>, <li>
 
 [FORBIDDEN]
 - Do not use generic praise (e.g., "인기가 많습니다", "추천할만 합니다").
@@ -573,7 +559,7 @@ User Instruction: {instruction}
 1. **NO HALLUCINATION**: Focus strictly on the Topic. Do not include unrelated data from search noise or game context.
 2. Create entirely new content (don't just tweak existing)
 3. Content length: 500-1500 characters (Korean)
-4. Use HTML tags: <p>, <h3>, <blockquote>, <strong>, <ul><li>, <br>
+4. Use HTML tags: <p>, <h3>, blockquote, <strong>, <ul><li>, <br>
 5. Include concrete details (names, numbers, facts)
 
 [OUTPUT JSON]

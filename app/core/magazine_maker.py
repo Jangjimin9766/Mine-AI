@@ -1,7 +1,8 @@
 from app.core.llm_client import llm_client
 import json
 from app.core.searcher import search_with_tavily, scrape_with_jina
-from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V4  # V3 → V4로 변경
+from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V4
+from app.core.unsplash_client import search_unsplash_image
 
 def generate_magazine_content(topic: str, user_interests: list = None, user_mood: str = None):
     print(f"🎨 Magazine Editor started for: {topic}")
@@ -92,25 +93,34 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
             "https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1200",
         ]
     
-    # 커버 이미지 검증
+    # 커버 이미지 검증 및 보정 (Unsplash 정밀 검색 우선)
+    cover_keyword = result_json.get('cover_image_search_keyword')
+    if cover_keyword and len(cover_keyword) > 2:
+        found_cover = search_unsplash_image(cover_keyword)
+        if found_cover:
+            result_json['cover_image_url'] = found_cover
+            print(f"🎯 Cover: Unsplash matched with '{cover_keyword}'")
+
     if not result_json.get('cover_image_url') or not result_json['cover_image_url'].startswith('http'):
         result_json['cover_image_url'] = images[0]
         print(f"⚠️ Fixed cover_image_url to: {images[0]}")
     
-    # 섹션 이미지 검증 및 display_order 추가
-    # Unsplash 클라이언트 임포트 (문단별 정확한 이미지 검색)
-    from app.core.unsplash_client import search_unsplash_image
-    
     for i, section in enumerate(result_json.get('sections', [])):
-        # thumbnail_url 검증 (V4 구조)
+        # thumbnail_url 검증 및 보정 (Unsplash 정밀 검색 우선 - V4 구조)
+        thumb_keyword = section.get('thumbnail_search_keyword')
+        if thumb_keyword and len(thumb_keyword) > 2:
+            found_thumb = search_unsplash_image(thumb_keyword)
+            if found_thumb:
+                section['thumbnail_url'] = found_thumb
+                print(f"🎯 Section {i} thumbnail: Unsplash matched with '{thumb_keyword}'")
+
         if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http'):
             section['thumbnail_url'] = images[min(i, len(images) - 1)]
             print(f"⚠️ Fixed section {i} thumbnail_url to: {section['thumbnail_url']}")
         
-        # 레거시 image_url 검증 (V3 호환)
+        # 레거시 image_url 검증 (V3 호환용 필드 채우기)
         if not section.get('image_url') or not section['image_url'].startswith('http'):
-            section['image_url'] = images[min(i + 1, len(images) - 1)]
-            print(f"⚠️ Fixed section {i} image_url to: {section['image_url']}")
+            section['image_url'] = section.get('thumbnail_url')
         
         # V4 paragraphs 배열 내 image_url 검증
         # 우선순위: 1) AI 생성 영어 키워드(Unsplash) → 2) Tavily 이미지 풀 → 3) Subtitle 검색(Fallback)
@@ -153,21 +163,21 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         if not section.get('layout_hint'):
             section['layout_hint'] = 'image_left'
 
-    # 4. [부록] 매거진과 1:1 매칭되는 무드보드 생성 (Local SDXL)
-    from app.core.moodboard_maker import generate_moodboard
-    
-    print(f"🎨 Generating matching moodboard for magazine: {result_json.get('title')}")
-    
-    moodboard_data = generate_moodboard(
-        topic=topic,
-        user_interests=user_interests,
-        magazine_tags=result_json.get('tags', []),
-        magazine_titles=[result_json.get('title', 'Untitled')]
-    )
-    
-    if moodboard_data:
-        result_json['moodboard'] = moodboard_data
-        print(f"✅ Moodboard attached to magazine")
+    # 4. [부록] 매거진과 1:1 매칭되는 무드보드 생성 (Local SDXL) - 임시 비활성화 (테스트 속도 향상)
+    # from app.core.moodboard_maker import generate_moodboard
+    # 
+    # print(f"🎨 Generating matching moodboard for magazine: {result_json.get('title')}")
+    # 
+    # moodboard_data = generate_moodboard(
+    #     topic=topic,
+    #     user_interests=user_interests,
+    #     magazine_tags=result_json.get('tags', []),
+    #     magazine_titles=[result_json.get('title', 'Untitled')]
+    # )
+    # 
+    # if moodboard_data:
+    #     result_json['moodboard'] = moodboard_data
+    #     print(f"✅ Moodboard attached to magazine")
     
     print(f"✅ Magazine with moodboard created: {len(result_json.get('sections', []))} sections")
     
