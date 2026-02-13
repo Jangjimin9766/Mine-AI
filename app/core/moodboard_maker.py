@@ -1,11 +1,78 @@
-from app.core.llm_client import llm_client
-from app.core.local_diffusion_client import local_diffusion_client
+import json
+import random
 import traceback
+from app.core import prompts
+from app.core.llm_client import llm_client
+from app.core.groq_client import groq_client
+from app.core.local_diffusion_client import local_diffusion_client
+
+def verify_prompt_integrity(topic: str, prompt: str) -> dict:
+    """
+    Multi-LLM Blind Test Protocol:
+    1. Groq (Llama 3) identifies the subject from the prompt WITHOUT knowing the topic.
+    2. Gemini compares the identified subject with the original topic for a 'Soft Match'.
+    """
+    try:
+        # 1. Blind Subject Identification (Meta Llama 3 via Groq)
+        verifier_input = prompts.MOODBOARD_VERIFIER_PROMPT.format(prompt=prompt)
+        
+        # Using Llama 3 via Groq for high-speed objective verification
+        blind_result = groq_client.generate_json(
+            system_prompt="You are a cold, objective image analyzer.",
+            user_prompt=verifier_input
+        )
+        
+        if not blind_result:
+            return {"is_valid": True, "score": 1.0, "reason": "Verifier unavailable, bypassing check"}
+
+        detected_subject = blind_result.get("detected_subject", "Unknown")
+        contains_humans = blind_result.get("contains_humans", False)
+        
+        # 2. Semantic Comparison (Gemini)
+        # We ask Gemini to judge if the detected subject matches our target topic.
+        comparison_prompt = f"""
+        Compare SUBJECT A with SUBJECT B. 
+        Are they semantically the same thing or is A a valid representation of B?
+        
+        SUBJECT A (Detected): {detected_subject}
+        SUBJECT B (Original Topic): {topic}
+        
+        Output JSON: {{"match": boolean, "score": float, "reason": "Korean explanation"}}
+        """
+        
+        comparison_res_text = llm_client.generate_text(
+            system_prompt="You are a linguistic expert comparing entities.",
+            user_prompt=comparison_prompt
+        )
+        
+        # Simple cleanup and parse
+        clean_json = comparison_res_text.strip()
+        if "```json" in clean_json:
+            clean_json = clean_json.split("```json")[1].split("```")[0].strip()
+        elif "```" in clean_json:
+            clean_json = clean_json.split("```")[1].split("```")[0].strip()
+        
+        comparison = json.loads(clean_json)
+        
+        # 3. Final Decision
+        # Reject if humans are detected where not expected, or if semantic match fails.
+        is_valid = comparison.get("match", False) and not contains_humans
+        score = comparison.get("score", 0.0)
+        
+        return {
+            "is_valid": is_valid,
+            "score": score,
+            "reason": comparison.get("reason", "No reason provided")
+        }
+
+    except Exception as e:
+        print(f"Verification failed due to error: {e}")
+        traceback.print_exc()
+        return {"is_valid": True, "score": 1.0, "reason": "Verification bypassed due to system error"}
 
 def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None) -> str:
     """
     Generate a detailed prompt for Stable Diffusion (SDXL) based on the user's magazine context.
-    Focus on creating an atmospheric BACKGROUND/WALLPAPER.
     """
     context_parts = []
     
@@ -26,131 +93,89 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
         
     full_context = "\n".join(context_parts)
 
-    import random
-    
-    # 다양성을 위한 랜덤 요소 추가
-    variations = [
-        "Focus on texture and material details.",
-        "Use a unique perspective or composition.",
-        "Experiment with lighting and shadow play.",
-        "Create a more abstract interpretation.",
-        "Emphasize color harmony and atmosphere."
-    ]
-    random_variation = random.choice(variations)
-
-    # 태그에서 실제 주제 키워드 추출 (스타일보다 주제 우선)
-    topic_keywords = []
-    if topic:
-        topic_keywords.append(topic)
-    if magazine_tags:
-        topic_keywords.extend(magazine_tags)
-    
-    topic_emphasis = ", ".join(topic_keywords) if topic_keywords else "general lifestyle"
-
-    system_prompt = f"""
-    You are an award-winning Art Director and Senior Photographer.
-    Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's moodboard.
-    
-    [CRITICAL: SUBJECT PRIORITY]
-    - The Topic ({topic_emphasis}) is the ABSOLUTE HERO. 
-    - If the topic is a character (e.g., Rilakkuma, Mickey Mouse), the image MUST feature that SPECIFIC character figure or plush toy.
-    - **NO CULTURAL HALLUCINATIONS**: Do not generate generic people or landscapes (e.g., a person in a kimono) just because a character is from a certain country.
-    - If the topic is "Rilakkuma", the prompt must include "Rilakkuma character figure" or "Rilakkuma plush toy" as the central subject.
-    
-    [PHOTOGRAPHY PARAMETERS]
-    1. **Subject**: Specific, high-definition subject related to the Topic ({topic_emphasis}).
-    2. **Composition**: Choose most effective (Flatlay, Extreme Close-up, Wide landscape, Golden ratio).
-    3. **Lighting**: Cinematic lighting (Volumetric light, Soft natural dawn light, Dramatic REMBRANDT shadows).
-    4. **Camera/Film**: 85mm lens for products, 24mm for landscapes. High-speed film grain (minimal), crisp focus.
-    5. **Style**: Premium magazine editorial style (Kinfolk, Magazine B, Vogue quality).
-    
-    [PROMPT STRUCTURE]
-    [Main Subject: Topic Figure/Object], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: 8k, photorealistic, mastery, masterpiece]
-    
-    [CRITICAL CONSTRAINTS]
-    - Output ONLY the prompt text.
-    - Do NOT use abstract words only. The Topic MUST be the hero of the image.
-    - Ensure the mood aligns with: {user_mood or "Sophisticated"}
-    """
-
+    system_prompt = prompts.MOODBOARD_SYSTEM_PROMPT
     user_prompt = f"""
     [User Context]
     {full_context}
     
-    Create a comma-separated prompt for a sophisticated BACKGROUND image.
+    Create a detailed English prompt for a premium magazine moodboard.
     """
 
     return llm_client.generate_text(system_prompt, user_prompt)
 
-# 기본 Fallback 이미지 (SDXL 실패 시 사용)
+# Default Fallback Images
 FALLBACK_MOODBOARD_IMAGES = [
     "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200",  # Gradient
     "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200",  # Abstract
     "https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1200",  # Gradient 2
 ]
 
-
 def generate_moodboard(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None) -> dict:
     """
-    Orchestrates the moodboard generation process using Stable Diffusion.
-    Returns structured response with success indicator and fallback on failure.
-    
-    Returns:
-        On success: {"image_url": "...", "description": "...", "success": True}
-        On failure: {"error": "...", "error_type": "...", "success": False, "fallback_url": "..."}
+    Orchestrates the moodboard generation process with M+MAC verification.
     """
-    import random
-    
-    # 토픽이 없으면 태그나 타이틀로 대체 토픽 설정 (로깅용)
     display_topic = topic or (magazine_titles[0] if magazine_titles else "User Profile")
-    
-    print(f"🎨 Generating Background Moodboard (SDXL) for: {display_topic}")
+    print(f"Generating Moodboard (M+MAC Protocol) for: {display_topic}")
 
-    # 1. Generate Prompt
-    try:
-        sd_prompt = generate_moodboard_prompt(topic, user_mood, user_interests, magazine_tags, magazine_titles)
-        print(f"✨ SDXL Prompt: {sd_prompt}")
-    except Exception as e:
-        print(f"❌ Prompt generation failed: {e}")
-        sd_prompt = None
+    MAX_RETRIES = 3
+    sd_prompt = None
+    
+    for attempt in range(1, MAX_RETRIES + 1):
+        print(f"Generation Attempt {attempt}/{MAX_RETRIES}...")
+        
+        # 1. Generate Prompt (MAC)
+        try:
+            current_prompt = generate_moodboard_prompt(topic, user_mood, user_interests, magazine_tags, magazine_titles)
+        except Exception as e:
+            print(f"Prompt generation failed: {e}")
+            continue
+
+        # 2. Verify Integrity (MAC Check)
+        verification = verify_prompt_integrity(display_topic, current_prompt)
+        
+        if verification["is_valid"]:
+            print(f"Integrity Verified (Score: {verification['score']})")
+            sd_prompt = current_prompt
+            break
+        else:
+            print(f"Integrity Violation (Score: {verification['score']})")
+            print(f" > Reason: {verification['reason']}")
+            # Fallback to Safe Mode on 3rd failure
+            if attempt == MAX_RETRIES:
+                print("Max retries reached. Using Safe Mode Fallback.")
+                sd_prompt = f"A high-quality studio photography of {display_topic}, minimalist composition, soft cinematic lighting, 8k resolution, masterpiece."
+                break
 
     if not sd_prompt:
         fallback_url = random.choice(FALLBACK_MOODBOARD_IMAGES)
         return {
-            "error": "Failed to generate prompt - LLM may not be configured",
-            "error_type": "PROMPT_GENERATION_FAILED",
+            "error": "Failed to generate valid prompt after retries",
             "success": False,
             "fallback_url": fallback_url,
-            # 호환성을 위해 image_url도 fallback으로 제공
-            "image_url": fallback_url,
-            "description": f"Fallback image for: {display_topic}"
+            "image_url": fallback_url
         }
 
-    # 2. Generate Image (Local SDXL)
+    # 3. Generate Image (Local SDXL)
     try:
-        print("🖼️ Generating image with SDXL...")
+        print(f"Generating image with Verified Prompt: {sd_prompt[:50]}...")
         image_url = local_diffusion_client.generate_image(sd_prompt)
     except Exception as e:
-        print(f"❌ Image generation exception: {e}")
+        print(f"Image generation exception: {e}")
         traceback.print_exc()
         image_url = None
     
     if not image_url:
         fallback_url = random.choice(FALLBACK_MOODBOARD_IMAGES)
         return {
-            "error": "Failed to generate image - SDXL model may not be loaded",
-            "error_type": "IMAGE_GENERATION_FAILED",
+            "error": "Image generation failed",
             "success": False,
             "fallback_url": fallback_url,
-            # 호환성을 위해 image_url도 fallback으로 제공
             "image_url": fallback_url,
             "description": sd_prompt
         }
         
-    print(f"✅ Moodboard Generated (Data URI)")
-
     return {
-        "image_url": image_url,  # This will be a Data URI (base64)
+        "image_url": image_url,
         "description": sd_prompt,
         "success": True
     }

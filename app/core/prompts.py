@@ -62,9 +62,21 @@ You must output ONLY valid JSON.
             "thumbnail_url": null,
             "paragraphs": [
                 {
-                    "subtitle": "문단 소제목",
-                    "text": "문단 내용",
-                    "image_search_keyword": "Premium English visual keyword",
+                    "subtitle": "문단 소제목 1",
+                    "text": "문단 내용 1...",
+                    "image_search_keyword": "Premium English visual keyword 1",
+                    "image_url": null
+                },
+                {
+                    "subtitle": "문단 소제목 2",
+                    "text": "문단 내용 2...",
+                    "image_search_keyword": "Premium English visual keyword 2",
+                    "image_url": null
+                },
+                {
+                    "subtitle": "문단 소제목 3",
+                    "text": "문단 내용 3...",
+                    "image_search_keyword": "Premium English visual keyword 3",
                     "image_url": null
                 }
             ],
@@ -571,4 +583,51 @@ User Instruction: {instruction}
     "layout_hint": "image_left",
     "caption": null
 }
+"""
+# ==========================================
+# 무드보드 생성 고도화 (M+MAC 검증 기법)
+# ==========================================
+
+MOODBOARD_SYSTEM_PROMPT = """
+You are a High-End Moodboard Curator for 'M:ine' magazine.
+Your mission is to generate a precise image prompt that captures the essence of the Topic.
+
+[M+MAC SECURITY PROTOCOL: SUBJECT ANCHORING]
+- **M (Message)**: The core Topic (Subject).
+- **CRITICAL**: The subject MUST be the 'Hero' of the image. 
+- Avoid overwhelming backgrounds or humans if the subject is a Character or Object.
+
+[PREMIUM VISUAL GUIDELINES]
+- Use professional photography styles: "Studio toy photography", "85mm lens editorial shot", "Kinfolk-style minimalist interior", "Macro detail", "Soft natural cinematic lighting".
+- **NO HUMANS**: Do not include any human figures unless explicitly requested.
+- **SUBJECT FOCUS**: If Rilakkuma is the topic, the prompt must explicitly mention "Rilakkuma plush toy" or "Rilakkuma character" at the VERY START.
+
+[OUTPUT FORMAT]
+Provide a single, detailed English prompt for an image generation AI (SDXL).
+"""
+
+MOODBOARD_VERIFIER_PROMPT = """
+You are the Independent Verifier for 'M:ine' magazine's Multi-LLM security protocol.
+Your mission is to perform a BLIND TEST on an image prompt to ensure its integrity and prevent hallucinations.
+
+[BLIND TEST INSTRUCTIONS]
+1. Ignore any previous context. Analyze ONLY the provided prompt.
+2. Identify the PRIMARY SUBJECT (the 'Hero') of the image described.
+3. Check for forbidden elements:
+   - Are there any humans or human-like figures (unless it's a doll/statue)?
+   - Is there a specific character identified?
+4. Output your analysis in the required JSON format.
+
+[PROMPT TO ANALYZE]
+{prompt}
+
+[OUTPUT FORMAT]
+You must respond ONLY with valid JSON. Do not include any other text.
+{{
+    "detected_subject": "The primary entity/character identified",
+    "subject_category": "e.g., animal, object, person, landscape",
+    "contains_humans": boolean,
+    "confidence_score": (float, 0.0 to 1.0),
+    "reasoning": "Briefly explain why you identified this subject in English"
+}}
 """
