@@ -41,7 +41,12 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
    - Section 1: `hero` (full width intro)
    - Section 2: `split_left`
    - Section 3: `split_right`
+   - Section 3: `split_right`
    - Section 4+: alternate `split_left` / `split_right`
+
+5. **MANDATORY FIELDS**:
+   - `image_search_keyword`: MUST NOT BE EMPTY. If you can't think of one, use the paragraph's subtitle + "visual".
+   - `subtitle`: MUST NOT BE EMPTY.
 
 [SOURCE MATERIAL]
 - Use ONLY the provided [Research Material]. Do not hallucinate.
@@ -91,6 +96,7 @@ You must output ONLY valid JSON.
 [SELF-CORRECTION]
 - [ ] Does each section have exactly 3 paragraphs? -> FIX IT.
 - [ ] Does each paragraph have `image_search_keyword` in ENGLISH? -> FIX IT.
+- [ ] Is `image_search_keyword` empty? -> GENERATE IT.
 - [ ] Are paragraph texts specific and focused (not generic)? -> MAKE SPECIFIC.
 - [ ] Are layouts alternating (hero -> split_left -> split_right)? -> FIX IT.
 

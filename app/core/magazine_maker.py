@@ -122,7 +122,7 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
             if current_url and current_url.startswith('http'):
                 continue
             
-            # [NEW] 1순위: AI가 생성한 영어 키워드로 Unsplash 정밀 검색
+                # [NEW] 1순위: AI가 생성한 영어 키워드로 Unsplash 정밀 검색
             search_keyword = paragraph.get('image_search_keyword')
             if search_keyword and len(search_keyword) > 2:
                 # 영어 키워드이므로 정확도가 매우 높음
@@ -131,6 +131,8 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
                     paragraph['image_url'] = found_url
                     print(f"🎯 Section {i} paragraph {j}: Unsplash matched with '{search_keyword}'")
                     continue
+                else:
+                    print(f"⚠️ Section {i} paragraph {j}: Unsplash failed for '{search_keyword}', trying fallback")
 
             # 2순위: Tavily에서 가져온 이미지 풀 사용 (Fallback 1)
             img_idx = min(i * 3 + j, len(images) - 1)
@@ -145,7 +147,12 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
                 subtitle = paragraph.get('subtitle', '')
                 search_query = f"{topic} {subtitle}" if subtitle else topic
                 paragraph['image_url'] = search_unsplash_image(search_query, tavily_url)
-                print(f"🖼️ Section {i} paragraph {j}: Unsplash fallback search with subtitle")
+                print(f"🖼️ Section {i} paragraph {j}: Unsplash fallback search with subtitle: {search_query}")
+                
+            # [FINAL CHECK] 여전히 image_url이 없거나 비어있으면 기본 이미지 강제 할당
+            if not paragraph.get('image_url'):
+                paragraph['image_url'] = "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200"
+                print(f"🚨 Section {i} paragraph {j}: FORCE ASSIGNED default image")
         
         # display_order 자동 부여 (그리드 순서)
         section['display_order'] = i
