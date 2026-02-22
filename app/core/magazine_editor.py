@@ -100,13 +100,15 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     current_image_url = current_section.get('image_url', '')
     
     system_prompt = """
-    You are rewriting a section of a premium lifestyle magazine.
-    Follow the user's instruction while maintaining HIGH-DENSITY, INFORMATIVE content.
+    You are rewriting a section of a high-end archival magazine (M:ine Archive).
+    Follow the user's instruction while maintaining DEPTH and EMOTIONAL RESONANCE.
     
     [EDITORIAL STANDARDS]
     1. **Hyper-Specificity**: Use concrete brand names, numbers, historical facts, and technical data.
     2. **Insightful Narrative**: Don't just list facts. Explain the *significance* and *context*.
-    3. **Tone**: Refined, sophisticated, and authoritative formal Korean (습니다/입니다).
+    3. **Tone**: Mix 70% professional analysis with 30% essayistic sensibility.
+    4. **Voice**: Use ~습니다/입니다 but allow literary expressions (metaphors, sensory details).
+    5. **Volume**: Each paragraph MUST be 4-6 sentences long. No short, single-line paragraphs.
     
     [HTML FORMATTING RULES]
     - <h3>: Section-level subheadings (Use at least 1-2 to break long text)
@@ -116,7 +118,7 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     - <ul><li>: Structured data or lists (only for 3+ items)
     
     [CRITICAL CONSTRAINTS]
-    - **Content Length**: 800-1,500 characters (Korean) including HTML tags.
+    - **Content Length**: 1200-2000 characters (Korean) including HTML tags.
     - **Image URL**: ALWAYS preserve the original image_url exactly as provided.
     - **No Vague Statements**: Avoid generic praise; prove value with evidence.
     
@@ -138,14 +140,14 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     User instruction: {instruction}
     
     Rewrite this section following the instruction.
-    Keep it in Korean, 800-1500 characters for content.
-    Make it INFORMATIVE and SPECIFIC, not vague or overly poetic.
+    Keep it in Korean, 1200-2000 characters for content.
+    Make it INFORMATIVE, SPECIFIC, and EMOTIONALLY RESONANT.
     
     IMPORTANT: Use this EXACT image_url in your response: {current_image_url}
     """
     
     from app.core.llm_client import llm_client
-    new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+    new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7, max_tokens=4000)
     
     # Force preserve original image URL
     new_section['image_url'] = current_image_url
@@ -182,13 +184,15 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
         research_content = "No specific research available. Create content based on general knowledge."
     
     system_prompt = """
-    You are adding a new section to a premium lifestyle magazine.
-    Create a high-density, authoritative editorial based on the provided research.
+    You are adding a new section to a high-end archival magazine.
+    Create a high-density, authoritative editorial with an essayistic touch.
     
     [EDITORIAL STANDARDS]
     1. **Data-Driven**: Use specific information from [Research Results] (numbers, names, specs).
     2. **Depth**: Provide context and background. Connect the new section to the magazine's theme.
     3. **Visual Structure**: Use HTML tags to create a structured, readable layout.
+    4. **Paragraph Structure**: Sensory Opening -> Analysis -> Meaning -> Conclusion.
+    5. **Tone**: Professional yet evocative.
     
     [HTML FORMATTING RULES]
     - <h3>: Section-level subheadings (Mandatory for sections over 1000 chars)
@@ -198,7 +202,7 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     - <ul><li>: Clear lists for facts or features
     
     [CRITICAL RULES]
-    - **Length**: 800-1,500 characters (Korean).
+    - **Length**: 1200-2000 characters (Korean).
     - **Persona**: Editor-in-Chief with deep domain knowledge.
     - **Originality**: Do not repeat existing section topics. Bring a fresh perspective.
     
@@ -224,13 +228,13 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     {images[:5] if images else "No images available"}
     
     Create a new section with SPECIFIC, INFORMATIVE content.
-    Keep it in Korean, 800-1500 characters for content.
+    Keep it in Korean, 1200-2000 characters for content.
     Use facts and details from the research.
     Make it as good as the original magazine sections.
     """
     
     from app.core.llm_client import llm_client
-    new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+    new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7, max_tokens=4000)
     
     # Ensure image_url is not null string
     if not new_section.get('image_url') or new_section.get('image_url') == 'null':

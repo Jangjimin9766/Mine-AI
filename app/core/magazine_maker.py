@@ -65,17 +65,22 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
     {json.dumps(images, ensure_ascii=False)}
     
     Create a premium magazine article with these requirements:
-    - **LAYOUT**: Zigzag flow. Alternate between `split_left` and `split_right`.
-    - **CONTENT**: Pure HTML text (<p>, <h3>, <blockquote>). NO `<img>` tags in content.
-    - **IMAGES**: Assign a relevant image_url to each section.
-    - **TONE**: Sophisticated Korean (습니다/입니다 formal tone).
-    - **STRUCTURE**: 4-6 Sections total.
+    - At least 4-6 sections with clear hierarchy
+    - Each section must have 3+ concrete facts/examples
+    - Use specific numbers, names, locations (not vague statements)
+    - **Tone**: Mix 30% emotional essay style with 70% professional analysis.
+    - **Narrative**: Start sections with sensory details (sights, sounds, feelings) before diving into data.
+    - First section should be layout_type "hero"
+    - Mix of split_left, split_right, and basic layouts
+    - Sophisticated Korean (습니다/입니다 formal tone)
+    
+    Remember: Readers should learn something valuable, not just be entertained.
     """
 
     print(f"🧠 AI Crafting V4 magazine with enhanced quality standards...")
     
-    # llm_client 사용 (안정성과 창의성의 균형을 위해 0.7로 설정)
-    result_json = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+    # llm_client 사용 (긴 호흡의 글을 위해 max_tokens 상향)
+    result_json = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7, max_tokens=4000)
     
     # [CoT 확인] 에디터의 생각 읽기
     if result_json.get('thought_process'):
@@ -98,62 +103,10 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         print(f"⚠️ Fixed cover_image_url to: {images[0]}")
     
     # 섹션 이미지 검증 및 display_order 추가
-    # Unsplash 클라이언트 임포트 (문단별 정확한 이미지 검색)
-    from app.core.unsplash_client import search_unsplash_image
-    
     for i, section in enumerate(result_json.get('sections', [])):
-        # thumbnail_url 검증 (V4 구조)
-        if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http'):
-            section['thumbnail_url'] = images[min(i, len(images) - 1)]
-            print(f"⚠️ Fixed section {i} thumbnail_url to: {section['thumbnail_url']}")
-        
-        # 레거시 image_url 검증 (V3 호환)
         if not section.get('image_url') or not section['image_url'].startswith('http'):
             section['image_url'] = images[min(i + 1, len(images) - 1)]
             print(f"⚠️ Fixed section {i} image_url to: {section['image_url']}")
-        
-        # V4 paragraphs 배열 내 image_url 검증
-        # 우선순위: 1) AI 생성 영어 키워드(Unsplash) → 2) Tavily 이미지 풀 → 3) Subtitle 검색(Fallback)
-        paragraphs = section.get('paragraphs', [])
-        for j, paragraph in enumerate(paragraphs):
-            current_url = paragraph.get('image_url', '')
-            
-            # 이미 유효한 URL이 있으면 스킵
-            if current_url and current_url.startswith('http'):
-                continue
-            
-                # [NEW] 1순위: AI가 생성한 영어 키워드로 Unsplash 정밀 검색
-            search_keyword = paragraph.get('image_search_keyword')
-            if search_keyword and len(search_keyword) > 2:
-                # 영어 키워드이므로 정확도가 매우 높음
-                found_url = search_unsplash_image(search_keyword)
-                if found_url:
-                    paragraph['image_url'] = found_url
-                    print(f"🎯 Section {i} paragraph {j}: Unsplash matched with '{search_keyword}'")
-                    continue
-                else:
-                    print(f"⚠️ Section {i} paragraph {j}: Unsplash failed for '{search_keyword}', trying fallback")
-
-            # 2순위: Tavily에서 가져온 이미지 풀 사용 (Fallback 1)
-            img_idx = min(i * 3 + j, len(images) - 1)
-            tavily_url = images[img_idx] if img_idx < len(images) else None
-            
-            # Tavily 이미지가 유효하면 사용
-            if tavily_url and tavily_url.startswith('http') and 'unsplash.com/photo-' not in tavily_url:
-                paragraph['image_url'] = tavily_url
-                print(f"📷 Section {i} paragraph {j}: Tavily image pool used")
-            else:
-                # 3순위: Unsplash에서 subtitle 기반 검색 (Fallback 2 - 한글일 수 있음)
-                subtitle = paragraph.get('subtitle', '')
-                search_query = f"{topic} {subtitle}" if subtitle else topic
-                paragraph['image_url'] = search_unsplash_image(search_query, tavily_url)
-                print(f"🖼️ Section {i} paragraph {j}: Unsplash fallback search with subtitle: {search_query}")
-                
-            # [FINAL CHECK] 여전히 image_url이 없거나 비어있으면 기본 이미지 강제 할당
-            if not paragraph.get('image_url'):
-                paragraph['image_url'] = "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200"
-                print(f"🚨 Section {i} paragraph {j}: FORCE ASSIGNED default image")
-        
         # display_order 자동 부여 (그리드 순서)
         section['display_order'] = i
         # layout_hint 기본값 설정
