@@ -1,6 +1,6 @@
 from app.core.llm_client import llm_client
 import json
-from app.core.searcher import search_with_tavily, scrape_with_jina
+from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images
 from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V4  # V3 → V4로 변경
 
 def generate_magazine_content(topic: str, user_interests: list = None, user_mood: str = None):
@@ -45,9 +45,14 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
     
     # 2. [정독] 상위 1개 글 정독 (Jina)
     deep_content = ""
+    scraped_images = []  # 크롤링된 소스에서 추출한 이미지
     if search_results:
         deep_content = scrape_with_jina(search_results[0]['url'])
-        if not deep_content:
+        if deep_content:
+            # [NEW] 크롤링된 소스에서 이미지 URL 추출 (Fix 1)
+            scraped_images = extract_images_from_content(deep_content)
+            print(f"📰 Scraped images from source: {len(scraped_images)} found")
+        else:
             deep_content = search_results[0]['content']
 
     # 3. [편집] LLM에게 매거진 작성 요청 (V4 프롬프트 - 더 구체적이고 품질 높게)
@@ -84,36 +89,56 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         del result_json['thought_process']
     
     # 🔒 이미지 URL 검증 및 보정
+    # [Fix 3] 하드코딩된 Unsplash 그라디언트 대신 주제 기반 fallback 사용
     if not images or len(images) == 0:
-        # 이미지가 없으면 플레이스홀더 사용
-        images = [
-            "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200",
-            "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200",
-            "https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1200",
-        ]
+        images = get_topic_fallback_images(topic, count=5)
+        print(f"⚠️ No Tavily images, using topic-based fallback for '{topic}'")
     
-    # 커버 이미지 검증
+    # Tavily 이미지에서 실제 이미지만 분리 (Unsplash fallback 제외)
+    real_tavily_images = [img for img in images if 'unsplash.com/photo-' not in img]
+    print(f"📊 Image pool: {len(scraped_images)} scraped, {len(real_tavily_images)} real Tavily, {len(images)} total")
+    
+    # 커버 이미지 검증: 크롤링 이미지 우선 → Tavily → 주제 fallback
     if not result_json.get('cover_image_url') or not result_json['cover_image_url'].startswith('http'):
-        result_json['cover_image_url'] = images[0]
-        print(f"⚠️ Fixed cover_image_url to: {images[0]}")
+        if scraped_images:
+            result_json['cover_image_url'] = scraped_images[0]
+            print(f"✅ Cover image from scraped source: {scraped_images[0][:60]}...")
+        elif real_tavily_images:
+            result_json['cover_image_url'] = real_tavily_images[0]
+            print(f"✅ Cover image from Tavily: {real_tavily_images[0][:60]}...")
+        else:
+            result_json['cover_image_url'] = images[0]
+            print(f"⚠️ Cover image fallback: {images[0][:60]}...")
     
     # 섹션 이미지 검증 및 display_order 추가
-    # Unsplash 클라이언트 임포트 (문단별 정확한 이미지 검색)
     from app.core.unsplash_client import search_unsplash_image
+    
+    # 크롤링 이미지 인덱스 (전역으로 순차 할당)
+    scraped_idx = 0
     
     for i, section in enumerate(result_json.get('sections', [])):
         # thumbnail_url 검증 (V4 구조)
         if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http'):
-            section['thumbnail_url'] = images[min(i, len(images) - 1)]
-            print(f"⚠️ Fixed section {i} thumbnail_url to: {section['thumbnail_url']}")
+            if scraped_idx < len(scraped_images):
+                section['thumbnail_url'] = scraped_images[scraped_idx]
+                scraped_idx += 1
+                print(f"📰 Section {i} thumbnail: scraped image used")
+            else:
+                section['thumbnail_url'] = images[min(i, len(images) - 1)]
+                print(f"⚠️ Section {i} thumbnail: fallback used")
         
         # 레거시 image_url 검증 (V3 호환)
         if not section.get('image_url') or not section['image_url'].startswith('http'):
-            section['image_url'] = images[min(i + 1, len(images) - 1)]
-            print(f"⚠️ Fixed section {i} image_url to: {section['image_url']}")
+            section['image_url'] = section.get('thumbnail_url', images[min(i, len(images) - 1)])
         
+        # ============================================
         # V4 paragraphs 배열 내 image_url 검증
-        # 우선순위: 1) AI 생성 영어 키워드(Unsplash) → 2) Tavily 이미지 풀 → 3) Subtitle 검색(Fallback)
+        # [Fix 2] 우선순위 재정립:
+        #   1순위: 크롤링된 소스 이미지 (가장 관련성 높음)
+        #   2순위: Tavily 실제 이미지 (Unsplash fallback 제외)
+        #   3순위: AI image_search_keyword → Unsplash 검색
+        #   4순위: subtitle 기반 Unsplash 검색 (최종 fallback)
+        # ============================================
         paragraphs = section.get('paragraphs', [])
         for j, paragraph in enumerate(paragraphs):
             current_url = paragraph.get('image_url', '')
@@ -122,37 +147,52 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
             if current_url and current_url.startswith('http'):
                 continue
             
-                # [NEW] 1순위: AI가 생성한 영어 키워드로 Unsplash 정밀 검색
+            # ---- 1순위: 크롤링된 소스 이미지 ----
+            if scraped_idx < len(scraped_images):
+                paragraph['image_url'] = scraped_images[scraped_idx]
+                scraped_idx += 1
+                print(f"📰 Section {i} paragraph {j}: SCRAPED source image used")
+                continue
+            
+            # ---- 2순위: Tavily 실제 이미지 (Unsplash fallback 제외) ----
+            tavily_img_idx = i * 3 + j
+            if tavily_img_idx < len(real_tavily_images):
+                paragraph['image_url'] = real_tavily_images[tavily_img_idx]
+                print(f"📷 Section {i} paragraph {j}: Tavily REAL image used")
+                continue
+            
+            # ---- 3순위: AI image_search_keyword → Unsplash 검색 ----
             search_keyword = paragraph.get('image_search_keyword')
             if search_keyword and len(search_keyword) > 2:
-                # 영어 키워드이므로 정확도가 매우 높음
                 found_url = search_unsplash_image(search_keyword)
-                if found_url:
+                # Unsplash 성공했고, 그라디언트 fallback이 아닌 경우만 사용
+                if found_url and 'unsplash.com/photo-' not in found_url:
                     paragraph['image_url'] = found_url
-                    print(f"🎯 Section {i} paragraph {j}: Unsplash matched with '{search_keyword}'")
+                    print(f"🎯 Section {i} paragraph {j}: Unsplash keyword matched '{search_keyword}'")
                     continue
                 else:
-                    print(f"⚠️ Section {i} paragraph {j}: Unsplash failed for '{search_keyword}', trying fallback")
-
-            # 2순위: Tavily에서 가져온 이미지 풀 사용 (Fallback 1)
-            img_idx = min(i * 3 + j, len(images) - 1)
-            tavily_url = images[img_idx] if img_idx < len(images) else None
+                    print(f"⚠️ Section {i} paragraph {j}: Unsplash keyword '{search_keyword}' → fallback to Tavily cycle")
             
-            # Tavily 이미지가 유효하면 사용
-            if tavily_url and tavily_url.startswith('http') and 'unsplash.com/photo-' not in tavily_url:
-                paragraph['image_url'] = tavily_url
-                print(f"📷 Section {i} paragraph {j}: Tavily image pool used")
-            else:
-                # 3순위: Unsplash에서 subtitle 기반 검색 (Fallback 2 - 한글일 수 있음)
-                subtitle = paragraph.get('subtitle', '')
-                search_query = f"{topic} {subtitle}" if subtitle else topic
-                paragraph['image_url'] = search_unsplash_image(search_query, tavily_url)
-                print(f"🖼️ Section {i} paragraph {j}: Unsplash fallback search with subtitle: {search_query}")
+            # ---- 4순위: Tavily 이미지 순환 재사용 (gradient 방지) ----
+            # 실제 Tavily 이미지가 있으면 순환(cycle)하여 재사용
+            if real_tavily_images:
+                cycle_idx = (i * 3 + j) % len(real_tavily_images)
+                paragraph['image_url'] = real_tavily_images[cycle_idx]
+                print(f"🔄 Section {i} paragraph {j}: Tavily image CYCLED (idx {cycle_idx})")
+                continue
+            
+            # ---- 5순위: subtitle 기반 Unsplash 검색 (최종 fallback) ----
+            subtitle = paragraph.get('subtitle', '')
+            search_query = f"{topic} {subtitle}" if subtitle else topic
+            fallback_url = images[min(i * 3 + j, len(images) - 1)] if images else None
+            paragraph['image_url'] = search_unsplash_image(search_query, fallback_url)
+            print(f"🖼️ Section {i} paragraph {j}: Unsplash subtitle fallback '{search_query}'")
                 
-            # [FINAL CHECK] 여전히 image_url이 없거나 비어있으면 기본 이미지 강제 할당
+            # [FINAL CHECK] 여전히 image_url이 없으면 주제 기반 fallback
             if not paragraph.get('image_url'):
-                paragraph['image_url'] = "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200"
-                print(f"🚨 Section {i} paragraph {j}: FORCE ASSIGNED default image")
+                topic_fallbacks = get_topic_fallback_images(topic, count=1)
+                paragraph['image_url'] = topic_fallbacks[0]
+                print(f"🚨 Section {i} paragraph {j}: TOPIC FALLBACK assigned")
         
         # display_order 자동 부여 (그리드 순서)
         section['display_order'] = i

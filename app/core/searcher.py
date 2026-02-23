@@ -119,3 +119,108 @@ def scrape_with_jina(url: str):
     except Exception as e:
         print(f"⚠️ Jina Error: {e}, continuing without deep content")
         return None
+
+
+import re
+
+def extract_images_from_content(content: str) -> list:
+    """
+    Jina가 반환한 마크다운/HTML 콘텐츠에서 이미지 URL을 추출합니다.
+    크롤링된 소스의 실제 이미지를 우선적으로 사용하기 위함.
+    
+    Returns:
+        유효한 이미지 URL 리스트 (중복 제거, 노이즈 필터링 완료)
+    """
+    if not content:
+        return []
+    
+    urls = set()
+    
+    # 1) 마크다운 이미지: ![alt](url)
+    md_pattern = r'!\[[^\]]*\]\((https?://[^\s\)]+)\)'
+    for match in re.finditer(md_pattern, content):
+        urls.add(match.group(1))
+    
+    # 2) HTML img 태그: <img src="url"> or <img src='url'>
+    html_pattern = r'<img[^>]+src=["\']?(https?://[^\s"\'>\)]+)["\']?'
+    for match in re.finditer(html_pattern, content, re.IGNORECASE):
+        urls.add(match.group(1))
+    
+    # 노이즈 이미지 필터링
+    noise_patterns = [
+        # 아이콘, 로고, 추적 픽셀
+        'favicon', 'icon', 'logo', 'badge', 'avatar',
+        'pixel', 'tracker', 'beacon', '1x1', 'spacer',
+        'emoji', 'button', 'arrow', 'spinner', 'loading',
+        # 광고 및 추적
+        'ad-', '/ads/', 'adserver', 'doubleclick', 'googlesyndication',
+        'facebook.com/tr', 'analytics', 'tracking',
+        # SNS 공유 버튼 등
+        'share', 'social', 'twitter-card', 'og-image',
+        # 너무 작은 이미지 (크기 힌트가 URL에 있는 경우)
+        'w=1&', 'h=1&', 'width=1', 'height=1',
+        '16x16', '32x32', '48x48', '64x64',
+    ]
+    
+    # 유효한 이미지 확장자
+    valid_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif']
+    
+    filtered = []
+    for url in urls:
+        url_lower = url.lower()
+        
+        # 노이즈 패턴 체크
+        if any(noise in url_lower for noise in noise_patterns):
+            continue
+        
+        # SVG 제외 (보통 아이콘)
+        if url_lower.endswith('.svg'):
+            continue
+        
+        # 최소한의 이미지 URL 길이 체크 (너무 짧으면 쓸모없음)
+        if len(url) < 30:
+            continue
+        
+        filtered.append(url)
+    
+    print(f"📰 Extracted {len(filtered)} images from crawled content (out of {len(urls)} total)")
+    return filtered
+
+
+def get_topic_fallback_images(topic: str, count: int = 5) -> list:
+    """
+    주제 기반으로 Unsplash에서 관련 이미지를 검색하여 fallback으로 사용합니다.
+    하드코딩된 파란 그라디언트 대신 주제와 관련 있는 이미지를 제공합니다.
+    
+    Args:
+        topic: 매거진 주제
+        count: 필요한 이미지 수
+    
+    Returns:
+        이미지 URL 리스트
+    """
+    from app.core.unsplash_client import search_unsplash_image
+    
+    # 기본 fallback (Unsplash 검색도 실패할 경우)
+    DEFAULT_FALLBACK = "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200"
+    
+    # 주제에서 핵심 키워드 추출 (간단한 방식)
+    # 한글 주제를 영어로 변환하기 어려우니, 그대로 Unsplash에 검색
+    search_variations = [
+        topic,                           # 원본 주제
+        f"{topic} lifestyle",            # 라이프스타일 앵커
+        f"{topic} aesthetic",            # 미학적 앵커
+    ]
+    
+    results = []
+    for i in range(count):
+        query = search_variations[i % len(search_variations)]
+        url = search_unsplash_image(query, DEFAULT_FALLBACK)
+        if url and url != DEFAULT_FALLBACK:
+            results.append(url)
+        else:
+            results.append(DEFAULT_FALLBACK)
+    
+    topic_count = sum(1 for u in results if u != DEFAULT_FALLBACK)
+    print(f"🎯 Topic fallback: {topic_count}/{count} topic-related images for '{topic}'")
+    return results
