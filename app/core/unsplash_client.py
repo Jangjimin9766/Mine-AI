@@ -7,9 +7,9 @@ from app.config import settings
 
 UNSPLASH_API_URL = "https://api.unsplash.com/search/photos"
 
-# 캐시: 동일 검색어 반복 방지
+# 캐시: 동일 검색어 반복 시 다른 이미지를 주기 위해 리스트 저장
 _image_cache = {}
-
+_cache_index = {}
 
 def search_unsplash_image(query: str, fallback_url: str = None) -> str:
     """
@@ -28,10 +28,21 @@ def search_unsplash_image(query: str, fallback_url: str = None) -> str:
         print(f"⚠️ Unsplash API key not configured, using fallback")
         return fallback_url or get_default_fallback()
     
-    # 캐시 확인
+    # 캐시 확인 (인덱스 순회하며 새로운 이미지 반환)
     if query in _image_cache:
-        print(f"📦 Unsplash cache hit: {query}")
-        return _image_cache[query]
+        urls = _image_cache[query]
+        idx = _cache_index.get(query, 0)
+        
+        if idx < len(urls):
+            image_url = urls[idx]
+            _cache_index[query] = idx + 1
+            print(f"📦 Unsplash cache hit: {query} (idx {idx}/{len(urls)})")
+            return image_url
+        else:
+            # 10장을 다 썼다면 다시 처음으로
+            _cache_index[query] = 1
+            print(f"📦 Unsplash cache cycle reset: {query}")
+            return urls[0]
     
     # 검색어 정제 (콤마 이후 부분만 사용하거나 전체 사용)
     clean_query = _clean_query(query)
@@ -41,7 +52,7 @@ def search_unsplash_image(query: str, fallback_url: str = None) -> str:
             UNSPLASH_API_URL,
             params={
                 "query": clean_query,
-                "per_page": 1,
+                "per_page": 10,  # 10장 미리 가져와서 캐싱
                 "orientation": "landscape",  # 가로 이미지 선호
                 "content_filter": "high"      # 안전한 콘텐츠만
             },
@@ -56,12 +67,14 @@ def search_unsplash_image(query: str, fallback_url: str = None) -> str:
             results = data.get("results", [])
             
             if results and len(results) > 0:
-                # 정규 사이즈 이미지 URL (1080px)
-                image_url = results[0].get("urls", {}).get("regular")
-                if image_url:
-                    print(f"✅ Unsplash found: {clean_query} → {image_url[:50]}...")
-                    _image_cache[query] = image_url
-                    return image_url
+                # 정규 사이즈 이미지 URL (1080px) 리스트 수집
+                urls = [r.get("urls", {}).get("regular") for r in results if r.get("urls", {}).get("regular")]
+                
+                if urls:
+                    print(f"✅ Unsplash found {len(urls)} images: {clean_query}")
+                    _image_cache[query] = urls
+                    _cache_index[query] = 1
+                    return urls[0]
         
         print(f"⚠️ Unsplash no results for: {clean_query}")
         return fallback_url or get_default_fallback()
