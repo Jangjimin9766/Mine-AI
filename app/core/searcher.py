@@ -64,7 +64,8 @@ def search_with_tavily(query: str, topic: str = None):
         noise_domains = [
             'wikia', 'fandom', 'game', 'screenshot', 'awakening', 
             'inven', 'ruliweb', 'dcinside', 'namu.wiki', 'strategywiki',
-            'mobiware', 'appstore', 'play.google', 'ytimg.com', 'youtube.com', 'youtu.be'
+            'mobiware', 'appstore', 'play.google', 'ytimg.com', 'youtube.com', 'youtu.be',
+            'daumcdn.net', 'pstatic.net', 'tistory.com', 'blogfiles.naver.net', 'kakaocdn.net', 'fmkorea', 'theqoo'
         ]
         
         for img in images:
@@ -160,6 +161,9 @@ def extract_images_from_content(content: str) -> list:
         # 너무 작은 이미지 (크기 힌트가 URL에 있는 경우)
         'w=1&', 'h=1&', 'width=1', 'height=1',
         '16x16', '32x32', '48x48', '64x64',
+        # 외부 다운로드(Hotlinking) 차단 CDN
+        'daumcdn.net', 'pstatic.net', 'tistory.com', 'blogfiles.naver.net', 
+        'kakaocdn.net', 'namu.wiki', 'namu.la', 'dcinside', 'fmkorea', 'theqoo'
     ]
     
     # 유효한 이미지 확장자
