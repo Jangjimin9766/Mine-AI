@@ -64,7 +64,7 @@ def search_with_tavily(query: str, topic: str = None):
         noise_domains = [
             'wikia', 'fandom', 'game', 'screenshot', 'awakening', 
             'inven', 'ruliweb', 'dcinside', 'namu.wiki', 'strategywiki',
-            'mobiware', 'appstore', 'play.google'
+            'mobiware', 'appstore', 'play.google', 'ytimg.com', 'youtube.com', 'youtu.be'
         ]
         
         for img in images:
