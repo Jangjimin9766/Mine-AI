@@ -59,25 +59,13 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
     {mood_context}
     
     [Research Material]
-    {deep_content[:3000]}
-    
+    {deep_content[:
     [Available Images]
     {json.dumps(images, ensure_ascii=False)}
     
-    Create a premium magazine article with these requirements:
-    - At least 4-6 sections with clear hierarchy
-    - Each section must have 3+ concrete facts/examples
-    - Use specific numbers, names, locations (not vague statements)
-    - **Tone**: Mix 30% emotional essay style with 70% professional analysis.
-    - **Narrative**: Start sections with sensory details (sights, sounds, feelings) before diving into data.
-    - First section should be layout_type "hero"
-    - Mix of split_left, split_right, and basic layouts
-    - Sophisticated Korean (습니다/입니다 formal tone)
-    
-    Remember: Readers should learn something valuable, not just be entertained.
-    """
-
-    print(f"🧠 AI Crafting V4 magazine with enhanced quality standards...")
+ .yS 'split_left' and 'split_right'.
+ """
+utaa
     
     # llm_client 사용 (긴 호흡의 글을 위해 max_tokens 상향)
     result_json = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7, max_tokens=4000)
