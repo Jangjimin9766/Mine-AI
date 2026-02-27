@@ -126,5 +126,5 @@ def _clean_query(query: str) -> str:
 
 
 def get_default_fallback() -> str:
-    """기본 fallback 이미지 반환"""
-    return "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200"
+    """기본 fallback 이미지 반환 — 빈 문자열 대신 None을 반환하여 후속 fallback 로직이 작동하도록 함"""
+    return None

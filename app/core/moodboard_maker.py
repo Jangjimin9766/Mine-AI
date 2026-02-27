@@ -99,12 +99,9 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
 
     return llm_client.generate_text(system_prompt, user_prompt)
 
-# 기본 Fallback 이미지 (SDXL 실패 시 사용)
-FALLBACK_MOODBOARD_IMAGES = [
-    "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200",  # Gradient
-    "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200",  # Abstract
-    "https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1200",  # Gradient 2
-]
+# 기본 Fallback 이미지 (SDXL 실패 시 사용) — Unsplash 그라디언트 제거
+# 무드보드는 AI 생성이므로, 실패 시 fallback URL 없이 에러 반환
+FALLBACK_MOODBOARD_IMAGES = []
 
 
 def generate_moodboard(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None) -> dict:
@@ -132,14 +129,12 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
         sd_prompt = None
 
     if not sd_prompt:
-        fallback_url = random.choice(FALLBACK_MOODBOARD_IMAGES)
         return {
             "error": "Failed to generate prompt - LLM may not be configured",
             "error_type": "PROMPT_GENERATION_FAILED",
             "success": False,
-            "fallback_url": fallback_url,
-            # 호환성을 위해 image_url도 fallback으로 제공
-            "image_url": fallback_url,
+            "fallback_url": None,
+            "image_url": None,
             "description": f"Fallback image for: {display_topic}"
         }
 
@@ -153,14 +148,12 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
         image_url = None
     
     if not image_url:
-        fallback_url = random.choice(FALLBACK_MOODBOARD_IMAGES)
         return {
             "error": "Failed to generate image - SDXL model may not be loaded",
             "error_type": "IMAGE_GENERATION_FAILED",
             "success": False,
-            "fallback_url": fallback_url,
-            # 호환성을 위해 image_url도 fallback으로 제공
-            "image_url": fallback_url,
+            "fallback_url": None,
+            "image_url": None,
             "description": sd_prompt
         }
         

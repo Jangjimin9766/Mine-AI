@@ -23,13 +23,7 @@ def search_with_tavily(query: str, topic: str = None):
     print(f"🔎 Tavily Searching for: {query} (Topic: {topic})")
     
     # 플레이스홀더 이미지 (Tavily 실패 시 사용)
-    FALLBACK_IMAGES = [
-        "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200",  # Gradient
-        "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200",  # Abstract
-        "https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1200",  # Gradient 2
-        "https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=1200",  # Abstract 2
-        "https://images.unsplash.com/photo-1557682224-5b8590cd9ec5?w=1200",  # Gradient 3
-    ]
+    FALLBACK_IMAGES = []
     
     # Tavily 클라이언트 가져오기 (없으면 fallback)
     tavily = _get_tavily_client()
@@ -82,8 +76,33 @@ def search_with_tavily(query: str, topic: str = None):
             images = FALLBACK_IMAGES
         
         # 최소 5개 이미지 보장
-        while len(images) < 5:
-            images.extend(FALLBACK_IMAGES)
+        if images and len(images) < 5:
+            # Try to fetch additional broad images once to guarantee unique photos
+            try:
+                print(f"🔄 Fetching additional broad images for: {topic}")
+                broad_response = tavily.search(
+                    query=f"{topic} wallpaper | photography",
+                    search_depth="basic",
+                    include_images=True,
+                    max_results=5
+                )
+                more_images = broad_response.get('images', [])
+                for img in more_images:
+                    img_lower = img.lower()
+                    if not any(noise in img_lower for noise in noise_domains) and img not in images:
+                        images.append(img)
+                        if len(images) >= 5:
+                            break
+            except Exception as e:
+                print(f"⚠️ Failed secondary Tavily search: {e}")
+                
+            # If still not enough, then and only then duplicate
+            if len(images) < 5:
+                images = (images * 5)[:10]
+        elif not images:
+            images = []
+
+
         
         print(f"✅ Found {len(results)} results and {len(images)} images")
         return results, images[:10]  # 최대 10개까지만
@@ -193,38 +212,119 @@ def extract_images_from_content(content: str) -> list:
 
 def get_topic_fallback_images(topic: str, count: int = 5) -> list:
     """
-    주제 기반으로 Unsplash에서 관련 이미지를 검색하여 fallback으로 사용합니다.
-    하드코딩된 파란 그라디언트 대신 주제와 관련 있는 이미지를 제공합니다.
+    주제 기반으로 Tavily에서 추가 이미지를 검색하여 fallback으로 사용합니다.
+    크롤링+Tavily만으로 이미지를 확보합니다.
     
     Args:
         topic: 매거진 주제
         count: 필요한 이미지 수
     
     Returns:
-        이미지 URL 리스트
+        실제 사진 URL 리스트
     """
-    from app.core.unsplash_client import search_unsplash_image
-    
-    # 기본 fallback (Unsplash 검색도 실패할 경우)
-    DEFAULT_FALLBACK = "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200"
-    
-    # 주제에서 핵심 키워드 추출 (간단한 방식)
-    # 한글 주제를 영어로 변환하기 어려우니, 그대로 Unsplash에 검색
+    # 주제 관련 이미지 검색 바리에이션
     search_variations = [
-        topic,                           # 원본 주제
-        f"{topic} lifestyle",            # 라이프스타일 앵커
-        f"{topic} aesthetic",            # 미학적 앵커
+        f"{topic} 사진",
+        f"{topic} 이미지 고화질",
+        f"{topic} photography",
     ]
     
     results = []
-    for i in range(count):
-        query = search_variations[i % len(search_variations)]
-        url = search_unsplash_image(query, DEFAULT_FALLBACK)
-        if url and url != DEFAULT_FALLBACK:
-            results.append(url)
-        else:
-            results.append(DEFAULT_FALLBACK)
+    seen = set()
     
-    topic_count = sum(1 for u in results if u != DEFAULT_FALLBACK)
-    print(f"🎯 Topic fallback: {topic_count}/{count} topic-related images for '{topic}'")
+    for query in search_variations:
+        if len(results) >= count:
+            break
+        try:
+            _, imgs = search_with_tavily(query, topic=topic)
+            for img in imgs:
+                if img not in seen and validate_image_url(img):
+                    seen.add(img)
+                    results.append(img)
+                    if len(results) >= count:
+                        break
+        except Exception as e:
+            print(f"⚠️ Topic fallback search failed for '{query}': {e}")
+    
+    print(f"🎯 Topic fallback: {len(results)}/{count} REAL images via Tavily for '{topic}'")
     return results
+
+
+def scrape_multiple_with_jina(urls: list, max_count: int = 3) -> tuple:
+    """
+    상위 N개 URL을 순차 크롤링하여 이미지 풀을 최대한 확보합니다.
+    
+    Args:
+        urls: 크롤링할 URL 리스트
+        max_count: 최대 크롤링할 URL 수
+        
+    Returns:
+        (deep_content, scraped_images) 튜플
+        - deep_content: 첫 번째 성공한 크롤링 본문 (AI 프롬프트용)
+        - scraped_images: 추출된 모든 이미지 URL 리스트 (중복 제거)
+    """
+    deep_content = ""
+    scraped_images = []
+    seen_images = set()
+    
+    for i, url in enumerate(urls[:max_count]):
+        print(f"📖 Jina crawling [{i+1}/{min(len(urls), max_count)}]: {url[:80]}...")
+        content = scrape_with_jina(url)
+        if content:
+            # 첫 번째 성공한 본문을 AI 프롬프트용으로 저장
+            if not deep_content:
+                deep_content = content
+            
+            # 이미지 추출 (중복 제거)
+            images = extract_images_from_content(content)
+            for img in images:
+                if img not in seen_images:
+                    seen_images.add(img)
+                    scraped_images.append(img)
+            
+            print(f"  → {len(images)} images extracted (total unique: {len(scraped_images)})")
+    
+    print(f"📰 Multi-crawl complete: {len(scraped_images)} unique images from {min(len(urls), max_count)} URLs")
+    return deep_content, scraped_images
+
+
+# 이미지 유효성 검증 캐시 (동일 URL 반복 검증 방지)
+_validation_cache = {}
+
+def validate_image_url(url: str) -> bool:
+    """
+    HTTP HEAD 요청으로 이미지 URL의 유효성을 검증합니다.
+    Content-Type이 image/*이고 status 200이면 유효.
+    
+    Args:
+        url: 검증할 이미지 URL
+        
+    Returns:
+        True: 유효한 이미지, False: 엑박/빈이미지/접근불가
+    """
+    if not url or not url.startswith('http'):
+        return False
+    
+    # 캐시 확인
+    if url in _validation_cache:
+        return _validation_cache[url]
+    
+    try:
+        response = requests.head(url, timeout=3, allow_redirects=True)
+        content_type = response.headers.get('Content-Type', '').lower()
+        
+        is_valid = (
+            response.status_code == 200 
+            and content_type.startswith('image/')
+        )
+        
+        if not is_valid:
+            print(f"❌ Image validation failed: {url[:60]}... (status={response.status_code}, type={content_type})")
+        
+        _validation_cache[url] = is_valid
+        return is_valid
+        
+    except Exception as e:
+        print(f"❌ Image validation error: {url[:60]}... ({e})")
+        _validation_cache[url] = False
+        return False

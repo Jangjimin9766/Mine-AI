@@ -1,6 +1,6 @@
 from app.core.llm_client import llm_client
 import json
-from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images
+from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images, scrape_multiple_with_jina, validate_image_url
 from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V4  # V3 → V4로 변경
 
 def generate_magazine_content(topic: str, user_interests: list = None, user_mood: str = None):
@@ -43,17 +43,26 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
     # 1. [취재] Tavily로 정보와 이미지 수집
     search_results, images = search_with_tavily(topic, topic=topic)
     
-    # 2. [정독] 상위 1개 글 정독 (Jina)
+    # 2. [정독] 상위 3개 글 정독 (Jina) — 이미지 풀 최대 확보
     deep_content = ""
     scraped_images = []  # 크롤링된 소스에서 추출한 이미지
     if search_results:
-        deep_content = scrape_with_jina(search_results[0]['url'])
-        if deep_content:
-            # [NEW] 크롤링된 소스에서 이미지 URL 추출 (Fix 1)
-            scraped_images = extract_images_from_content(deep_content)
-            print(f"📰 Scraped images from source: {len(scraped_images)} found")
-        else:
-            deep_content = search_results[0]['content']
+        urls = [r['url'] for r in search_results[:3]]
+        deep_content, scraped_images = scrape_multiple_with_jina(urls, max_count=3)
+        
+        # 크롤링 실패 시 검색 결과 본문을 fallback으로 사용
+        if not deep_content:
+            deep_content = search_results[0].get('content', '')
+        
+        # 크롤링 이미지 유효성 사전 검증 (엑박 방지)
+        validated_scraped = []
+        for img in scraped_images:
+            if validate_image_url(img):
+                validated_scraped.append(img)
+            else:
+                print(f"🗑️ Removed invalid scraped image: {img[:60]}...")
+        scraped_images = validated_scraped
+        print(f"✅ Validated scraped images: {len(scraped_images)} passed")
 
     # 3. [편집] LLM에게 매거진 작성 요청 (V4 프롬프트 - 더 구체적이고 품질 높게)
     system_prompt = MAGAZINE_SYSTEM_PROMPT_V4  # V3에서 V4로 업그레이드!
@@ -89,14 +98,15 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         del result_json['thought_process']
     
     # 🔒 이미지 URL 검증 및 보정
-    # [Fix 3] 하드코딩된 Unsplash 그라디언트 대신 주제 기반 fallback 사용
     if not images or len(images) == 0:
-        images = get_topic_fallback_images(topic, count=5)
-        print(f"⚠️ No Tavily images, using topic-based fallback for '{topic}'")
+        # Tavily 이미지가 없으면 추가 검색 시도
+        print(f"⚠️ No Tavily images, attempting additional search for '{topic}'")
+        extra_results, extra_images = search_with_tavily(f"{topic} 사진 이미지", topic=topic)
+        images = extra_images
     
-    # Tavily 이미지에서 실제 이미지만 분리 (Unsplash fallback 제외)
-    real_tavily_images = [img for img in images if 'unsplash.com/photo-' not in img]
-    print(f"📊 Image pool: {len(scraped_images)} scraped, {len(real_tavily_images)} real Tavily, {len(images)} total")
+    # Tavily에서 가져온 실제 이미지
+    real_tavily_images = [img for img in images]
+    print(f"📊 Image pool: {len(scraped_images)} scraped, {len(real_tavily_images)} Tavily, {len(images)} total")
     
     # 커버 이미지 검증: 크롤링 이미지 우선 → Tavily → 주제 fallback
     if not result_json.get('cover_image_url') or not result_json['cover_image_url'].startswith('http'):
@@ -111,7 +121,6 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
             print(f"⚠️ Cover image fallback: {images[0][:60]}...")
     
     # 섹션 이미지 검증 및 display_order 추가
-    from app.core.unsplash_client import search_unsplash_image
     # 전역 사용 URL 저장 (중복 방지)
     used_image_urls = set()
     if result_json.get('cover_image_url'):
@@ -155,22 +164,26 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         
         # ============================================
         # V4 paragraphs 배열 내 image_url 검증
-        # [Fix 2] 우선순위 재정립:
-        #   1순위: 크롤링된 소스 이미지 (가장 관련성 높음)
-        #   2순위: Tavily 실제 이미지 (Unsplash fallback 제외)
-        #   3순위: AI image_search_keyword → Unsplash 검색
-        #   4순위: subtitle 기반 Unsplash 검색 (최종 fallback)
+        # 우선순위 (Jina 크롤링 + Tavily 전용):
+        #   1순위: 크롤링된 소스 이미지 (Jina 3개 URL, 가장 관련성 높음)
+        #   2순위: Tavily 실제 이미지 (검색 결과에 포함된 이미지)
+        #   3순위: Tavily 추가 검색 (주제 변형 검색어로 이미지 확보)
         # ============================================
         paragraphs = section.get('paragraphs', [])
         for j, paragraph in enumerate(paragraphs):
             current_url = paragraph.get('image_url', '')
             
-            # 이미 유효한 URL이 있으면 스킵
+            # 이미 유효한 URL이 있으면 검증 후 스킵
             if current_url and current_url.startswith('http'):
-                continue
+                if validate_image_url(current_url):
+                    continue
+                else:
+                    print(f"⚠️ Section {i} paragraph {j}: AI-assigned URL invalid, re-assigning")
+                    paragraph['image_url'] = None
+            
             assigned = False
             
-            # ---- 1순위: 크롤링된 소스 이미지 ----
+            # ---- 1순위: 크롤링된 소스 이미지 (Jina 3개 URL에서 수집, 사전 검증 완료) ----
             while scraped_idx < len(scraped_images):
                 img = scraped_images[scraped_idx]
                 scraped_idx += 1
@@ -183,64 +196,48 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
             
             if assigned: continue
             
-            # ---- 2순위: Tavily 실제 이미지 ----
+            # ---- 2순위: Tavily 실제 이미지 (검증 포함) ----
             while tavily_img_idx < len(real_tavily_images):
                 img = real_tavily_images[tavily_img_idx]
                 tavily_img_idx += 1
-                if img not in used_image_urls:
+                if img not in used_image_urls and validate_image_url(img):
                     paragraph['image_url'] = img
                     used_image_urls.add(img)
                     assigned = True
-                    print(f"📷 Section {i} paragraph {j}: Tavily REAL image used")
+                    print(f"📷 Section {i} paragraph {j}: Tavily REAL image used (validated)")
                     break
                     
             if assigned: continue
             
-            # ---- 3순위: AI image_search_keyword → Unsplash 검색 ----
-            search_keyword = paragraph.get('image_search_keyword')
-            if search_keyword and len(search_keyword) > 2:
-                found_url = search_unsplash_image(search_keyword)
-                if found_url and 'unsplash.com/photo-' not in found_url:
-                    if found_url not in used_image_urls:
-                        paragraph['image_url'] = found_url
-                        used_image_urls.add(found_url)
-                        assigned = True
-                        print(f"🎯 Section {i} paragraph {j}: Unsplash keyword matched '{search_keyword}'")
-                    else:
-                        print(f"⚠️ Section {i} paragraph {j}: Unsplash image for '{search_keyword}' already used, falling back")
+            # ---- 3순위: Tavily 추가 검색으로 이미지 확보 ----
+            if not assigned:
+                search_keyword = paragraph.get('image_search_keyword', '')
+                subtitle = paragraph.get('subtitle', '')
+                extra_query = f"{topic} {subtitle}" if subtitle else f"{topic} {search_keyword}"
+                
+                try:
+                    _, extra_imgs = search_with_tavily(extra_query, topic=topic)
+                    for img in extra_imgs:
+                        if img not in used_image_urls and validate_image_url(img):
+                            paragraph['image_url'] = img
+                            used_image_urls.add(img)
+                            assigned = True
+                            print(f"🔄 Section {i} paragraph {j}: Tavily EXTRA search image used")
+                            break
+                except Exception as e:
+                    print(f"⚠️ Extra Tavily search failed: {e}")
             
             if assigned: continue
             
-            # ---- 4순위: subtitle 기반 Unsplash 검색 (최종 fallback) ----
-            # 이전 버전의 Tavily 돌려막기(cycle)는 완전히 폐기하고 항상 고유 이미지를 찾습니다.
-            subtitle = paragraph.get('subtitle', '')
-            search_query = f"{topic} {subtitle}" if subtitle else topic
-            
-            found_url = search_unsplash_image(search_query)
-            if found_url and 'unsplash.com/photo-' not in found_url:
-                if found_url not in used_image_urls:
-                    paragraph['image_url'] = found_url
-                    used_image_urls.add(found_url)
-                    assigned = True
-                    print(f"🖼️ Section {i} paragraph {j}: Unsplash subtitle fallback '{search_query}'")
-                
-            if assigned: continue
-                
-            # [FINAL CHECK] 정말 고유 이미지를 더 이상 찾을 수 없으면 주제 기반 fallback (최후의 수단, 중복 허용)
+            # ---- 최종: 이미 사용된 이미지라도 중복 허용 (빈 이미지보다 중복이 나음) ----
             if not paragraph.get('image_url'):
-                topic_fallbacks = get_topic_fallback_images(topic, count=5)
-                for img in topic_fallbacks:
-                    if img not in used_image_urls:
-                        paragraph['image_url'] = img
-                        used_image_urls.add(img)
-                        assigned = True
-                        print(f"🚨 Section {i} paragraph {j}: UNIQUE TOPIC FALLBACK assigned")
-                        break
-                
-                # 고유 이미지 풀도 전부 고갈되었다면 어쩔 수 없이 첫번째 폴백 사용(중복 발생)
-                if not assigned and topic_fallbacks:
-                    paragraph['image_url'] = topic_fallbacks[0]
-                    print(f"⚠️ Section {i} paragraph {j}: DUPLICATE TOPIC FALLBACK assigned (out of unique images)")
+                # 모든 이미지 풀에서 아무거나 하나 선택
+                all_available = scraped_images + real_tavily_images
+                if all_available:
+                    paragraph['image_url'] = all_available[0]
+                    print(f"⚠️ Section {i} paragraph {j}: DUPLICATE image assigned (out of unique images)")
+                else:
+                    print(f"❌ Section {i} paragraph {j}: NO images available at all")
         
         # display_order 자동 부여 (그리드 순서)
         section['display_order'] = i
