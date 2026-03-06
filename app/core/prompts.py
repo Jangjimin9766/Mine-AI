@@ -55,6 +55,11 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
    - `image_search_keyword`: MUST NOT BE EMPTY. If you can't think of one, use the paragraph's subtitle + "visual".
    - `subtitle`: MUST NOT BE EMPTY.
 
+6. **TAGS (STRICT — 반드시 아래 목록에서만 선택)**:
+   - `tags` 값은 반드시 아래 허용 목록 중에서 2~4개를 골라야 합니다. 임의로 만들지 마세요.
+   - Allowed: FASHION, BEAUTY, ACCESSORY, DESIGN, INTERIOR, DOLL, MUSIC, ART, MUSICAL, THEATER, READING, OTT, DRAMA, MOVIE, SCIENCE, SOCIETY, MATH, LANGUAGE, HISTORY, RELIGION, CULTURE, EDUCATION, MINIMALISM, RETRO, VINTAGE, CYBERPUNK, TREND, WEATHER, SPORTS, FITNESS, TRAVEL, CAMPING, HIKING, ENVIRONMENT, ARCHITECTURE, PHOTOGRAPHY, IT, ELECTRONICS, GAME, ANIMAL, PLANT, PSYCHOLOGY, FINANCE, INVESTMENT, LIFESTYLE, FOOD, HEALTH, TECH
+   - Example: 야구 매거진 → ["SPORTS"], 패션 여행 → ["FASHION", "TRAVEL"], 영화 리뷰 → ["MOVIE", "OTT"]
+
 [SOURCE MATERIAL]
 - Use ONLY the provided [Research Material]. Do not hallucinate.
 
@@ -67,7 +72,7 @@ You must output ONLY valid JSON.
     "subtitle": "매거진 부제",
     "introduction": "도입부 (150-200자)",
     "cover_image_url": null,
-    "tags": ["태그1", "태그2", "태그3"],
+    "tags": ["관심사코드1", "관심사코드2"],
     "sections": [
         {
             "heading": "섹션 제목 (예: 부산 맛집)",
