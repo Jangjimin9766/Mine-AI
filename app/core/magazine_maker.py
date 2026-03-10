@@ -132,31 +132,49 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
     
     for i, section in enumerate(result_json.get('sections', [])):
         # thumbnail_url 검증 (V4 구조)
-        if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http'):
+        if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http') or not validate_image_url(section['thumbnail_url']):
             assigned = False
             # 1. 크롤링 이미지 우선 시도
             while scraped_idx < len(scraped_images):
                 img = scraped_images[scraped_idx]
                 scraped_idx += 1
-                if img not in used_image_urls:
+                if img not in used_image_urls and validate_image_url(img):
                     section['thumbnail_url'] = img
                     used_image_urls.add(img)
                     assigned = True
                     print(f"📰 Section {i} thumbnail: scraped image used")
                     break
             
-            # 2. 크롤링 본문 이미지가 없으면 Fallback
+            # 2. 크롤링 본문 이미지가 없으면 초기 검색 이미지 풀에서 할당
             if not assigned:
                 for img in images:
-                    if img not in used_image_urls:
+                    if img not in used_image_urls and validate_image_url(img):
                         section['thumbnail_url'] = img
                         used_image_urls.add(img)
                         assigned = True
                         break
-                if not assigned and images:
-                    # 중복이어도 어쩔 수 없음
-                    section['thumbnail_url'] = images[0]
-                print(f"⚠️ Section {i} thumbnail: fallback used")
+            
+            # 3. [NEW] 그래도 없으면 해당 섹션 주제로 무조건 강제 검색하여 진짜 이미지를 가져옴 (유저 필수 요청)
+            if not assigned:
+                print(f"⚠️ Section {i} thumbnail: Pool exhausted. Forcing a fresh Tavily search for a real image.")
+                heading = section.get('heading', topic)
+                fallback_query = f"{topic} {heading} 사진"
+                try:
+                    _, extra_imgs = search_with_tavily(fallback_query, topic=topic)
+                    for img in extra_imgs:
+                        if validate_image_url(img): # 중복 여부 상관없이 일단 유효하면 박음
+                            section['thumbnail_url'] = img
+                            used_image_urls.add(img)
+                            assigned = True
+                            print(f"✅ Section {i} thumbnail: Successfully fetched a real fallback image via Tavily")
+                            break
+                except Exception as e:
+                    print(f"❌ Force fallback search failed: {e}")
+
+            # 4. 정 안되면 중복이라도 기존 풀에서 첫번째 유효 이미지 보장
+            if not assigned and images:
+                 section['thumbnail_url'] = images[0]
+                 print(f"⚠️ Section {i} thumbnail: fallback to duplicate first image")
         
         # 레거시 image_url 검증 (V3 호환)
         if not section.get('image_url') or not section['image_url'].startswith('http'):
