@@ -184,6 +184,7 @@ def extract_images_from_content(content: str) -> list:
         'daumcdn.net', 'pstatic.net', 'tistory.com', 'blogfiles.naver.net', 
         'kakaocdn.net', 'namu.wiki', 'namu.la', 'dcinside', 'fmkorea', 'theqoo',
         'tiktok.com', 'tiktokcdn.com', 'tiktokv.com', 'tiktok.net',
+        'instagram.com', 'cdninstagram.com',
         'pinterest.com', 'pinimg.com', 'reddit.com', 'redditstatic.com', 'imgur.com'
     ]
     
