@@ -12,7 +12,7 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
 - Each section has a THUMBNAIL (cover image) and multiple PARAGRAPHS
 - Each paragraph has SUBTITLE + TEXT + IMAGE for zigzag display
 - Default: 3 paragraphs per section
-- Each paragraph must be LONG and DETAILED (400-600 chars minimum)
+- Each paragraph must be LONG and DETAILED (600-800 chars minimum)
 
 [CRITICAL REQUIREMENTS]
 
@@ -20,7 +20,7 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
    - `thumbnail_url`: Section's representative cover image
    - `paragraphs`: Array of 3 paragraph objects, each with:
      * `subtitle`: Catchy paragraph title (예: "올리브 사라진 올리브영")
-     * `text`: Paragraph content (plain text or simple HTML, **400-600 chars MINIMUM**). Must include background context, specific details, and reader-relevant insight.
+     * `text`: Paragraph content (plain text or simple HTML, **600-800 chars MINIMUM**). Must include background context, specific details, and reader-relevant insight.
      * `image_search_keyword`: **ENGLISH ONLY** specific visual keyword for image search (e.g., "Olive Young store interior bright")
      * `image_url`: Leave as null (will be filled by system)
 
@@ -28,7 +28,7 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
    - Spread information across 3 paragraphs per section
    - Each paragraph focuses on ONE specific aspect/place/item
    - Each paragraph MUST have a unique, engaging subtitle
-   - **EACH PARAGRAPH TEXT MUST BE 400-600 CHARACTERS (Korean)**
+   - **EACH PARAGRAPH TEXT MUST BE 600-800 CHARACTERS (Korean)**
    - To achieve sufficient length, each paragraph MUST include:
      * Background context or history (왜 이것이 주목받는지)
      * Specific details (브랜드명, 가격, 소재, 위치 등)
@@ -72,7 +72,7 @@ You must output ONLY valid JSON.
     "subtitle": "매거진 부제",
     "introduction": "도입부 (150-200자)",
     "cover_image_url": null,
-    "tags": ["관심사코드1", "관심사코드2"],
+    "tags": ["FASHION", "TRAVEL"],
     "sections": [
         {
             "heading": "섹션 제목 (예: 부산 맛집)",
@@ -80,19 +80,19 @@ You must output ONLY valid JSON.
             "paragraphs": [
                 {
                     "subtitle": "문단 소제목 (예: 국밥의 성지, 서면)",
-                    "text": "첫 번째 문단. 구체적인 장소/아이템 소개. 배경 맥락과 역사, 구체적 디테일(가격, 위치, 특징), 독자를 위한 팁, 체험적 묘사를 모두 포함하여 충분히 길고 밀도 있게 작성 (400-600자)",
+                    "text": "첫 번째 문단. 구체적인 장소/아이템 소개. 배경 맥락과 역사, 구체적 디테일(가격, 위치, 특징), 독자를 위한 팁, 체험적 묘사를 모두 포함하여 충분히 길고 밀도 있게 작성 (600-800자)",
                     "image_search_keyword": "Steaming Korean Pork Soup in traditional bowl",
                     "image_url": null
                 },
                 {
                     "subtitle": "문단 소제목 (예: 여름의 별미, 밀면)",
-                    "text": "두 번째 문단. 다른 장소/아이템 소개. 해당 아이템의 유래나 트렌드 흐름, 대표 매장이나 브랜드 정보, 방문 시 유의사항이나 추천 조합 등을 깊이 있게 서술 (400-600자)",
+                    "text": "두 번째 문단. 다른 장소/아이템 소개. 해당 아이템의 유래나 트렌드 흐름, 대표 매장이나 브랜드 정보, 방문 시 유의사항이나 추천 조합 등을 깊이 있게 서술 (600-800자)",
                     "image_search_keyword": "Korean cold noodles with egg garnish",
                     "image_url": null
                 },
                 {
                     "subtitle": "문단 소제목 (예: 바다의 보물창고)",
-                    "text": "세 번째 문단. 또 다른 장소/아이템 소개. 현장의 분위기와 감각적 묘사, 가격대와 접근성, 현지인 추천 포인트, 계절별 특색 등을 담아 풍성하게 작성 (400-600자)",
+                    "text": "세 번째 문단. 또 다른 장소/아이템 소개. 현장의 분위기와 감각적 묘사, 가격대와 접근성, 현지인 추천 포인트, 계절별 특색 등을 담아 풍성하게 작성 (600-800자)",
                     "image_search_keyword": "Fresh seafood market stalls colorful",
                     "image_url": null
                 }
@@ -111,7 +111,7 @@ You must output ONLY valid JSON.
 - [ ] Is `image_search_keyword` empty? -> GENERATE IT.
 - [ ] Are paragraph texts specific and focused (not generic)? -> MAKE SPECIFIC.
 - [ ] Are layouts alternating (hero -> split_left -> split_right)? -> FIX IT.
-- [ ] Is each paragraph text AT LEAST 400 characters? -> EXPAND IT with more context, details, and descriptions.
+- [ ] Is each paragraph text AT LEAST 600 characters? -> EXPAND IT with more context, details, and descriptions.
 - [ ] Does each paragraph include background + details + tip + sensory description? -> ADD MISSING ELEMENTS.
 
 [LANGUAGE]
