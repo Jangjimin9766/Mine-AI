@@ -180,9 +180,11 @@ def extract_images_from_content(content: str) -> list:
         # 너무 작은 이미지 (크기 힌트가 URL에 있는 경우)
         'w=1&', 'h=1&', 'width=1', 'height=1',
         '16x16', '32x32', '48x48', '64x64',
-        # 외부 다운로드(Hotlinking) 차단 CDN
+        # 외부 다운로드(Hotlinking) 차단 CDN (매우 중요)
         'daumcdn.net', 'pstatic.net', 'tistory.com', 'blogfiles.naver.net', 
-        'kakaocdn.net', 'namu.wiki', 'namu.la', 'dcinside', 'fmkorea', 'theqoo'
+        'kakaocdn.net', 'namu.wiki', 'namu.la', 'dcinside', 'fmkorea', 'theqoo',
+        'tiktok.com', 'tiktokcdn.com', 'tiktokv.com', 'tiktok.net',
+        'pinterest.com', 'pinimg.com', 'reddit.com', 'redditstatic.com', 'imgur.com'
     ]
     
     # 유효한 이미지 확장자
