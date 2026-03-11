@@ -185,7 +185,8 @@ def extract_images_from_content(content: str) -> list:
         'kakaocdn.net', 'namu.wiki', 'namu.la', 'dcinside', 'fmkorea', 'theqoo',
         'tiktok.com', 'tiktokcdn.com', 'tiktokv.com', 'tiktok.net',
         'instagram.com', 'cdninstagram.com',
-        'pinterest.com', 'pinimg.com', 'reddit.com', 'redditstatic.com', 'imgur.com'
+        'pinterest.com', 'pinimg.com', 'reddit.com', 'redditstatic.com', 'imgur.com',
+        'fbcdn.net', 'twimg.com', 'shutterstock', 'istockphoto', 'gettyimages', 'alamy', 'freepik'
     ]
     
     # 유효한 이미지 확장자
@@ -315,13 +316,24 @@ def validate_image_url(url: str) -> bool:
     try:
         response = requests.head(url, timeout=3, allow_redirects=True)
         content_type = response.headers.get('Content-Type', '').lower()
+        content_length_str = response.headers.get('Content-Length', '0')
         
+        # 크기 확인 (Content-Length가 제공될 경우)
+        try:
+            content_length = int(content_length_str)
+        except ValueError:
+            content_length = 5001 # 알 수 없는 경우 일단 통과
+            
         is_valid = (
             response.status_code == 200 
             and content_type.startswith('image/')
         )
         
-        if not is_valid:
+        if is_valid and content_length > 0 and content_length < 5000:
+            print(f"➖ Image too small ({content_length} bytes), likely an icon: {url[:60]}...")
+            is_valid = False
+            
+        if not is_valid and (response.status_code != 200 or not content_type.startswith('image/')):
             print(f"❌ Image validation failed: {url[:60]}... (status={response.status_code}, type={content_type})")
         
         _validation_cache[url] = is_valid
