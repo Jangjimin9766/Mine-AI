@@ -9,7 +9,7 @@ class MoodboardResponse(BaseModel):
 class Paragraph(BaseModel):
     """섹션 내 개별 문단 - 소제목, 텍스트, 이미지가 한 세트"""
     subtitle: str                       # 문단 소제목 (예: "올리브 사라진 올리브영")
-    text: str                           # 문단 본문 (HTML 허용)
+    text: str                           # 문단 본문 (Markdown 권장)
     image_url: Optional[str] = None     # 문단 이미지 URL
 
 

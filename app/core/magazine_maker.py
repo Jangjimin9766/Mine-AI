@@ -80,7 +80,7 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
     
     Create a premium magazine article with these requirements:
     - **LAYOUT**: Zigzag flow. Alternate between `split_left` and `split_right`.
-    - **CONTENT**: Pure HTML text (<p>, <h3>, <blockquote>). NO `<img>` tags in content.
+    - **CONTENT**: Markdown text in each paragraph (`text` field). Use `>`, lists (`-`, `1.`), and `**bold**` naturally. NO HTML tags.
     - **IMAGES**: Assign a relevant image_url to each section.
     - **TONE**: Sophisticated Korean (습니다/입니다 formal tone).
     - **STRUCTURE**: 4-6 Sections total.

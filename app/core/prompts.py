@@ -20,7 +20,7 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
    - `thumbnail_url`: Section's representative cover image
    - `paragraphs`: Array of 3 paragraph objects, each with:
      * `subtitle`: Catchy paragraph title (예: "올리브 사라진 올리브영")
-     * `text`: Paragraph content (plain text or simple HTML, **600-800 chars MINIMUM**). Must include background context, specific details, and reader-relevant insight.
+     * `text`: Paragraph content in Markdown (**600-800 chars MINIMUM**). Must include background context, specific details, and reader-relevant insight.
      * `image_search_keyword`: **ENGLISH ONLY** specific visual keyword for image search (e.g., "Olive Young store interior bright")
      * `image_url`: Leave as null (will be filled by system)
 
@@ -60,6 +60,13 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
    - Allowed: FASHION, BEAUTY, ACCESSORY, DESIGN, INTERIOR, DOLL, MUSIC, ART, MUSICAL, THEATER, READING, OTT, DRAMA, MOVIE, SCIENCE, SOCIETY, MATH, LANGUAGE, HISTORY, RELIGION, CULTURE, EDUCATION, MINIMALISM, RETRO, VINTAGE, CYBERPUNK, TREND, WEATHER, SPORTS, FITNESS, TRAVEL, CAMPING, HIKING, ENVIRONMENT, ARCHITECTURE, PHOTOGRAPHY, IT, ELECTRONICS, GAME, ANIMAL, PLANT, PSYCHOLOGY, FINANCE, INVESTMENT, LIFESTYLE, FOOD, HEALTH, TECH
    - Example: 야구 매거진 → ["SPORTS"], 패션 여행 → ["FASHION", "TRAVEL"], 영화 리뷰 → ["MOVIE", "OTT"]
 
+7. **MARKDOWN STYLE GUIDE (STRICT)**:
+   - `text` MUST be written in Markdown (NOT HTML tags).
+   - Use blockquote (`>`) for key insight or emphasized takeaway at least once when natural.
+   - Use unordered (`-`) or ordered (`1.`) lists for concrete tips/examples when natural.
+   - Use bold (`**text**`) for important terms/keywords.
+   - Keep Markdown readable and purposeful; avoid decorative over-formatting.
+
 [SOURCE MATERIAL]
 - Use ONLY the provided [Research Material]. Do not hallucinate.
 
@@ -80,19 +87,19 @@ You must output ONLY valid JSON.
             "paragraphs": [
                 {
                     "subtitle": "문단 소제목 (예: 국밥의 성지, 서면)",
-                    "text": "첫 번째 문단. 구체적인 장소/아이템 소개. 배경 맥락과 역사, 구체적 디테일(가격, 위치, 특징), 독자를 위한 팁, 체험적 묘사를 모두 포함하여 충분히 길고 밀도 있게 작성 (600-800자)",
+                    "text": "첫 번째 문단. 구체적인 장소/아이템 소개를 Markdown으로 작성. 배경 맥락과 역사, 구체적 디테일(가격, 위치, 특징), 독자를 위한 팁, 체험적 묘사를 모두 포함하여 충분히 길고 밀도 있게 작성 (600-800자). 필요 시 **핵심 키워드** 강조, - 리스트, > 인용구를 자연스럽게 활용",
                     "image_search_keyword": "Steaming Korean Pork Soup in traditional bowl",
                     "image_url": null
                 },
                 {
                     "subtitle": "문단 소제목 (예: 여름의 별미, 밀면)",
-                    "text": "두 번째 문단. 다른 장소/아이템 소개. 해당 아이템의 유래나 트렌드 흐름, 대표 매장이나 브랜드 정보, 방문 시 유의사항이나 추천 조합 등을 깊이 있게 서술 (600-800자)",
+                    "text": "두 번째 문단. 다른 장소/아이템 소개를 Markdown으로 작성. 해당 아이템의 유래나 트렌드 흐름, 대표 매장이나 브랜드 정보, 방문 시 유의사항이나 추천 조합 등을 깊이 있게 서술 (600-800자). 필요 시 **핵심 키워드** 강조, 1. 순서 리스트, > 인용구를 자연스럽게 활용",
                     "image_search_keyword": "Korean cold noodles with egg garnish",
                     "image_url": null
                 },
                 {
                     "subtitle": "문단 소제목 (예: 바다의 보물창고)",
-                    "text": "세 번째 문단. 또 다른 장소/아이템 소개. 현장의 분위기와 감각적 묘사, 가격대와 접근성, 현지인 추천 포인트, 계절별 특색 등을 담아 풍성하게 작성 (600-800자)",
+                    "text": "세 번째 문단. 또 다른 장소/아이템 소개를 Markdown으로 작성. 현장의 분위기와 감각적 묘사, 가격대와 접근성, 현지인 추천 포인트, 계절별 특색 등을 담아 풍성하게 작성 (600-800자). 필요 시 **핵심 키워드** 강조, - 리스트, > 인용구를 자연스럽게 활용",
                     "image_search_keyword": "Fresh seafood market stalls colorful",
                     "image_url": null
                 }
@@ -113,6 +120,8 @@ You must output ONLY valid JSON.
 - [ ] Are layouts alternating (hero -> split_left -> split_right)? -> FIX IT.
 - [ ] Is each paragraph text AT LEAST 600 characters? -> EXPAND IT with more context, details, and descriptions.
 - [ ] Does each paragraph include background + details + tip + sensory description? -> ADD MISSING ELEMENTS.
+- [ ] Is each paragraph text in Markdown (no HTML tags)? -> CONVERT TO MARKDOWN.
+- [ ] Are >, list(- or 1.), and **bold** used appropriately for readability? -> IMPROVE STYLING.
 
 [LANGUAGE]
 - Korean (Hangul) for all content
