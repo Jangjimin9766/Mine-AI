@@ -21,6 +21,8 @@ def handle_magazine_request(request: UnifiedMagazineRequest):
         return handle_edit_magazine(request)
     elif action == "edit_section":
         return handle_edit_section(request)
+    elif action == "generate_paragraph":
+        return handle_generate_paragraph(request)
     else:
         raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
 
@@ -133,6 +135,40 @@ def handle_edit_section(request: UnifiedMagazineRequest):
             "error": str(e),
             "updated_section": None
         }
+
+
+def handle_generate_paragraph(request: UnifiedMagazineRequest):
+    """문단 생성"""
+    from app.core.magazine_editor import generate_paragraph
+    
+    # We expect `data` inside the request, but UnifiedMagazineRequest might not have all fields.
+    # We will accept it as a dict. Wait, request is a UnifiedMagazineRequest. 
+    # Let's adjust this. 
+    # Actually, the Spring Boot sends Map<String, Object> wrapped in {"action": "generate_paragraph", "data": {...}}
+    # For UnifiedMagazineRequest, data fields might be directly mapped or passed via Extra.
+    # So we'll access request dict.
+    
+    req_dict = request.model_dump(exclude_unset=True)
+    
+    topic = req_dict.get("topic", "")
+    user_mood = req_dict.get("user_mood", "")
+    section_heading = req_dict.get("section_heading", "")
+    message = req_dict.get("message", "")
+    existing_paragraphs = req_dict.get("existing_paragraphs", [])
+    
+    try:
+        result = generate_paragraph(
+            topic=topic,
+            section_heading=section_heading,
+            message=message,
+            user_mood=user_mood,
+            existing_paragraphs=existing_paragraphs
+        )
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/moodboard", response_model=MoodboardResponse)

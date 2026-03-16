@@ -261,6 +261,77 @@ def change_overall_tone(magazine_data: dict, instruction: str) -> list:
 # 섹션 레벨 편집 (Section-Level Editing)
 # ==========================================
 
+def generate_paragraph(topic: str, section_heading: str, message: str, user_mood: str, existing_paragraphs: list) -> dict:
+    """
+    섹션 맨 끝에 문단을 추가하기 위한 콘텐츠 생성
+    """
+    from app.core.searcher import search_with_tavily
+    from app.core.llm_client import llm_client
+    import json
+    
+    # 1. 주제 및 내용 기반 검색
+    search_query = f"{topic} {section_heading} {message}"
+    print(f"🔍 Searching for new paragraph: {search_query}")
+    try:
+        search_results, images = search_with_tavily(search_query, topic=topic)
+    except Exception as e:
+        print(f"⚠️ Search failed: {e}")
+        search_results, images = [], []
+        
+    research_content = ""
+    if search_results:
+        research_content = "\n".join([f"- {r.get('title')}: {r.get('content')[:200]}" for r in search_results[:3]])
+    
+    # 2. 기존 문단 텍스트 추출 (중복 방지)
+    existing_text = "\n".join([f"Subtitle: {p.get('subtitle')}\nText: {p.get('text')}" for p in existing_paragraphs])
+    
+    system_prompt = f"""
+    You are an AI editor for a premium lifestyle magazine.
+    Your task is to generate a NEW paragraph (subtitle, text, and image) to be appended to the current section.
+    
+    [MAGAZINE CONTEXT]
+    Topic: {topic}
+    Section Heading: {section_heading}
+    Tone/Mood: {user_mood if user_mood else 'vibrant and sophisticated'}
+    
+    [EXISTING PARAGRAPHS in this section]
+    {existing_text if existing_text else "None."}
+    
+    CRITICAL INSTRUCTIONS:
+    1. Do NOT repeat what is already in the EXISTING PARAGRAPHS. Provide fresh information or a new perspective.
+    2. Directly address the user's specific request: "{message}"
+    3. Use the provided [Research Results] to add specific facts, numbers, or deep insights.
+    4. Write in sophisticated, editorial Korean (합쇼체/해요체, ~습니다/~입니다).
+    5. The 'text' should be a single continuous string containing HTML tags like <p>, <strong>, etc., with a length of 300-600 characters.
+    6. Select the BEST 'url' from [Available Images]. If none fit perfectly, return null. DO NOT make up URLs.
+    
+    Output JSON (snake_case) exactly like this:
+    {{
+        "subtitle": "A catchy, relevant subtitle for this new paragraph",
+        "text": "<p>The main content with HTML tags...</p>",
+        "image_url": "url from Available Images or null"
+    }}
+    """
+    
+    user_prompt = f"""
+    User Request: {message}
+    
+    [Research Results]
+    {research_content if research_content else "No research available."}
+    
+    [Available Images]
+    {json.dumps(images[:5], ensure_ascii=False) if images else "[]"}
+    """
+    
+    result = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+    
+    # Validation
+    if not result.get('image_url') or result.get('image_url') == 'null':
+        result['image_url'] = None
+        
+    return result
+
+
 def strip_markdown_codeblocks(content: str) -> str:
     """
     LLM 출력에서 마크다운 코드블럭을 제거합니다.

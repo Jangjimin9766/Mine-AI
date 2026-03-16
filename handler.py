@@ -71,6 +71,8 @@ def handler(event):
             return handle_edit_magazine(data)
         elif action == "edit_section":
             return handle_edit_section(data)
+        elif action == "generate_paragraph":
+            return handle_generate_paragraph(data)
         elif action == "health":
             # 상세 헬스체크 - API 설정 상태 포함
             from app.core.llm_client import llm_client
@@ -331,6 +333,50 @@ def handle_edit_section(data: dict) -> dict:
             "error": str(e),
             "updated_section": None
         }
+
+
+def handle_generate_paragraph(data: dict) -> dict:
+    """
+    Handle paragraph generation request for RunPod.
+    """
+    logger.info("📝 [1/3] Generate paragraph handler started")
+    logger.info(f"📝 [1/3] Data received: {data}")
+    
+    try:
+        from app.core.magazine_editor import generate_paragraph
+        logger.info("📝 [2/3] Import successful")
+        
+        topic = data.get("topic", "")
+        section_heading = data.get("section_heading", "")
+        message = data.get("message", "")
+        user_mood = data.get("user_mood", "")
+        existing_paragraphs = data.get("existing_paragraphs", [])
+        
+        if not message:
+            return {"error": "message is required", "success": False}
+        
+        logger.info(f"📝 [2/3] Generating paragraph for: {message[:50]}...")
+        
+        result = generate_paragraph(
+            topic=topic,
+            section_heading=section_heading,
+            message=message,
+            user_mood=user_mood,
+            existing_paragraphs=existing_paragraphs
+        )
+        
+        logger.info(f"📝 [3/3] Result success")
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Generate Paragraph Error: {e}")
+        import traceback
+        logger.error(f"📋 Traceback:\n{traceback.format_exc()}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 
 
 # Start the RunPod serverless worker
