@@ -54,6 +54,7 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
 5. **MANDATORY FIELDS**:
    - `image_search_keyword`: MUST NOT BE EMPTY. If you can't think of one, use the paragraph's subtitle + "visual".
    - `subtitle`: MUST NOT BE EMPTY.
+   - `title`: MUST BE 22 CHARACTERS OR LESS (including spaces). This is a strict UI constraint.
 
 6. **TAGS (STRICT — 반드시 아래 목록에서만 선택)**:
    - `tags` 값은 반드시 아래 허용 목록 중에서 2~4개를 골라야 합니다. 임의로 만들지 마세요.

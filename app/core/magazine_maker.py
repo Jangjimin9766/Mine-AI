@@ -162,7 +162,7 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
                 try:
                     _, extra_imgs = search_with_tavily(fallback_query, topic=topic)
                     for img in extra_imgs:
-                        if validate_image_url(img): # 중복 여부 상관없이 일단 유효하면 박음
+                        if validate_image_url(img) and img not in used_image_urls: # 중복 방지 조건 추가
                             section['thumbnail_url'] = img
                             used_image_urls.add(img)
                             assigned = True
@@ -171,10 +171,34 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
                 except Exception as e:
                     print(f"❌ Force fallback search failed: {e}")
 
-            # 4. 정 안되면 중복이라도 기존 풀에서 첫번째 유효 이미지 보장
+            # 4. 정 안되면 중복 없는 새로운 이미지 확보를 위해 더 넓은 키워드로 마지막 검색 시도
+            if not assigned:
+                print(f"⚠️ Section {i} thumbnail: Still no unique image. Trying broad search.")
+                broad_query = f"{topic} 고화질 배경화면"
+                try:
+                    _, extra_imgs = search_with_tavily(broad_query, topic=topic)
+                    for img in extra_imgs:
+                        if validate_image_url(img) and img not in used_image_urls:
+                             section['thumbnail_url'] = img
+                             used_image_urls.add(img)
+                             assigned = True
+                             print(f"✅ Section {i} thumbnail: broad fallback success")
+                             break
+                except Exception as e:
+                    pass
+                
             if not assigned and images:
-                 section['thumbnail_url'] = images[0]
-                 print(f"⚠️ Section {i} thumbnail: fallback to duplicate first image")
+                 # 정말로 새로운 이미지를 찾지 못한 최악의 경우, 중복 허용을 방지하기 위해 
+                 # 플레이스홀더를 쓰거나 차라리 빈 값으로 둡니다. 하지만 여기선 일단 첫번째 유효 이미지를 쓰되,
+                 # 중복 방지를 원하셨으므로 차라리 검색 결과 중 가장 안 쓴 이미지를 찾으려는 노력은 생략하고
+                 # 중복이 발생하더라도 앱이 터지지 않도록 최후의 안전망만 유지 (단, 이 단계까지 올 확률은 극히 낮음)
+                 unassigned_imgs = [img for img in images if img not in used_image_urls]
+                 if unassigned_imgs:
+                     section['thumbnail_url'] = unassigned_imgs[0]
+                     used_image_urls.add(unassigned_imgs[0])
+                 else:
+                     section['thumbnail_url'] = images[0]
+                 print(f"⚠️ Section {i} thumbnail: ultimate fallback (might be duplicate)")
         
         # 레거시 image_url 검증 (V3 호환)
         if not section.get('image_url') or not section['image_url'].startswith('http'):
@@ -247,15 +271,35 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
             
             if assigned: continue
             
-            # ---- 최종: 이미 사용된 이미지라도 중복 허용 (빈 이미지보다 중복이 나음) ----
+            # ---- 최종: 이미 사용된 이미지라도 중복 허용 (빈 이미지보다 중복이 나음) 코드를 수정하여 중복 방지 강화 ----
             if not paragraph.get('image_url'):
-                # 모든 이미지 풀에서 아무거나 하나 선택
-                all_available = scraped_images + real_tavily_images
-                if all_available:
-                    paragraph['image_url'] = all_available[0]
-                    print(f"⚠️ Section {i} paragraph {j}: DUPLICATE image assigned (out of unique images)")
-                else:
-                    print(f"❌ Section {i} paragraph {j}: NO images available at all")
+                print(f"⚠️ Section {i} paragraph {j}: Still no unique image. Forcing broad search.")
+                broad_query = f"{topic} 고화질 풍경"
+                try:
+                    _, extra_imgs = search_with_tavily(broad_query, topic=topic)
+                    for img in extra_imgs:
+                        if img not in used_image_urls and validate_image_url(img):
+                            paragraph['image_url'] = img
+                            used_image_urls.add(img)
+                            assigned = True
+                            print(f"✅ Section {i} paragraph {j}: broad fallback success")
+                            break
+                except Exception as e:
+                    pass
+                
+                if not paragraph.get('image_url'):
+                    # 정말로 모든 방법이 다 실패했을 때만 최악의 대안 (미사용 이미지 우선 탐색)
+                    all_available = scraped_images + real_tavily_images
+                    unused = [img for img in all_available if img not in used_image_urls]
+                    if unused:
+                        paragraph['image_url'] = unused[0]
+                        used_image_urls.add(unused[0])
+                        print(f"⚠️ Section {i} paragraph {j}: Used remaining unused image")
+                    elif all_available:
+                        paragraph['image_url'] = all_available[0]
+                        print(f"❌ Section {i} paragraph {j}: DUPLICATE image assigned (out of unique images)")
+                    else:
+                        print(f"❌ Section {i} paragraph {j}: NO images available at all")
         
         # display_order 자동 부여 (그리드 순서)
         section['display_order'] = i

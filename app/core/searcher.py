@@ -168,21 +168,23 @@ def extract_images_from_content(content: str) -> list:
     
     # 노이즈 이미지 필터링
     noise_patterns = [
-        # 아이콘, 로고, 추적 픽셀
-        'favicon', 'icon', 'logo', 'badge', 'avatar',
-        'pixel', 'tracker', 'beacon', '1x1', 'spacer',
-        'emoji', 'button', 'arrow', 'spinner', 'loading',
-        # 광고 및 추적
-        'ad-', '/ads/', 'adserver', 'doubleclick', 'googlesyndication',
-        'facebook.com/tr', 'analytics', 'tracking',
-        # SNS 공유 버튼 등
-        'share', 'social', 'twitter-card', 'og-image',
-        # 너무 작은 이미지 (크기 힌트가 URL에 있는 경우)
-        'w=1&', 'h=1&', 'width=1', 'height=1',
-        '16x16', '32x32', '48x48', '64x64',
-        # 외부 다운로드(Hotlinking) 차단 CDN (매우 중요)
+        # 아이콘, 로고, 추적 픽셀, UI 요소
+        'favicon', 'icon', 'logo', 'badge', 'avatar', 'profile', 'thumb', 'menu', 'nav', 'header', 'footer', 'sidebar',
+        'pixel', 'tracker', 'beacon', '1x1', 'spacer', 'blank', 'transparent', 'default',
+        'emoji', 'button', 'arrow', 'spinner', 'loading', 'spinner',
+        # 사이즈 관련 (작은 이미지나 썸네일 방지)
+        'w=1&', 'h=1&', 'width=1', 'height=1', 'w=50', 'h=50',
+        '16x16', '32x32', '48x48', '64x64', '100x100', '120x120', '150x150',
+        'thumbnail', 'small', 'tiny', 'mini',
+        # 광고 및 마케팅 네트워크 (매우 중요)
+        'ad-', '/ads/', '-ad-', 'adserver', 'doubleclick', 'googlesyndication', 'googleadservices',
+        'adsystem', 'adtech', 'adform', 'criteo', 'taboola', 'outbrain', 'mgid',
+        'facebook.com/tr', 'analytics', 'tracking', 'banner', 'sponsor', 'promo', 'campaign',
+        # SNS 공유, 카드, 위젯
+        'share', 'social', 'twitter-card', 'og-image', 'widget', 'plugin',
+        # 외부 다운로드(Hotlinking) 차단 CDN 및 커뮤니티 사이트 (관련성 떨어지는 짤방 방지)
         'daumcdn.net', 'pstatic.net', 'tistory.com', 'blogfiles.naver.net', 
-        'kakaocdn.net', 'namu.wiki', 'namu.la', 'dcinside', 'fmkorea', 'theqoo',
+        'kakaocdn.net', 'namu.wiki', 'namu.la', 'dcinside', 'fmkorea', 'theqoo', 'ruliweb', 'inven',
         'tiktok.com', 'tiktokcdn.com', 'tiktokv.com', 'tiktok.net',
         'instagram.com', 'cdninstagram.com',
         'pinterest.com', 'pinimg.com', 'reddit.com', 'redditstatic.com', 'imgur.com',
