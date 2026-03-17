@@ -134,64 +134,48 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
         # thumbnail_url 검증 (V4 구조)
         if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http') or not validate_image_url(section['thumbnail_url']):
             assigned = False
-            # 1. 크롤링 이미지 우선 시도
-            while scraped_idx < len(scraped_images):
-                img = scraped_images[scraped_idx]
-                scraped_idx += 1
-                if img not in used_image_urls and validate_image_url(img):
-                    section['thumbnail_url'] = img
-                    used_image_urls.add(img)
-                    assigned = True
-                    print(f"📰 Section {i} thumbnail: scraped image used")
-                    break
             
-            # 2. 크롤링 본문 이미지가 없으면 초기 검색 이미지 풀에서 할당
+            # ---- 1. Pexels 검색을 최우선으로 시도 (섹션 주제 기반) ----
+            from app.core.searcher import search_with_pexels
+            heading = section.get('heading', topic)
+            pexels_query = f"{topic} {heading} wallpaper" # 넓은 영문/한글 혼합 키워드
+            
+            try:
+                pexels_imgs = search_with_pexels(pexels_query, orientation='landscape', per_page=5)
+                for img in pexels_imgs:
+                    if img not in used_image_urls and validate_image_url(img):
+                        section['thumbnail_url'] = img
+                        used_image_urls.add(img)
+                        assigned = True
+                        print(f"📸 Section {i} thumbnail: Pexels image used ({pexels_query})")
+                        break
+            except Exception as e:
+                print(f"⚠️ Pexels search failed for section thumbnail: {e}")
+                
+            # ---- 2. Pexels 실패 시 기존 크롤링된 이미지(Jina) 사용 ----
+            if not assigned:
+                while scraped_idx < len(scraped_images):
+                    img = scraped_images[scraped_idx]
+                    scraped_idx += 1
+                    if img not in used_image_urls and validate_image_url(img):
+                        section['thumbnail_url'] = img
+                        used_image_urls.add(img)
+                        assigned = True
+                        print(f"📰 Section {i} thumbnail: scraped image used")
+                        break
+            
+            # ---- 3. 크롤링 본문 이미지도 없으면 Tavily 기본 탐색 이미지 사용 ----
             if not assigned:
                 for img in images:
                     if img not in used_image_urls and validate_image_url(img):
                         section['thumbnail_url'] = img
                         used_image_urls.add(img)
                         assigned = True
+                        print(f"📷 Section {i} thumbnail: Tavily fallback image used")
                         break
-            
-            # 3. [NEW] 그래도 없으면 해당 섹션 주제로 무조건 강제 검색하여 진짜 이미지를 가져옴 (유저 필수 요청)
-            if not assigned:
-                print(f"⚠️ Section {i} thumbnail: Pool exhausted. Forcing a fresh Tavily search for a real image.")
-                heading = section.get('heading', topic)
-                fallback_query = f"{topic} {heading} 사진"
-                try:
-                    _, extra_imgs = search_with_tavily(fallback_query, topic=topic)
-                    for img in extra_imgs:
-                        if validate_image_url(img) and img not in used_image_urls: # 중복 방지 조건 추가
-                            section['thumbnail_url'] = img
-                            used_image_urls.add(img)
-                            assigned = True
-                            print(f"✅ Section {i} thumbnail: Successfully fetched a real fallback image via Tavily")
-                            break
-                except Exception as e:
-                    print(f"❌ Force fallback search failed: {e}")
-
-            # 4. 정 안되면 중복 없는 새로운 이미지 확보를 위해 더 넓은 키워드로 마지막 검색 시도
-            if not assigned:
-                print(f"⚠️ Section {i} thumbnail: Still no unique image. Trying broad search.")
-                broad_query = f"{topic} 고화질 배경화면"
-                try:
-                    _, extra_imgs = search_with_tavily(broad_query, topic=topic)
-                    for img in extra_imgs:
-                        if validate_image_url(img) and img not in used_image_urls:
-                             section['thumbnail_url'] = img
-                             used_image_urls.add(img)
-                             assigned = True
-                             print(f"✅ Section {i} thumbnail: broad fallback success")
-                             break
-                except Exception as e:
-                    pass
-                
+                        
+            # ---- 4. 최후의 보루 (빈 이미지 방지) ----
             if not assigned and images:
-                 # 정말로 새로운 이미지를 찾지 못한 최악의 경우, 중복 허용을 방지하기 위해 
-                 # 플레이스홀더를 쓰거나 차라리 빈 값으로 둡니다. 하지만 여기선 일단 첫번째 유효 이미지를 쓰되,
-                 # 중복 방지를 원하셨으므로 차라리 검색 결과 중 가장 안 쓴 이미지를 찾으려는 노력은 생략하고
-                 # 중복이 발생하더라도 앱이 터지지 않도록 최후의 안전망만 유지 (단, 이 단계까지 올 확률은 극히 낮음)
                  unassigned_imgs = [img for img in images if img not in used_image_urls]
                  if unassigned_imgs:
                      section['thumbnail_url'] = unassigned_imgs[0]
@@ -205,11 +189,11 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
             section['image_url'] = section.get('thumbnail_url', images[0] if images else None)
         
         # ============================================
-        # V4 paragraphs 배열 내 image_url 검증
-        # 우선순위 (Jina 크롤링 + Tavily 전용):
-        #   1순위: 크롤링된 소스 이미지 (Jina 3개 URL, 가장 관련성 높음)
-        #   2순위: Tavily 실제 이미지 (검색 결과에 포함된 이미지)
-        #   3순위: Tavily 추가 검색 (주제 변형 검색어로 이미지 확보)
+        # V5 paragraphs 배열 내 image_url 검증 (Pexels 도입)
+        # 우선순위:
+        #   1순위: Pexels 이미지 (AI가 생성한 영어 키워드 기반)
+        #   2순위: 크롤링된 소스 이미지 (Jina)
+        #   3순위: Tavily 실제 이미지
         # ============================================
         paragraphs = section.get('paragraphs', [])
         for j, paragraph in enumerate(paragraphs):
@@ -224,8 +208,25 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
                     paragraph['image_url'] = None
             
             assigned = False
+            search_keyword = paragraph.get('image_search_keyword', '')
             
-            # ---- 1순위: 크롤링된 소스 이미지 (Jina 3개 URL에서 수집, 사전 검증 완료) ----
+            # ---- 1순위: Pexels 이미지 검색 (AI가 추천한 영어 키워드 활용) ----
+            if search_keyword:
+                try:
+                    pexels_imgs = search_with_pexels(search_keyword, orientation='landscape', per_page=5)
+                    for img in pexels_imgs:
+                        if img not in used_image_urls and validate_image_url(img):
+                            paragraph['image_url'] = img
+                            used_image_urls.add(img)
+                            assigned = True
+                            print(f"📸 Section {i} paragraph {j}: Pexels image used for '{search_keyword}'")
+                            break
+                except Exception as e:
+                    print(f"⚠️ Pexels search failed for paragraph: {e}")
+            
+            if assigned: continue
+            
+            # ---- 2순위: 크롤링된 소스 이미지 (Jina 3개 URL에서 수집) ----
             while scraped_idx < len(scraped_images):
                 img = scraped_images[scraped_idx]
                 scraped_idx += 1
@@ -233,12 +234,12 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
                     paragraph['image_url'] = img
                     used_image_urls.add(img)
                     assigned = True
-                    print(f"📰 Section {i} paragraph {j}: SCRAPED source image used")
+                    print(f"📰 Section {i} paragraph {j}: SCRAPED source image used as fallback")
                     break
             
             if assigned: continue
             
-            # ---- 2순위: Tavily 실제 이미지 (검증 포함) ----
+            # ---- 3순위: Tavily 실제 이미지 (초기 검색 풀) ----
             while tavily_img_idx < len(real_tavily_images):
                 img = real_tavily_images[tavily_img_idx]
                 tavily_img_idx += 1
@@ -246,58 +247,22 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
                     paragraph['image_url'] = img
                     used_image_urls.add(img)
                     assigned = True
-                    print(f"📷 Section {i} paragraph {j}: Tavily REAL image used (validated)")
+                    print(f"📷 Section {i} paragraph {j}: Tavily REAL image used as fallback")
                     break
                     
             if assigned: continue
             
-            # ---- 3순위: Tavily 추가 검색으로 이미지 확보 ----
-            if not assigned:
-                search_keyword = paragraph.get('image_search_keyword', '')
-                subtitle = paragraph.get('subtitle', '')
-                extra_query = f"{topic} {subtitle}" if subtitle else f"{topic} {search_keyword}"
-                
-                try:
-                    _, extra_imgs = search_with_tavily(extra_query, topic=topic)
-                    for img in extra_imgs:
-                        if img not in used_image_urls and validate_image_url(img):
-                            paragraph['image_url'] = img
-                            used_image_urls.add(img)
-                            assigned = True
-                            print(f"🔄 Section {i} paragraph {j}: Tavily EXTRA search image used")
-                            break
-                except Exception as e:
-                    print(f"⚠️ Extra Tavily search failed: {e}")
-            
-            if assigned: continue
-            
-            # ---- 최종: 이미 사용된 이미지라도 중복 허용 (빈 이미지보다 중복이 나음) 코드를 수정하여 중복 방지 강화 ----
+            # ---- 최종: 빈 이미지 부여 방지 ----
             if not paragraph.get('image_url'):
-                print(f"⚠️ Section {i} paragraph {j}: Still no unique image. Forcing broad search.")
-                broad_query = f"{topic} 고화질 풍경"
-                try:
-                    _, extra_imgs = search_with_tavily(broad_query, topic=topic)
-                    for img in extra_imgs:
-                        if img not in used_image_urls and validate_image_url(img):
-                            paragraph['image_url'] = img
-                            used_image_urls.add(img)
-                            assigned = True
-                            print(f"✅ Section {i} paragraph {j}: broad fallback success")
-                            break
-                except Exception as e:
-                    pass
-                
-                if not paragraph.get('image_url'):
-                    # 정말로 모든 방법이 다 실패했을 때만 최악의 대안 (미사용 이미지 우선 탐색)
-                    all_available = scraped_images + real_tavily_images
-                    unused = [img for img in all_available if img not in used_image_urls]
-                    if unused:
-                        paragraph['image_url'] = unused[0]
-                        used_image_urls.add(unused[0])
-                        print(f"⚠️ Section {i} paragraph {j}: Used remaining unused image")
-                    elif all_available:
-                        paragraph['image_url'] = all_available[0]
-                        print(f"❌ Section {i} paragraph {j}: DUPLICATE image assigned (out of unique images)")
+                all_available = scraped_images + real_tavily_images
+                unused = [img for img in all_available if img not in used_image_urls]
+                if unused:
+                    paragraph['image_url'] = unused[0]
+                    used_image_urls.add(unused[0])
+                    print(f"⚠️ Section {i} paragraph {j}: Used remaining unused image")
+                elif all_available:
+                    paragraph['image_url'] = all_available[0]
+                    print(f"❌ Section {i} paragraph {j}: DUPLICATE image assigned (out of unique images)")
                     else:
                         print(f"❌ Section {i} paragraph {j}: NO images available at all")
         

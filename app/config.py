@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     # 검색용 키 추가
     TAVILY_API_KEY: str = ""
     JINA_API_KEY: str = ""  # 선택 사항이라 기본값 비워둠
-    UNSPLASH_ACCESS_KEY: str = ""  # Unsplash API (문단별 이미지 검색)
+    UNSPLASH_ACCESS_KEY: str = ""  # 추후 사용 시 대비 (현재는 Pexels 메인)
+    PEXELS_API_KEY: str = "" # Pexels 이미지 검색 API 키
     
     # 보안 키
     PYTHON_API_KEY: str = "mine-secret-key-1234"

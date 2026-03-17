@@ -21,7 +21,7 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
    - `paragraphs`: Array of 3 paragraph objects, each with:
      * `subtitle`: Catchy paragraph title (예: "올리브 사라진 올리브영")
      * `text`: Paragraph content in Markdown (**600-800 chars MINIMUM**). Must include background context, specific details, and reader-relevant insight.
-     * `image_search_keyword`: **ENGLISH ONLY** specific visual keyword for image search (e.g., "Olive Young store interior bright")
+     * `image_search_keyword`: **ENGLISH NOUNS ONLY (Max 3 words)** for high-quality Pexels image search (e.g., "office laptop coding", "vintage cafe interior"). Never use sentences or abstract concepts.
      * `image_url`: Leave as null (will be filled by system)
 
 2. **CONTENT DISTRIBUTION**:
@@ -40,9 +40,10 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
      * Paragraph 3: subtitle="바다의 보물창고", image_search_keyword="Fresh seafood market display various fish"
 
 3. **IMAGE MATCHING**:
-   - Generate specific `image_search_keyword` in ENGLISH for each paragraph.
-   - The keyword MUST be visual and concrete (e.g., "Apple iPhone 15 Pro titanium frame macro shot").
-   - Do NOT use abstract concepts (e.g., "Innovation", "Future").
+   - Generate specific `image_search_keyword` in ENGLISH NOUNS ONLY for each paragraph.
+   - The keyword MUST be visual, concrete, and optimized for stock photo search (e.g., "apple laptop desk", "korean food bowl", "modern architecture").
+   - Limit to MAX 3-4 WORDS. Do not write full sentences.
+   - Do NOT use abstract concepts (e.g., "Innovation", "Future", "Love").
 
 4. **LAYOUT ALTERNATION**:
    - Section 1: `hero` (full width intro)
@@ -89,19 +90,19 @@ You must output ONLY valid JSON.
                 {
                     "subtitle": "문단 소제목 (예: 국밥의 성지, 서면)",
                     "text": "첫 번째 문단. 구체적인 장소/아이템 소개를 Markdown으로 작성. 배경 맥락과 역사, 구체적 디테일(가격, 위치, 특징), 독자를 위한 팁, 체험적 묘사를 모두 포함하여 충분히 길고 밀도 있게 작성 (600-800자). 필요 시 **핵심 키워드** 강조, - 리스트, > 인용구를 자연스럽게 활용",
-                    "image_search_keyword": "Steaming Korean Pork Soup in traditional bowl",
+                    "image_search_keyword": "korean soup bowl",
                     "image_url": null
                 },
                 {
                     "subtitle": "문단 소제목 (예: 여름의 별미, 밀면)",
                     "text": "두 번째 문단. 다른 장소/아이템 소개를 Markdown으로 작성. 해당 아이템의 유래나 트렌드 흐름, 대표 매장이나 브랜드 정보, 방문 시 유의사항이나 추천 조합 등을 깊이 있게 서술 (600-800자). 필요 시 **핵심 키워드** 강조, 1. 순서 리스트, > 인용구를 자연스럽게 활용",
-                    "image_search_keyword": "Korean cold noodles with egg garnish",
+                    "image_search_keyword": "cold noodles summer",
                     "image_url": null
                 },
                 {
                     "subtitle": "문단 소제목 (예: 바다의 보물창고)",
                     "text": "세 번째 문단. 또 다른 장소/아이템 소개를 Markdown으로 작성. 현장의 분위기와 감각적 묘사, 가격대와 접근성, 현지인 추천 포인트, 계절별 특색 등을 담아 풍성하게 작성 (600-800자). 필요 시 **핵심 키워드** 강조, - 리스트, > 인용구를 자연스럽게 활용",
-                    "image_search_keyword": "Fresh seafood market stalls colorful",
+                    "image_search_keyword": "seafood market fish",
                     "image_url": null
                 }
             ],

@@ -345,3 +345,49 @@ def validate_image_url(url: str) -> bool:
         print(f"❌ Image validation error: {url[:60]}... ({e})")
         _validation_cache[url] = False
         return False
+
+def search_with_pexels(query: str, orientation: str = 'landscape', per_page: int = 5) -> list:
+    """
+    Pexels API를 사용하여 고품질 무료 스톡 이미지를 검색합니다.
+    
+    Args:
+        query: 검색어 (영어가 가장 정확함)
+        orientation: 이미지 방향 (landscape, portrait, square)
+        per_page: 가져올 이미지 수
+    
+    Returns:
+        이미지 URL 리스트 (large 사이즈)
+    """
+    api_key = getattr(settings, 'PEXELS_API_KEY', None)
+    if not api_key:
+        print("⚠️ PEXELS_API_KEY not configured")
+        return []
+        
+    print(f"📸 Pexels Searching for: {query}")
+    
+    url = "https://api.pexels.com/v1/search"
+    headers = {
+        "Authorization": api_key
+    }
+    params = {
+        "query": query,
+        "orientation": orientation,
+        "per_page": per_page
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        
+        images = []
+        for photo in data.get('photos', []):
+            img_url = photo.get('src', {}).get('large')
+            if img_url:
+                images.append(img_url)
+                
+        print(f"✅ Pexels Found {len(images)} images")
+        return images
+    except Exception as e:
+        print(f"❌ Pexels Error: {e}")
+        return []
