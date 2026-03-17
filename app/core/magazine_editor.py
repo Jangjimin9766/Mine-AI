@@ -203,12 +203,13 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     - **Length**: 800-1,500 characters (Korean).
     - **Persona**: Editor-in-Chief with deep domain knowledge.
     - **Originality**: Do not repeat existing section topics. Bring a fresh perspective.
+    - **Image Keyword**: Generate an English noun keyword for Pexels search.
     
     Output JSON (snake_case):
     {
         "heading": "Sophisticated heading",
         "content": "Masterpiece Markdown content...",
-        "image_url": "Pick relevant URL or null",
+        "image_search_keyword": "english noun keyword",
         "layout_hint": "image_left | full_width"
     }
     """
@@ -234,9 +235,25 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     from app.core.llm_client import llm_client
     new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
     
-    # Ensure image_url is not null string
-    if not new_section.get('image_url') or new_section.get('image_url') == 'null':
-        new_section['image_url'] = None
+    # Evaluate Pexels image search
+    search_keyword = new_section.get('image_search_keyword', '')
+    new_section['image_url'] = None
+    
+    if search_keyword:
+        from app.core.searcher import search_with_pexels
+        print(f"📸 add_new_section: Pexels search for '{search_keyword}'")
+        try:
+            pexels_imgs = search_with_pexels(search_keyword, orientation='landscape', per_page=1)
+            if pexels_imgs:
+                new_section['image_url'] = pexels_imgs[0]
+                print(f"✅ Assigned Pexels image: {pexels_imgs[0]}")
+        except Exception as e:
+            print(f"⚠️ Pexels failed for add_new_section: {e}")
+            
+    # Fallback to Tavily if Pexels fails
+    if not new_section['image_url'] and images:
+        new_section['image_url'] = images[0]
+        print(f"📷 Fallback to Tavily image: {images[0]}")
     
     return new_section
 
@@ -305,13 +322,14 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
     3. Use the provided [Research Results] to add specific facts, numbers, or deep insights.
     4. Write in sophisticated, editorial Korean (합쇼체/해요체, ~습니다/~입니다).
     5. The 'text' should be a single continuous string in Markdown (NO HTML TAGS), with a length of 300-600 characters. Use **bold** or italics naturally.
-    6. Select the BEST 'url' from [Available Images]. If none fit perfectly, return null. DO NOT make up URLs.
+    6. Generate a specific `image_search_keyword` in ENGLISH NOUNS ONLY (Max 3 words) optimized for Pexels stock photo search.
     
     Output JSON (snake_case) exactly like this:
     {{
         "subtitle": "A catchy, relevant subtitle for this new paragraph",
         "text": "The main content in Markdown format...",
-        "image_url": "url from Available Images or null"
+        "image_search_keyword": "english noun keyword",
+        "image_url": null
     }}
     """
     
@@ -327,9 +345,25 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
     
     result = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
     
-    # Validation
-    if not result.get('image_url') or result.get('image_url') == 'null':
-        result['image_url'] = None
+    # Request Pexels for new paragraph image
+    search_keyword = result.get('image_search_keyword', '')
+    result['image_url'] = None
+    
+    if search_keyword:
+        from app.core.searcher import search_with_pexels
+        print(f"📸 generate_paragraph: Pexels search for '{search_keyword}'")
+        try:
+            pexels_imgs = search_with_pexels(search_keyword, orientation='landscape', per_page=1)
+            if pexels_imgs:
+                result['image_url'] = pexels_imgs[0]
+                print(f"✅ Assigned Pexels image: {pexels_imgs[0]}")
+        except Exception as e:
+            print(f"⚠️ Pexels failed for generate_paragraph: {e}")
+            
+    # Fallback to Tavily
+    if not result['image_url'] and images:
+        result['image_url'] = images[0]
+        print(f"📷 Fallback to Tavily image: {images[0]}")
         
     return result
 
