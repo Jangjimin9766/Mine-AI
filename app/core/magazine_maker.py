@@ -1,6 +1,6 @@
 from app.core.llm_client import llm_client
 import json
-from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images, scrape_multiple_with_jina, validate_image_url
+from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images, scrape_multiple_with_jina, validate_image_url, search_with_pexels
 from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V4  # V3 → V4로 변경
 
 def generate_magazine_content(topic: str, user_interests: list = None, user_mood: str = None):
@@ -136,7 +136,6 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
             assigned = False
             
             # ---- 1. Pexels 검색을 최우선으로 시도 (섹션 주제 기반) ----
-            from app.core.searcher import search_with_pexels
             heading = section.get('heading', topic)
             pexels_query = f"{topic} {heading} wallpaper" # 넓은 영문/한글 혼합 키워드
             

@@ -1,0 +1,120 @@
+INFO:     Will watch for changes in these directories: ['/Users/jangjimin/my_dev/Mine-AI']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [66329] using WatchFiles
+/Users/jangjimin/my_dev/Mine-AI/app/core/llm_client.py:5: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+2026-03-17 17:03:54,099 - app.core.llm_client - INFO - ✅ OpenAI client initialized successfully.
+2026-03-17 17:03:54,099 - app.core.llm_client - INFO - ℹ️ GEMINI_API_KEY not set. Gemini will not be available.
+INFO:     Started server process [66369]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:57556 - "POST /api/magazine/create HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:57571 - "POST /api/magazine/create HTTP/1.1" 400 Bad Request
+2026-03-17 17:06:17,540 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-17 17:06:26,033 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+🚀 [Python] handle_create_magazine started for topic: 세계여행
+🎨 Magazine Editor started for: 세계여행
+🔎 Tavily Searching for: 세계여행 (Topic: 세계여행)
+🔄 Fetching additional broad images for: 세계여행
+✅ Found 5 results and 5 images
+📖 Jina crawling [1/3]: https://www.travie.com/news/articleView.html?idxno=52718...
+📖 Jina Reading: https://www.travie.com/news/articleView.html?idxno=52718
+⚠️ Jina request failed with status: 402, continuing without deep content
+📖 Jina crawling [2/3]: https://steemit.com/kr/@rohy/500...
+📖 Jina Reading: https://steemit.com/kr/@rohy/500
+⚠️ Jina request failed with status: 402, continuing without deep content
+📖 Jina crawling [3/3]: https://mins-world-travel.tistory.com/entry/%EC%84%B8%EA%B3%84%EC%97%AC%ED%96%89...
+📖 Jina Reading: https://mins-world-travel.tistory.com/entry/%EC%84%B8%EA%B3%84%EC%97%AC%ED%96%89-%ED%98%84%EC%9E%AC%EA%B9%8C%EC%A7%80%EC%9D%98-%EC%97%AC%ED%96%89-%EA%B8%B0%EB%A1%9D
+⚠️ Jina request failed with status: 402, continuing without deep content
+📰 Multi-crawl complete: 0 unique images from 3 URLs
+✅ Validated scraped images: 0 passed
+🧠 AI Crafting V4 magazine with enhanced quality standards...
+🤔 Editor's Thought: Planning sections and distributing content across paragraphs......
+📊 Image pool: 0 scraped, 5 Tavily, 5 total
+✅ Cover image from Tavily: https://cdn.myportfolio.com/4835c10532f8914866be88618fb54b34...
+🚀 [Python] handle_create_magazine started for topic: 세계여행
+🎨 Magazine Editor started for: 세계여행
+🔎 Tavily Searching for: 세계여행 (Topic: 세계여행)
+⚠️ Pexels search failed for paragraph: cannot access local variable 'search_with_pexels' where it is not associated with a value
+📷 Section 0 paragraph 0: Tavily REAL image used as fallback
+⚠️ Pexels search failed for paragraph: cannot access local variable 'search_with_pexels' where it is not associated with a value
+📷 Section 0 paragraph 1: Tavily REAL image used as fallback
+⚠️ Pexels search failed for paragraph: cannot access local variable 'search_with_pexels' where it is not associated with a value
+📷 Section 0 paragraph 2: Tavily REAL image used as fallback
+⚠️ Pexels search failed for paragraph: cannot access local variable 'search_with_pexels' where it is not associated with a value
+🔄 Fetching additional broad images for: 세계여행
+✅ Found 5 results and 5 images
+📖 Jina crawling [1/3]: https://www.travie.com/news/articleView.html?idxno=52718...
+📖 Jina Reading: https://www.travie.com/news/articleView.html?idxno=52718
+📷 Section 1 paragraph 0: Tavily REAL image used as fallback
+⚠️ Pexels search failed for paragraph: cannot access local variable 'search_with_pexels' where it is not associated with a value
+❌ Section 1 paragraph 1: DUPLICATE image assigned (out of unique images)
+⚠️ Pexels search failed for paragraph: cannot access local variable 'search_with_pexels' where it is not associated with a value
+❌ Section 1 paragraph 2: DUPLICATE image assigned (out of unique images)
+⚠️ Pexels search failed for paragraph: cannot access local variable 'search_with_pexels' where it is not associated with a value
+❌ Section 2 paragraph 0: DUPLICATE image assigned (out of unique images)
+⚠️ Pexels search failed for paragraph: cannot access local variable 'search_with_pexels' where it is not associated with a value
+❌ Section 2 paragraph 1: DUPLICATE image assigned (out of unique images)
+⚠️ Pexels search failed for paragraph: cannot access local variable 'search_with_pexels' where it is not associated with a value
+❌ Section 2 paragraph 2: DUPLICATE image assigned (out of unique images)
+⚠️ Jina request failed with status: 402, continuing without deep content
+📖 Jina crawling [2/3]: https://steemit.com/kr/@rohy/500...
+📖 Jina Reading: https://steemit.com/kr/@rohy/500
+⚠️ Jina request failed with status: 402, continuing without deep content
+📖 Jina crawling [3/3]: https://mins-world-travel.tistory.com/entry/%EC%84%B8%EA%B3%84%EC%97%AC%ED%96%89...
+📖 Jina Reading: https://mins-world-travel.tistory.com/entry/%EC%84%B8%EA%B3%84%EC%97%AC%ED%96%89-%ED%98%84%EC%9E%AC%EA%B9%8C%EC%A7%80%EC%9D%98-%EC%97%AC%ED%96%89-%EA%B8%B0%EB%A1%9D
+⚠️ Jina request failed with status: 402, continuing without deep content
+📰 Multi-crawl complete: 0 unique images from 3 URLs
+✅ Validated scraped images: 0 passed
+🧠 AI Crafting V4 magazine with enhanced quality standards...
+🎨 Generating matching moodboard for magazine: 세계여행의 매력
+🎨 Generating Background Moodboard (SDXL) for: 세계여행
+✨ SDXL Prompt: vintage leather suitcase with worn travel stickers and a classic globe, sun-drenched outdoor café setting with blooming flowers, Wide landscape composition, Soft natural dawn light illuminating the scene, 24mm lens, 8k, photorealistic, mastery, masterpiece
+🖼️ Generating image with SDXL...
+⏳ Loading Stable Diffusion XL model to MPS (This may take a while on first run)...
+Loading pipeline components...:   0%|          | 0/7 [00:00<?, ?it/s]`torch_dtype` is deprecated! Use `dtype` instead!
+You are using a model of type clip_text_model to instantiate a model of type clip. This is not supported for all configurations of models and can yield errors.
+Loading pipeline components...:  43%|████▎     | 3/7 [00:00<00:00, 28.03it/s]You are using a model of type clip_text_model to instantiate a model of type clip. This is not supported for all configurations of models and can yield errors.
+Loading pipeline components...:  86%|████████▌ | 6/7 [00:00<00:00, 12.59it/s]Loading pipeline components...: 100%|██████████| 7/7 [00:00<00:00, 15.22it/s]
+✅ Model loaded successfully on MPS.
+🎨 Generating image locally with prompt: vintage leather suitcase with worn travel stickers...
+  0%|          | 0/30 [00:00<?, ?it/s]  3%|▎         | 1/30 [00:03<01:30,  3.13s/it]  7%|▋         | 2/30 [00:06<01:27,  3.12s/it] 10%|█         | 3/30 [00:09<01:24,  3.14s/it] 13%|█▎        | 4/30 [00:12<01:21,  3.15s/it] 17%|█▋        | 5/30 [00:15<01:18,  3.15s/it] 20%|██        | 6/30 [00:18<01:15,  3.15s/it]2026-03-17 17:06:53,718 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-17 17:06:56,237 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+ 23%|██▎       | 7/30 [00:22<01:12,  3.16s/it]🤔 Editor's Thought: Creating a structured article on world travel, focusing on specific destinations and experiences......
+📊 Image pool: 0 scraped, 5 Tavily, 5 total
+✅ Cover image from Tavily: https://cdn.myportfolio.com/4835c10532f8914866be88618fb54b34...
+⚠️ PEXELS_API_KEY not configured
+📷 Section 0 thumbnail: Tavily fallback image used
+⚠️ PEXELS_API_KEY not configured
+📷 Section 0 paragraph 0: Tavily REAL image used as fallback
+⚠️ PEXELS_API_KEY not configured
+📷 Section 0 paragraph 1: Tavily REAL image used as fallback
+⚠️ PEXELS_API_KEY not configured
+📷 Section 0 paragraph 2: Tavily REAL image used as fallback
+⚠️ PEXELS_API_KEY not configured
+⚠️ Section 1 thumbnail: ultimate fallback (might be duplicate)
+⚠️ PEXELS_API_KEY not configured
+❌ Section 1 paragraph 0: DUPLICATE image assigned (out of unique images)
+⚠️ PEXELS_API_KEY not configured
+❌ Section 1 paragraph 1: DUPLICATE image assigned (out of unique images)
+⚠️ PEXELS_API_KEY not configured
+❌ Section 1 paragraph 2: DUPLICATE image assigned (out of unique images)
+🎨 Generating matching moodboard for magazine: 세계여행의 매력
+🎨 Generating Background Moodboard (SDXL) for: 세계여행
+✨ SDXL Prompt: vintage suitcase with travel stickers, passport and a classic camera, sunlit cobblestone street in a quaint European village, Wide landscape, Soft natural dawn light, 24mm lens, 8k, photorealistic, mastery, masterpiece
+🖼️ Generating image with SDXL...
+🎨 Generating image locally with prompt: vintage suitcase with travel stickers, passport an...
+
+  0%|          | 0/30 [00:00<?, ?it/s][A 27%|██▋       | 8/30 [00:27<01:24,  3.85s/it]
+  3%|▎         | 1/30 [00:06<02:54,  6.01s/it][AWARNING:  WatchFiles detected changes in 'app/core/magazine_maker.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+ 30%|███       | 9/30 [00:33<01:37,  4.64s/it]
+  7%|▋         | 2/30 [00:12<02:52,  6.16s/it][A 33%|███▎      | 10/30 [00:40<01:43,  5.19s/it]
