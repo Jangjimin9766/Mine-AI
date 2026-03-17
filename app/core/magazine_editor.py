@@ -108,22 +108,23 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     2. **Insightful Narrative**: Don't just list facts. Explain the *significance* and *context*.
     3. **Tone**: Refined, sophisticated, and authoritative formal Korean (습니다/입니다).
     
-    [HTML FORMATTING RULES]
-    - <h3>: Section-level subheadings (Use at least 1-2 to break long text)
-    - <p>: Detailed paragraphs (2-3 sentences each)
-    - <strong>: Technical terms or key findings
-    - <blockquote>: Powerful quotes or striking statistics
-    - <ul><li>: Structured data or lists (only for 3+ items)
-    
+    [MARKDOWN FORMATTING RULES]
+    - Use ### or #### for subheadings to break long text naturally.
+    - Use standard Markdown paragraphs (double line breaks).
+    - Use **bold** for technical terms or key findings.
+    - Use > (blockquote) for powerful quotes or striking statistics.
+    - Use - or 1. lists for structured data (only for 3+ items).
+    - NEVER use HTML tags like <p>, <h3>, <strong>.
+
     [CRITICAL CONSTRAINTS]
-    - **Content Length**: 800-1,500 characters (Korean) including HTML tags.
+    - **Content Length**: 800-1,500 characters (Korean).
     - **Image URL**: ALWAYS preserve the original image_url exactly as provided.
     - **No Vague Statements**: Avoid generic praise; prove value with evidence.
     
     Output JSON (snake_case):
     {
         "heading": "Clear, brand-like heading",
-        "content": "<p>High-quality HTML content...</p>",
+        "content": "High-quality Markdown content...",
         "image_url": "EXACT URL provided",
         "layout_hint": "image_left | full_width"
     }
@@ -188,14 +189,15 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     [EDITORIAL STANDARDS]
     1. **Data-Driven**: Use specific information from [Research Results] (numbers, names, specs).
     2. **Depth**: Provide context and background. Connect the new section to the magazine's theme.
-    3. **Visual Structure**: Use HTML tags to create a structured, readable layout.
+    3. **Visual Structure**: Use Markdown tags to create a structured, readable layout.
     
-    [HTML FORMATTING RULES]
-    - <h3>: Section-level subheadings (Mandatory for sections over 1000 chars)
-    - <p>: Descriptive paragraphs
-    - <strong>: Key technical terms or emphasize points
-    - <blockquote>: Quotes from research or core insights
-    - <ul><li>: Clear lists for facts or features
+    [MARKDOWN FORMATTING RULES]
+    - Use ### or #### for subheadings (Mandatory for sections over 1000 chars)
+    - Use standard Markdown paragraphs.
+    - Use **bold** for key technical terms or to emphasize points.
+    - Use > (blockquote) for quotes from research or core insights.
+    - Use - or 1. lists for facts or features.
+    - NEVER use HTML tags like <p>, <h3>, <strong>.
     
     [CRITICAL RULES]
     - **Length**: 800-1,500 characters (Korean).
@@ -205,7 +207,7 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     Output JSON (snake_case):
     {
         "heading": "Sophisticated heading",
-        "content": "<p>Masterpiece HTML content...</p>",
+        "content": "Masterpiece Markdown content...",
         "image_url": "Pick relevant URL or null",
         "layout_hint": "image_left | full_width"
     }
@@ -302,13 +304,13 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
     2. Directly address the user's specific request: "{message}"
     3. Use the provided [Research Results] to add specific facts, numbers, or deep insights.
     4. Write in sophisticated, editorial Korean (합쇼체/해요체, ~습니다/~입니다).
-    5. The 'text' should be a single continuous string containing HTML tags like <p>, <strong>, etc., with a length of 300-600 characters.
+    5. The 'text' should be a single continuous string in Markdown (NO HTML TAGS), with a length of 300-600 characters. Use **bold** or italics naturally.
     6. Select the BEST 'url' from [Available Images]. If none fit perfectly, return null. DO NOT make up URLs.
     
     Output JSON (snake_case) exactly like this:
     {{
         "subtitle": "A catchy, relevant subtitle for this new paragraph",
-        "text": "<p>The main content with HTML tags...</p>",
+        "text": "The main content in Markdown format...",
         "image_url": "url from Available Images or null"
     }}
     """
@@ -334,18 +336,20 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
 
 def strip_markdown_codeblocks(content: str) -> str:
     """
-    LLM 출력에서 마크다운 코드블럭을 제거합니다.
-    예: ```html\n<p>내용</p>\n``` → <p>내용</p>
+    LLM 출력에서 최외곽 마크다운 코드블럭을 제거합니다.
+    예: ```markdown\n내용\n``` → 내용
     """
+    if not content:
+        return content
+        
     import re
     
-    # ```html ... ``` 또는 ``` ... ``` 패턴 제거
-    pattern = r'```(?:html|HTML)?\s*([\s\S]*?)\s*```'
-    match = re.search(pattern, content)
+    # ```markdown ... ``` 또는 ``` ... ``` 패턴 제거
+    pattern = r'^```(?:markdown|md|html|HTML)?\s*([\s\S]*?)\s*```$'
+    match = re.search(pattern, content.strip())
     if match:
         return match.group(1).strip()
     
-    # 코드블럭이 없으면 그대로 반환
     return content.strip()
 
 
@@ -423,7 +427,7 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
                 available_images=available_images
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only. Include images using <img> tags.",
+                "You are a magazine editor. Output Markdown content only. Include images using ![]() tags.",
                 append_prompt,
                 temperature=0.6
             )
@@ -436,7 +440,7 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
                 message=message
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only.",
+                "You are a magazine editor. Output Markdown content only.",
                 tone_prompt,
                 temperature=0.6
             )
@@ -448,7 +452,7 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
                 message=message
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only.",
+                "You are a magazine editor. Output Markdown content only.",
                 rewrite_prompt,
                 temperature=0.7
             )
@@ -484,7 +488,7 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
                 message="간단하게, 짧게, 쉽게"
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only.",
+                "You are a magazine editor. Output Markdown content only.",
                 tone_prompt,
                 temperature=0.6
             )
@@ -497,7 +501,7 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
                 message="더 자세하게, 길게, 깊이있게"
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only.",
+                "You are a magazine editor. Output Markdown content only.",
                 tone_prompt,
                 temperature=0.7
             )
@@ -522,7 +526,7 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
                 available_images=available_images
             )
             new_content = llm_client.generate_text(
-                "You are a magazine editor. Output HTML content only. Include images using <img> tags.",
+                "You are a magazine editor. Output Markdown content only. Include images using ![]() tags.",
                 append_prompt,
                 temperature=0.6
             )
