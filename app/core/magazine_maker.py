@@ -263,8 +263,8 @@ The user wants a '{user_mood}' style. Adjust your tone accordingly:
                 elif all_available:
                     paragraph['image_url'] = all_available[0]
                     print(f"❌ Section {i} paragraph {j}: DUPLICATE image assigned (out of unique images)")
-                    else:
-                        print(f"❌ Section {i} paragraph {j}: NO images available at all")
+                else:
+                    print(f"❌ Section {i} paragraph {j}: NO images available at all")
         
         # display_order 자동 부여 (그리드 순서)
         section['display_order'] = i
