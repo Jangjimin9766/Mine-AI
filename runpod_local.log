@@ -118,3 +118,199 @@ INFO:     Shutting down
 INFO:     Waiting for connections to close. (CTRL+C to force quit)
  30%|███       | 9/30 [00:33<01:37,  4.64s/it]
   7%|▋         | 2/30 [00:12<02:52,  6.16s/it][A 33%|███▎      | 10/30 [00:40<01:43,  5.19s/it]
+ 10%|█         | 3/30 [00:18<02:49,  6.27s/it][A 37%|███▋      | 11/30 [00:46<01:45,  5.54s/it]
+ 13%|█▎        | 4/30 [00:25<02:43,  6.30s/it][A 40%|████      | 12/30 [00:52<01:44,  5.79s/it]
+ 17%|█▋        | 5/30 [00:31<02:37,  6.32s/it][A 43%|████▎     | 13/30 [00:59<01:41,  5.97s/it]
+ 20%|██        | 6/30 [00:37<02:31,  6.33s/it][A 47%|████▋     | 14/30 [01:05<01:37,  6.08s/it]
+ 23%|██▎       | 7/30 [00:44<02:25,  6.34s/it][A 50%|█████     | 15/30 [01:11<01:32,  6.15s/it]
+ 27%|██▋       | 8/30 [00:50<02:19,  6.34s/it][A 53%|█████▎    | 16/30 [01:18<01:26,  6.21s/it]
+ 30%|███       | 9/30 [00:56<02:13,  6.35s/it][A 57%|█████▋    | 17/30 [01:24<01:21,  6.28s/it]
+ 33%|███▎      | 10/30 [01:03<02:07,  6.39s/it][A 60%|██████    | 18/30 [01:31<01:15,  6.30s/it]
+ 37%|███▋      | 11/30 [01:09<02:00,  6.36s/it][A 63%|██████▎   | 19/30 [01:37<01:09,  6.31s/it]
+ 40%|████      | 12/30 [01:15<01:54,  6.36s/it][A 67%|██████▋   | 20/30 [01:43<01:02,  6.30s/it]
+ 43%|████▎     | 13/30 [01:22<01:47,  6.34s/it][A 70%|███████   | 21/30 [01:49<00:56,  6.31s/it]
+ 47%|████▋     | 14/30 [01:28<01:41,  6.33s/it][A 73%|███████▎  | 22/30 [01:56<00:50,  6.32s/it]
+ 50%|█████     | 15/30 [01:34<01:34,  6.33s/it][A 73%|███████▎  | 22/30 [02:02<00:44,  5.57s/it]
+Traceback (most recent call last):
+  File "/Users/jangjimin/my_dev/Mine-AI/app/core/local_diffusion_client.py", line 126, in generate_image
+    image = self.pipe(prompt=prompt, num_inference_steps=30).images[0]
+            ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/torch/utils/_contextlib.py", line 120, in decorate_context
+    return func(*args, **kwargs)
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/diffusers/pipelines/stable_diffusion_xl/pipeline_stable_diffusion_xl.py", line 1238, in __call__
+    latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
+              ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/diffusers/schedulers/scheduling_euler_discrete.py", line 668, in step
+    dt = self.sigmas[self.step_index + 1] - sigma_hat
+         ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+IndexError: index 31 is out of bounds for dimension 0 with size 31
+❌ Local Generation Error: index 31 is out of bounds for dimension 0 with size 31
+✅ Moodboard attached to magazine
+✅ Magazine with moodboard created: 3 sections
+✅ [Python] Magazine generated successfully. Title: 세계여행의 매력
+INFO:     127.0.0.1:57578 - "POST /api/magazine/create HTTP/1.1" 200 OK
+ 50%|█████     | 15/30 [01:40<01:40,  6.71s/it]
+Traceback (most recent call last):
+  File "/Users/jangjimin/my_dev/Mine-AI/app/core/local_diffusion_client.py", line 126, in generate_image
+    image = self.pipe(prompt=prompt, num_inference_steps=30).images[0]
+            ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/torch/utils/_contextlib.py", line 120, in decorate_context
+    return func(*args, **kwargs)
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/diffusers/pipelines/stable_diffusion_xl/pipeline_stable_diffusion_xl.py", line 1238, in __call__
+    latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
+              ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/diffusers/schedulers/scheduling_euler_discrete.py", line 668, in step
+    dt = self.sigmas[self.step_index + 1] - sigma_hat
+         ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+IndexError: index 31 is out of bounds for dimension 0 with size 31
+❌ Local Generation Error: index 31 is out of bounds for dimension 0 with size 31
+✅ Moodboard attached to magazine
+✅ Magazine with moodboard created: 2 sections
+✅ [Python] Magazine generated successfully. Title: 세계여행의 매력
+INFO:     127.0.0.1:57601 - "POST /api/magazine/create HTTP/1.1" 200 OK
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [66369]
+/Users/jangjimin/my_dev/Mine-AI/app/core/llm_client.py:5: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+2026-03-17 17:08:39,274 - app.core.llm_client - INFO - ✅ OpenAI client initialized successfully.
+2026-03-17 17:08:39,274 - app.core.llm_client - INFO - ℹ️ GEMINI_API_KEY not set. Gemini will not be available.
+INFO:     Started server process [69719]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-03-17 17:53:13,280 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-17 17:53:21,886 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+🚀 [Python] handle_create_magazine started for topic: IT technology
+🎨 Magazine Editor started for: IT technology
+🔎 Tavily Searching for: IT technology (Topic: IT technology)
+✅ Found 5 results and 5 images
+📖 Jina crawling [1/3]: https://www.mtu.edu/applied-computing/undergraduate/it/what/...
+📖 Jina Reading: https://www.mtu.edu/applied-computing/undergraduate/it/what/
+⚠️ Jina Error: HTTPSConnectionPool(host='r.jina.ai', port=443): Read timed out. (read timeout=10), continuing without deep content
+📖 Jina crawling [2/3]: https://www.phoenix.edu/blog/it-trends.html...
+📖 Jina Reading: https://www.phoenix.edu/blog/it-trends.html
+⚠️ Jina request failed with status: 402, continuing without deep content
+📖 Jina crawling [3/3]: https://en.wikipedia.org/wiki/Information_technology...
+📖 Jina Reading: https://en.wikipedia.org/wiki/Information_technology
+⚠️ Jina request failed with status: 402, continuing without deep content
+📰 Multi-crawl complete: 0 unique images from 3 URLs
+✅ Validated scraped images: 0 passed
+🧠 AI Crafting V4 magazine with enhanced quality standards...
+🤔 Editor's Thought: Planning sections and distributing content across paragraphs......
+📊 Image pool: 0 scraped, 5 Tavily, 5 total
+✅ Cover image from Tavily: https://ccitraining.edu/wp-content/uploads/2023/12/Informati...
+⚠️ PEXELS_API_KEY not configured
+📷 Section 0 paragraph 0: Tavily REAL image used as fallback
+⚠️ PEXELS_API_KEY not configured
+📷 Section 0 paragraph 1: Tavily REAL image used as fallback
+⚠️ PEXELS_API_KEY not configured
+📷 Section 0 paragraph 2: Tavily REAL image used as fallback
+⚠️ PEXELS_API_KEY not configured
+📷 Section 1 paragraph 0: Tavily REAL image used as fallback
+⚠️ PEXELS_API_KEY not configured
+❌ Section 1 paragraph 1: DUPLICATE image assigned (out of unique images)
+⚠️ PEXELS_API_KEY not configured
+❌ Section 1 paragraph 2: DUPLICATE image assigned (out of unique images)
+⚠️ PEXELS_API_KEY not configured
+❌ Section 2 paragraph 0: DUPLICATE image assigned (out of unique images)
+⚠️ PEXELS_API_KEY not configured
+❌ Section 2 paragraph 1: DUPLICATE image assigned (out of unique images)
+⚠️ PEXELS_API_KEY not configured
+❌ Section 2 paragraph 2: DUPLICATE image assigned (out of unique images)
+🎨 Generating matching moodboard for magazine: IT 기술의 매력
+🎨 Generating Background Moodboard (SDXL) for: IT technology
+✨ SDXL Prompt: high-definition laptop with a sleek wireless mouse and a stack of educational tech books, modern office environment with clean lines and soft furnishings, Flatlay composition, soft natural dawn light streaming through a large window, 85mm lens for crisp focus, 8k, photorealistic, mastery, masterpiece
+🖼️ Generating image with SDXL...
+⏳ Loading Stable Diffusion XL model to MPS (This may take a while on first run)...
+Loading pipeline components...:   0%|          | 0/7 [00:00<?, ?it/s]Loading pipeline components...:  43%|████▎     | 3/7 [00:00<00:00,  9.84it/s]`torch_dtype` is deprecated! Use `dtype` instead!
+You are using a model of type clip_text_model to instantiate a model of type clip. This is not supported for all configurations of models and can yield errors.
+You are using a model of type clip_text_model to instantiate a model of type clip. This is not supported for all configurations of models and can yield errors.
+Loading pipeline components...: 100%|██████████| 7/7 [00:00<00:00, 17.20it/s]Loading pipeline components...: 100%|██████████| 7/7 [00:00<00:00, 15.68it/s]
+✅ Model loaded successfully on MPS.
+🎨 Generating image locally with prompt: high-definition laptop with a sleek wireless mouse...
+  0%|          | 0/30 [00:00<?, ?it/s]  3%|▎         | 1/30 [00:03<01:29,  3.09s/it]  7%|▋         | 2/30 [00:06<01:27,  3.12s/it] 10%|█         | 3/30 [00:09<01:24,  3.13s/it] 13%|█▎        | 4/30 [00:12<01:21,  3.14s/it] 17%|█▋        | 5/30 [00:15<01:18,  3.15s/it] 20%|██        | 6/30 [00:18<01:15,  3.15s/it] 23%|██▎       | 7/30 [00:21<01:12,  3.14s/it] 27%|██▋       | 8/30 [00:25<01:09,  3.14s/it] 30%|███       | 9/30 [00:28<01:06,  3.15s/it] 33%|███▎      | 10/30 [00:31<01:02,  3.15s/it] 37%|███▋      | 11/30 [00:34<00:59,  3.15s/it] 40%|████      | 12/30 [00:37<00:56,  3.16s/it] 43%|████▎     | 13/30 [00:40<00:53,  3.16s/it] 47%|████▋     | 14/30 [00:44<00:50,  3.16s/it] 50%|█████     | 15/30 [00:47<00:47,  3.16s/it] 53%|█████▎    | 16/30 [00:50<00:44,  3.15s/it] 57%|█████▋    | 17/30 [00:53<00:41,  3.17s/it] 60%|██████    | 18/30 [00:57<00:40,  3.35s/it] 63%|██████▎   | 19/30 [01:00<00:36,  3.30s/it] 67%|██████▋   | 20/30 [01:03<00:32,  3.27s/it] 70%|███████   | 21/30 [01:06<00:29,  3.25s/it] 73%|███████▎  | 22/30 [01:10<00:25,  3.23s/it] 77%|███████▋  | 23/30 [01:13<00:22,  3.22s/it] 80%|████████  | 24/30 [01:16<00:19,  3.22s/it] 83%|████████▎ | 25/30 [01:19<00:16,  3.25s/it] 87%|████████▋ | 26/30 [01:23<00:12,  3.22s/it] 90%|█████████ | 27/30 [01:26<00:09,  3.20s/it] 93%|█████████▎| 28/30 [01:29<00:06,  3.19s/it] 97%|█████████▋| 29/30 [01:32<00:03,  3.18s/it]100%|██████████| 30/30 [01:35<00:00,  3.17s/it]100%|██████████| 30/30 [01:35<00:00,  3.19s/it]
+WARNING:  WatchFiles detected changes in 'app/core/magazine_maker.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [69719]
+/Users/jangjimin/my_dev/Mine-AI/app/core/llm_client.py:5: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+2026-03-17 19:01:20,794 - app.core.llm_client - INFO - ✅ OpenAI client initialized successfully.
+2026-03-17 19:01:20,794 - app.core.llm_client - INFO - ℹ️ GEMINI_API_KEY not set. Gemini will not be available.
+Process SpawnProcess-3:
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/process.py", line 320, in _bootstrap
+    self.run()
+    ~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+    ~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/uvicorn/server.py", line 67, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/uvicorn/server.py", line 71, in serve
+    await self._serve(sockets)
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/uvicorn/server.py", line 78, in _serve
+    config.load()
+    ~~~~~~~~~~~^^
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/uvicorn/config.py", line 439, in load
+    self.loaded_app = import_from_string(self.app)
+                      ~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/Users/jangjimin/my_dev/Mine-AI/venv/lib/python3.14/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+  File "/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1398, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1371, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1342, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 938, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 762, in exec_module
+  File "<frozen importlib._bootstrap>", line 491, in _call_with_frames_removed
+  File "/Users/jangjimin/my_dev/Mine-AI/app/main.py", line 12, in <module>
+    from app.api import agent, analysis, crawling, magazine, chat
+  File "/Users/jangjimin/my_dev/Mine-AI/app/api/magazine.py", line 3, in <module>
+    from app.core.magazine_maker import generate_magazine_content
+  File "/Users/jangjimin/my_dev/Mine-AI/app/core/magazine_maker.py", line 153
+    )")
+    ^
+SyntaxError: unmatched ')'
+WARNING:  WatchFiles detected changes in 'app/core/magazine_maker.py'. Reloading...
+/Users/jangjimin/my_dev/Mine-AI/app/core/llm_client.py:5: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+2026-03-17 19:01:39,875 - app.core.llm_client - INFO - ✅ OpenAI client initialized successfully.
+2026-03-17 19:01:39,875 - app.core.llm_client - INFO - ℹ️ GEMINI_API_KEY not set. Gemini will not be available.
+INFO:     Started server process [77710]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
