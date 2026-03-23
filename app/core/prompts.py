@@ -110,6 +110,60 @@ You must output ONLY valid JSON.
             "layout_type": "hero",
             "layout_hint": "zigzag",
             "display_order": 0
+        },
+        {
+            "heading": "섹션 2 제목 (반드시 생성해야 함)",
+            "thumbnail_url": null,
+            "paragraphs": [
+                {
+                    "subtitle": "문단 소제목",
+                    "text": "Markdown 본문 (600-800자)",
+                    "image_search_keyword": "keyword english",
+                    "image_url": null
+                },
+                {
+                    "subtitle": "문단 소제목",
+                    "text": "Markdown 본문 (600-800자)",
+                    "image_search_keyword": "keyword english",
+                    "image_url": null
+                },
+                {
+                    "subtitle": "문단 소제목",
+                    "text": "Markdown 본문 (600-800자)",
+                    "image_search_keyword": "keyword english",
+                    "image_url": null
+                }
+            ],
+            "layout_type": "split_left",
+            "layout_hint": "zigzag",
+            "display_order": 1
+        },
+        {
+            "heading": "섹션 3 제목 (반드시 생성해야 함)",
+            "thumbnail_url": null,
+            "paragraphs": [
+                {
+                    "subtitle": "문단 소제목",
+                    "text": "Markdown 본문 (600-800자)",
+                    "image_search_keyword": "keyword english",
+                    "image_url": null
+                },
+                {
+                    "subtitle": "문단 소제목",
+                    "text": "Markdown 본문 (600-800자)",
+                    "image_search_keyword": "keyword english",
+                    "image_url": null
+                },
+                {
+                    "subtitle": "문단 소제목",
+                    "text": "Markdown 본문 (600-800자)",
+                    "image_search_keyword": "keyword english",
+                    "image_url": null
+                }
+            ],
+            "layout_type": "split_right",
+            "layout_hint": "zigzag",
+            "display_order": 2
         }
     ]
 }
