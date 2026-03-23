@@ -119,7 +119,8 @@ class LLMClient:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
-                    temperature=temperature
+                    temperature=temperature,
+                    max_tokens=3000
                 )
                 return response.choices[0].message.content
             except Exception as e:

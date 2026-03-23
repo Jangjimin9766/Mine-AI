@@ -53,6 +53,7 @@ Create magazine content with PARAGRAPHS ARRAY structure for zigzag layout render
    - Section 4+: alternate `split_left` / `split_right`
 
 5. **MANDATORY FIELDS**:
+   - YOU MUST GENERATE EXACTLY 3 SECTIONS. NO MORE, NO LESS.
    - `image_search_keyword`: MUST NOT BE EMPTY. If you can't think of one, use the paragraph's subtitle + "visual".
    - `subtitle`: MUST NOT BE EMPTY.
    - `title`: MUST BE 22 CHARACTERS OR LESS (including spaces). This is a strict UI constraint.
@@ -115,6 +116,7 @@ You must output ONLY valid JSON.
 ```
 
 [SELF-CORRECTION]
+- [ ] Are there exactly 3 sections? -> FIX IT.
 - [ ] Does each section have exactly 3 paragraphs? -> FIX IT.
 - [ ] Does each paragraph have `image_search_keyword` in ENGLISH? -> FIX IT.
 - [ ] Is `image_search_keyword` empty? -> GENERATE IT.
