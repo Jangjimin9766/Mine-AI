@@ -220,12 +220,18 @@ def handle_edit_magazine(data: dict) -> dict:
         deleted_section_ids = []
         
         if intent.action == "regenerate_section":
-            result = regenerate_section(
-                magazine_data,
-                intent.target_section_index,
-                intent.instruction
-            )
-            new_sections = [result] if result else []
+            # ⭐ Fix: target_section_index가 None이면 regenerate 불가 → add_section으로 처리
+            if intent.target_section_index is None:
+                logger.warning(f"⚠️ regenerate_section 요청이지만 target_section_index=None → add_section으로 처리: {message[:50]}")
+                result = add_new_section(magazine_data, intent.instruction or message)
+                new_sections = [result] if result else []
+            else:
+                result = regenerate_section(
+                    magazine_data,
+                    intent.target_section_index,
+                    intent.instruction
+                )
+                new_sections = [result] if result else []
         elif intent.action == "add_section":
             result = add_new_section(magazine_data, intent.instruction)
             new_sections = [result] if result else []
@@ -242,6 +248,7 @@ def handle_edit_magazine(data: dict) -> dict:
             # 기본: 전체 톤 변경으로 처리
             result = change_overall_tone(magazine_data, message)
             new_sections = result if isinstance(result, list) else []
+
         
         logger.info(f"💬 [4/4] Result: {result is not None or len(deleted_section_ids) > 0}")
         
