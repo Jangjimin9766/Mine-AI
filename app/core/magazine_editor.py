@@ -211,6 +211,7 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
             f"- {result.get('title', '')}: {result.get('content', '')[:200]}"
             for result in search_results[:3]
         ])
+        ])
     else:
         research_content = "No specific research available. Create content based on general knowledge."
     
