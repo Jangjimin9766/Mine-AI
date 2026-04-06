@@ -206,11 +206,9 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     
     research_content = ""
     if search_results:
-        research_content = "
-".join([
+        research_content = "\\n".join([
             f"- {result.get('title', '')}: {result.get('content', '')[:200]}"
             for result in search_results[:3]
-        ])
         ])
     else:
         research_content = "No specific research available. Create content based on general knowledge."
