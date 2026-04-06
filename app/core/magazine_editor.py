@@ -1,3 +1,4 @@
+# FORCE_REDEPLOY_FOR_STRUCTURE_SYNC_V2
 import json
 from app.core.llm_client import llm_client
 from app.models.chat import AgentIntent
