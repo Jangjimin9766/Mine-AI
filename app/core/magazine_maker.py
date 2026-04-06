@@ -1,7 +1,7 @@
 from app.core.llm_client import llm_client
 import json
 from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images, scrape_multiple_with_jina, scrape_labeled_sources, validate_image_url, search_with_pexels
-from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V5
+from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V6
 from concurrent.futures import ThreadPoolExecutor
 import threading
 
@@ -18,24 +18,26 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     if user_mood:
         mood_context = f"[User Mood]\nThe user wants a '{user_mood}' style.\n"
 
+    # Increase max_results to ensure 9+ unique sources
     search_results, images = search_with_tavily(topic, topic=topic)
     
-    # 2. [One Source One Section] Labeled source scraping
+    # 2. [One Source One Paragraph] Labeled source scraping (Up to 9)
     labeled_sources = []
     scraped_images = []
     if search_results:
-        urls = [r['url'] for r in search_results[:3]]
-        labeled_sources, scraped_images = scrape_labeled_sources(urls, max_count=3)
+        # Fetch up to 12 results to pick 9 good ones
+        urls = [r['url'] for r in search_results[:12]]
+        labeled_sources, scraped_images = scrape_labeled_sources(urls, max_count=9)
         
-        # Fallback: if no sources scraped, use Tavily snippet
+        # Fallback: if no sources scraped, use Tavily snippets
         if not labeled_sources and search_results:
-            for r in search_results[:3]:
+            for r in search_results[:9]:
                 labeled_sources.append((r.get('url', ''), r.get('content', '')))
         
         scraped_images = [img for img in scraped_images if validate_image_url(img)]
         print(f"Validated scraped images: {len(scraped_images)}")
 
-    # 3. Build labeled research material (NOT concatenated)
+    # 3. Build labeled research material (Source 1 to 9)
     labeled_material = ""
     for i, (url, content) in enumerate(labeled_sources):
         truncated = content[:1500] if content else "No content available."
@@ -44,7 +46,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     if not labeled_material.strip():
         labeled_material = "No research material available. Use general knowledge only."
 
-    system_prompt = MAGAZINE_SYSTEM_PROMPT_V5
+    system_prompt = MAGAZINE_SYSTEM_PROMPT_V6
     user_prompt = f"""
     Topic: {topic}
     {interest_context}
@@ -54,20 +56,32 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     [Available Images]
     {json.dumps(images, ensure_ascii=False)}
     Create a premium magazine article with structured JSON.
-    Remember: Section 1 uses ONLY Source 1, Section 2 uses ONLY Source 2, Section 3 uses ONLY Source 3.
-    Each section MUST include the source_url field.
+    Remember the flexible source allocation rule: Prioritize one source per paragraph (9 total), but can share if a source is exceptionally deep.
     """
 
-    print(f"AI Crafting V5 magazine (One Source One Section)...")
+    print(f"AI Crafting V6 magazine (One Source One Paragraph)...")
     result_json = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
     
+    # Handle Safety/NSFW Errors
+    if "error" in result_json:
+        print(f"⚠️ AI Server Policy Triggered: {result_json.get('error')}")
+        return result_json
+
     if result_json.get('thought_process'):
         del result_json['thought_process']
     
-    # 4. Ensure source_url fallback for each section
-    for i, section in enumerate(result_json.get('sections', [])):
-        if not section.get('source_url') and i < len(labeled_sources):
-            section['source_url'] = labeled_sources[i][0]
+    # 4. Ensure source_url fallback at the paragraph level
+    source_count = len(labeled_sources)
+    for s_idx, section in enumerate(result_json.get('sections', [])):
+        for p_idx, para in enumerate(section.get('paragraphs', [])):
+            if not para.get('source_url'):
+                # Global index for 9 sources: Section 1 (0-2), Section 2 (3-5), Section 3 (6-8)
+                global_idx = s_idx * 3 + p_idx
+                if global_idx < source_count:
+                    para['source_url'] = labeled_sources[global_idx][0]
+                elif source_count > 0:
+                    # Fallback to the very first source if we ran out
+                    para['source_url'] = labeled_sources[0][0]
     
     # 5. Parallel image searching + moodboard generation
     print(f"Parallelizing image searching and moodboard generation...")
@@ -145,5 +159,5 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
             elif real_tavily_images: result_json['cover_image_url'] = real_tavily_images[0]
             else: result_json['cover_image_url'] = images[0] if images else ""
 
-    print(f"V5 Magazine created: {len(result_json.get('sections', []))} sections with source tracking")
+    print(f"V6 Magazine created: {len(result_json.get('sections', []))} sections with paragraph-level source tracking")
     return result_json

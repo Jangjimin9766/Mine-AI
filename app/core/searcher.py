@@ -47,7 +47,7 @@ def search_with_tavily(query: str, topic: str = None):
             query=clean_query,
             search_depth="advanced",
             include_images=True,
-            max_results=5
+            max_results=15
         )
         
         results = response.get('results', [])

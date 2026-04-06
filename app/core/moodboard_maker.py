@@ -84,6 +84,8 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     [Subject Detail with concrete objects], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: 8k, photorealistic, mastery, masterpiece]
     
     [CRITICAL CONSTRAINTS]
+    - **NSFW POLICY**: NEVER generate prompts for pornography, explicit sexual acts, extreme violence, or illegal content.
+    - If the topic is inappropriate, your entire response MUST be: "FORBIDDEN_CONTENT"
     - Output ONLY the prompt text in ENGLISH. Nothing else.
     - Do NOT use abstract words only. Include SPECIFIC OBJECTS related to the topic.
     - Ensure the mood aligns with: {user_mood or "Sophisticated"}
@@ -128,14 +130,14 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
         print(f"❌ Prompt generation failed: {e}")
         sd_prompt = None
 
-    if not sd_prompt:
+    if not sd_prompt or sd_prompt.strip() == "FORBIDDEN_CONTENT":
         return {
-            "error": "Failed to generate prompt - LLM may not be configured",
-            "error_type": "PROMPT_GENERATION_FAILED",
+            "error": "Forbidden content detected or prompt generation failed",
+            "error_type": "FORBIDDEN_CONTENT" if sd_prompt == "FORBIDDEN_CONTENT" else "PROMPT_GENERATION_FAILED",
             "success": False,
             "fallback_url": None,
             "image_url": None,
-            "description": f"Fallback image for: {display_topic}"
+            "description": f"Safety filter blocked prompt generation for: {display_topic}"
         }
 
     # 2. Generate Image (Local SDXL)

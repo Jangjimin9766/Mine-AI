@@ -131,14 +131,25 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     - Use specific details (numbers, brands, facts)
     - Instruction to follow: {instruction}
 
-    Output JSON EXACTLY:
-    {
-        "heading": "섹션 제목",
-        "thumbnail_search_keyword": "keyword",
         "paragraphs": [
-            {"subtitle": "소제목 1", "text": "본문 1", "image_search_keyword": "kw1"},
-            {"subtitle": "소제목 2", "text": "본문 2", "image_search_keyword": "kw2"},
-            {"subtitle": "소제목 3", "text": "본문 3", "image_search_keyword": "kw3"}
+            {
+                "subtitle": "소제목 1",
+                "text": "본문 1",
+                "image_search_keyword": "kw1",
+                "source_url": "https://..."
+            },
+            {
+                "subtitle": "소제목 2",
+                "text": "본문 2",
+                "image_search_keyword": "kw2",
+                "source_url": "https://..."
+            },
+            {
+                "subtitle": "소제목 3",
+                "text": "본문 3",
+                "image_search_keyword": "kw3",
+                "source_url": "https://..."
+            }
         ]
     }
     """.replace("{instruction}", instruction)
@@ -153,12 +164,20 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     
     new_data = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
     
+    if "error" in new_data:
+        return new_data
+
     # 이미지 검색 (기존 이미지 활용 또는 신규 검색)
     current_paras = current_section.get('paragraphs', [])
     for i, para in enumerate(new_data.get('paragraphs', [])):
         keyword = para.get('image_search_keyword')
         para['image_url'] = None
-        # 기존 이미지가 있다면 최대한 유지, 없거나 키워드가 명확하면 신규 검색
+        
+        # [Sync] source_url fallback if missing
+        if not para.get('source_url'):
+            para['source_url'] = source_url
+
+        # 기존 이미지가 있다면 최대한 유지
         if i < len(current_paras):
             para['image_url'] = current_paras[i].get('imageUrl') or current_paras[i].get('image_url')
         
@@ -176,8 +195,6 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
             if imgs: new_data['thumbnail_url'] = imgs[0]
         except: pass
     
-    if source_url: new_data['source_url'] = source_url
-    
     return new_data
 
 
@@ -189,29 +206,29 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     from app.core.llm_client import llm_client
     import json
     
-    # 1. 주제 추출 및 검색
+    # 1. 주제 추출 및 [Source 1, 2, 3] 확보
     magazine_title = magazine_data.get('title', '')
     search_query = f"{magazine_title} {instruction}"
     
-    print(f"🔍 Searching for: {search_query}")
+    print(f"🔍 Searching sources for new section: {search_query}")
     
-    source_url = None
+    labeled_sources = []
+    images = []
     try:
         search_results, images = search_with_tavily(search_query, topic=magazine_title)
         if search_results:
-            source_url = search_results[0].get('url')
+            from app.core.searcher import scrape_labeled_sources
+            urls = [r['url'] for r in search_results[:5]]
+            labeled_sources, _ = scrape_labeled_sources(urls, max_count=3)
     except Exception as e:
-        print(f"⚠️ Search failed: {e}, using fallback")
-        search_results, images = [], []
+        print(f"⚠️ Search failed: {e}")
     
     research_content = ""
-    if search_results:
-        research_content = "\\n".join([
-            f"- {result.get('title', '')}: {result.get('content', '')[:200]}"
-            for result in search_results[:3]
-        ])
-    else:
-        research_content = "No specific research available. Create content based on general knowledge."
+    for i, (url, content) in enumerate(labeled_sources):
+        research_content += f"\n[Source {i+1}: {url}]\n{content[:1000]}\n"
+    
+    if not research_content:
+        research_content = "No specific research available. Use general knowledge."
     
     # 기존 섹션 헤딩 (중복 방지)
     existing_headings = [s.get('heading', '') for s in magazine_data.get('sections', [])]
@@ -240,17 +257,20 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
             {
                 "subtitle": "소제목 1",
                 "text": "본문 내용 1",
-                "image_search_keyword": "keyword1"
+                "image_search_keyword": "keyword1",
+                "source_url": "Source 1 URL"
             },
             {
                 "subtitle": "소제목 2",
                 "text": "본문 내용 2",
-                "image_search_keyword": "keyword2"
+                "image_search_keyword": "keyword2",
+                "source_url": "Source 2 URL"
             },
             {
                 "subtitle": "소제목 3",
                 "text": "본문 내용 3",
-                "image_search_keyword": "keyword3"
+                "image_search_keyword": "keyword3",
+                "source_url": "Source 3 URL"
             }
         ]
     }
@@ -266,8 +286,16 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     
     new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
     
-    # 2. 이미지 검색 (Pexels)
-    for para in new_section.get('paragraphs', []):
+    if "error" in new_section:
+        return new_section
+
+    # 2. 이미지 검색 및 source_url 보정
+    source_count = len(labeled_sources)
+    for i, para in enumerate(new_section.get('paragraphs', [])):
+        # source_url Fallback
+        if not para.get('source_url') and i < source_count:
+            para['source_url'] = labeled_sources[i][0]
+
         keyword = para.get('image_search_keyword')
         para['image_url'] = None
         if keyword:
@@ -284,9 +312,6 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
         if imgs: new_section['thumbnail_url'] = imgs[0]
     except: pass
     if not new_section['thumbnail_url'] and images: new_section['thumbnail_url'] = images[0]
-    
-    # [One Source One Use] source_url 첨부
-    if source_url: new_section['source_url'] = source_url
     
     return new_section
 
@@ -362,9 +387,10 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
     
     Output JSON (snake_case) exactly like this:
     {{
-        "subtitle": "A catchy, relevant subtitle for this new paragraph",
+        "subtitle": "...",
         "text": "The main content in Markdown format...",
-        "image_search_keyword": "english noun keyword",
+        "image_search_keyword": "keyword",
+        "source_url": "URL used for this content",
         "image_url": null
     }}
     """
