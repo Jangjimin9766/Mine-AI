@@ -102,7 +102,13 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     current_section = sections[section_index]
     magazine_title = magazine_data.get('title', '')
     
-    # [One Source One Use] 필요 시 검색 수행 (기존 source_url이 있다면 활용)
+    # [Language Guard] Pre-translate instruction if English
+    original_instruction = instruction
+    if is_mostly_english(instruction):
+        instruction = translate_to_korean(instruction, "edit instruction")
+        print(f"  -> Instruction translated: {original_instruction} -> {instruction}")
+
+    # [One Source One Use]
     source_url = current_section.get('source_url')
     research_content = ""
     
@@ -200,6 +206,9 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     new_data.pop('subtitle', None)
     new_data.pop('introduction', None)
     
+    # [Final Language Guard] Force translate if AI still returns English
+    new_data = force_translate_section(new_data)
+    
     return new_data
 
 
@@ -207,12 +216,18 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     """
     새 섹션 추가 - Spring Boot가 기대하는 paragraphs 배열 구조(3개 문단)로 반환
     """
-    from app.core.searcher import search_with_tavily, search_with_pexels
+    from app.core.searcher import search_with_tavily, search_with_pexels, scrape_labeled_sources
     from app.core.llm_client import llm_client
+    from app.core.utils import is_mostly_english, translate_to_korean, force_translate_section
     import json
     
     # 1. 주제 추출 및 [Source 1, 2, 3] 확보
     magazine_title = magazine_data.get('title', '')
+    
+    # [Language Guard] Pre-translate instruction if English
+    if is_mostly_english(instruction):
+        instruction = translate_to_korean(instruction, "new section instruction")
+
     search_query = f"{magazine_title} {instruction}"
     
     print(f"🔍 Searching sources for new section: {search_query}")
@@ -323,6 +338,9 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     # V2 Cleanup
     new_section.pop('subtitle', None)
     new_section.pop('introduction', None)
+    
+    # [Final Language Guard] Force translate if AI still returns English
+    new_section = force_translate_section(new_section)
     
     return new_section
 

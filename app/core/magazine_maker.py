@@ -2,12 +2,20 @@ from app.core.llm_client import llm_client
 import json
 from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images, scrape_multiple_with_jina, scrape_labeled_sources, validate_image_url, search_with_pexels
 from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V7
+from app.core.utils import is_mostly_english, translate_to_korean, force_translate_magazine_json
 from concurrent.futures import ThreadPoolExecutor
 import threading
 
 def generate_magazine_content(topic: str, user_interests: list = None, user_mood: str = None):
     print(f"Magazine Editor started for: {topic}")
     
+    # [Language Guard] Translate English topic to Korean to set the "Korean Persona" early
+    original_topic = topic
+    if is_mostly_english(topic):
+        korean_topic = translate_to_korean(topic, "magazine topic")
+        print(f"  -> Input translation: {original_topic} -> {korean_topic}")
+        topic = korean_topic
+
     # 1. Context building
     interest_context = ""
     mood_context = ""
@@ -18,26 +26,24 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     if user_mood:
         mood_context = f"[User Mood]\nThe user wants a '{user_mood}' style.\n"
 
-    # Increase max_results to ensure 9+ unique sources
-    search_results, images = search_with_tavily(topic, topic=topic)
+    # Search with original (if English) + Korean for maximum relevance
+    search_query = f"{original_topic} {topic}" if original_topic != topic else topic
+    search_results, images = search_with_tavily(search_query, topic=topic)
     
     # 2. [Parallel Scraping V2] Labeled source scraping (Up to 9)
     labeled_sources = []
     scraped_images = []
     if search_results:
-        # Fetch up to 12 results to pick 9 good ones
         urls = [r['url'] for r in search_results[:12]]
         labeled_sources, scraped_images = scrape_labeled_sources(urls, max_count=9)
         
-        # Fallback: if no sources scraped, use Tavily snippets
         if not labeled_sources and search_results:
             for r in search_results[:9]:
                 labeled_sources.append((r.get('url', ''), r.get('content', '')))
         
         scraped_images = [img for img in scraped_images if validate_image_url(img)]
-        print(f"Validated scraped images: {len(scraped_images)}")
 
-    # 3. Build labeled research material (Source 1 to 9)
+    # 3. Build labeled research material
     labeled_material = ""
     for i, (url, content) in enumerate(labeled_sources):
         truncated = content[:2000] if content else "No content available."
@@ -48,7 +54,8 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
 
     system_prompt = MAGAZINE_SYSTEM_PROMPT_V7
     user_prompt = f"""
-    Topic: {topic}
+    Topic (Korean): {topic}
+    Original Topic (if any): {original_topic}
     {interest_context}
     {mood_context}
     [Research Material - LABELED SOURCES]
@@ -56,11 +63,10 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     [Available Images]
     {json.dumps(images, ensure_ascii=False)}
     
-    당신은 전문적인 한국어 잡지 에디터입니다.
-    1. 출처 9개를 활용하여 3개 섹션(각 3개 문단)을 만드세요.
-    2. 모든 내용은 반드시 한국어로 작성하세요 (소스가 영어여도 한국어로 번역/윤문).
-    3. 매거진 레벨의 subtitle(부제)이나 introduction(표지 소개글)을 생성하지 마세요.
-    4. 모든 문단에 source_url을 반드시 포함하세요.
+    [ABSOLUTE LANGUAGE RULE]
+    - YOU MUST RESPOND IN KOREAN (HANGUL).
+    - Even if the sources are in English, translate them into professional Korean.
+    - Title, Headings, and Body Text must all be in Korean.
     """
 
     print(f"AI Crafting V7 magazine (Professional Korean Editor)...")
@@ -74,19 +80,21 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     if result_json.get('thought_process'):
         del result_json['thought_process']
     
+    # [Final Language Guard] If the LLM still returns English, force translate the whole object
+    result_json = force_translate_magazine_json(result_json)
+    
     # 4. Ensure source_url fallback at the paragraph level (V2 Source Fallback Hack)
     source_count = len(labeled_sources)
     for s_idx, section in enumerate(result_json.get('sections', [])):
         for p_idx, para in enumerate(section.get('paragraphs', [])):
             if not para.get('source_url'):
-                # Global index for 9 sources: Section 1 (0-2), Section 2 (3-5), Section 3 (6-8)
                 fallback_idx = min(s_idx * 3 + p_idx, 8)
                 if fallback_idx < source_count:
                     para['source_url'] = labeled_sources[fallback_idx][0]
                 elif source_count > 0:
                     para['source_url'] = labeled_sources[0][0]
 
-    # V2 Field Cleanup: Remove unused root fields (V7 Safety)
+    # V2 Field Cleanup
     result_json.pop('subtitle', None)
     result_json.pop('introduction', None)
     

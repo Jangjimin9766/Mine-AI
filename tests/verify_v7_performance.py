@@ -30,8 +30,8 @@ def test_parallel_scraping_speed():
         print(f"⚠️ SPEED TEST WARNING: Scraped took {duration:.2f}s. Check network/Jina latency.")
 
 def test_v7_schema_and_language():
-    print("\n🧪 Testing V7 Schema and Language (Korean Editor)...")
-    topic = "High-end mechanical keyboard trends"
+    print("\n🧪 Testing V7 Language Guard (English Input -> Korean Output)...")
+    topic = "History of American Burgers"
     res = generate_magazine_content(topic)
     
     if "error" in res:
