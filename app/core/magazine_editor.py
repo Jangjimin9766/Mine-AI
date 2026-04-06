@@ -131,6 +131,9 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     - Use specific details (numbers, brands, facts)
     - Instruction to follow: {instruction}
 
+    Output JSON EXACTLY:
+    {
+        "heading": "섹션 제목",
         "paragraphs": [
             {
                 "subtitle": "소제목 1",
@@ -191,9 +194,13 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     new_data['thumbnail_url'] = current_section.get('thumbnail_url') or current_section.get('image_url')
     if not new_data['thumbnail_url']:
         try:
-            imgs = search_with_pexels(new_data.get('thumbnail_search_keyword', 'lifestyle'), orientation='landscape', per_page=1)
+            imgs = search_with_pexels(new_data.get('heading', 'lifestyle'), orientation='landscape', per_page=1)
             if imgs: new_data['thumbnail_url'] = imgs[0]
         except: pass
+    
+    # V2 Cleanup: Ensure no root-level intro/subtitle
+    new_data.pop('subtitle', None)
+    new_data.pop('introduction', None)
     
     return new_data
 
@@ -289,12 +296,16 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     if "error" in new_section:
         return new_section
 
-    # 2. 이미지 검색 및 source_url 보정
+    # 2. 이미지 검색 및 source_url 보정 (V2 Fallback Hack)
     source_count = len(labeled_sources)
     for i, para in enumerate(new_section.get('paragraphs', [])):
         # source_url Fallback
-        if not para.get('source_url') and i < source_count:
-            para['source_url'] = labeled_sources[i][0]
+        if not para.get('source_url'):
+            fallback_idx = min(i, 2) # Local fallback for 3 paragraphs in one section
+            if fallback_idx < source_count:
+                para['source_url'] = labeled_sources[fallback_idx][0]
+            elif source_count > 0:
+                para['source_url'] = labeled_sources[0][0]
 
         keyword = para.get('image_search_keyword')
         para['image_url'] = None
@@ -305,13 +316,16 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
             except: pass
         if not para['image_url'] and images: para['image_url'] = images[0]
 
-    thumb_kw = new_section.get('thumbnail_search_keyword', magazine_title)
     new_section['thumbnail_url'] = None
     try:
-        imgs = search_with_pexels(thumb_kw, orientation='landscape', per_page=1)
+        imgs = search_with_pexels(new_section.get('heading', magazine_title), orientation='landscape', per_page=1)
         if imgs: new_section['thumbnail_url'] = imgs[0]
     except: pass
     if not new_section['thumbnail_url'] and images: new_section['thumbnail_url'] = images[0]
+    
+    # V2 Cleanup
+    new_section.pop('subtitle', None)
+    new_section.pop('introduction', None)
     
     return new_section
 

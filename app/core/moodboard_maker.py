@@ -163,6 +163,5 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
 
     return {
         "image_url": image_url,  # This will be a Data URI (base64)
-        "description": sd_prompt,
         "success": True
     }

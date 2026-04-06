@@ -57,9 +57,11 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     {json.dumps(images, ensure_ascii=False)}
     Create a premium magazine article with structured JSON.
     Remember the flexible source allocation rule: Prioritize one source per paragraph (9 total), but can share if a source is exceptionally deep.
+    Do NOT generate magazine-level subtitle or introduction.
+    Every paragraph MUST include a source_url.
     """
 
-    print(f"AI Crafting V6 magazine (One Source One Paragraph)...")
+    print(f"AI Crafting V6 magazine (V2 Schema Sync)...")
     result_json = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
     
     # Handle Safety/NSFW Errors
@@ -70,18 +72,21 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     if result_json.get('thought_process'):
         del result_json['thought_process']
     
-    # 4. Ensure source_url fallback at the paragraph level
+    # 4. Ensure source_url fallback at the paragraph level (V2 Source Fallback Hack)
     source_count = len(labeled_sources)
     for s_idx, section in enumerate(result_json.get('sections', [])):
         for p_idx, para in enumerate(section.get('paragraphs', [])):
             if not para.get('source_url'):
                 # Global index for 9 sources: Section 1 (0-2), Section 2 (3-5), Section 3 (6-8)
-                global_idx = s_idx * 3 + p_idx
-                if global_idx < source_count:
-                    para['source_url'] = labeled_sources[global_idx][0]
+                fallback_idx = min(s_idx * 3 + p_idx, 8)
+                if fallback_idx < source_count:
+                    para['source_url'] = labeled_sources[fallback_idx][0]
                 elif source_count > 0:
-                    # Fallback to the very first source if we ran out
                     para['source_url'] = labeled_sources[0][0]
+
+    # V2 Field Cleanup: Remove unused root fields
+    result_json.pop('subtitle', None)
+    result_json.pop('introduction', None)
     
     # 5. Parallel image searching + moodboard generation
     print(f"Parallelizing image searching and moodboard generation...")

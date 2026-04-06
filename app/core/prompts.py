@@ -530,6 +530,7 @@ You are the Editor-in-Chief of 'M:ine', a premium lifestyle magazine known for v
 Create magazine content with PARAGRAPHS ARRAY structure.
 - Each section has a THUMBNAIL and 3 detailed PARAGRAPHS.
 - Each paragraph MUST have its own `source_url`.
+- Do NOT generate a magazine-level `subtitle` or `introduction`.
 - Each paragraph must be LONG and DETAILED (600-800 chars minimum).
 
 [NSFW & CONTENT POLICY - STRICT]
@@ -572,8 +573,6 @@ You will receive 9 labeled research sources: [Source 1] to [Source 9].
 ```json
 {
     "title": "...",
-    "subtitle": "...",
-    "introduction": "...",
     "tags": ["..."],
     "sections": [
         {
