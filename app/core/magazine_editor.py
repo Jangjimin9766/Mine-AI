@@ -89,76 +89,104 @@ def analyze_user_intent(user_message: str, magazine_data: dict) -> AgentIntent:
 
 def regenerate_section(magazine_data: dict, section_index: int, instruction: str) -> dict:
     """
-    특정 섹션만 재생성 - 품질 향상
+    특정 섹션만 재생성 - Spring Boot가 기대하는 paragraphs 배열 구조(3개 문단)로 반환
     """
-    sections = magazine_data.get('sections', [])
+    from app.core.llm_client import llm_client
+    from app.core.searcher import search_with_pexels, search_with_tavily
     
+    sections = magazine_data.get('sections', [])
     if section_index < 0 or section_index >= len(sections):
         raise ValueError(f"Invalid section index: {section_index}")
     
     current_section = sections[section_index]
-    current_image_url = current_section.get('image_url', '')
+    magazine_title = magazine_data.get('title', '')
+    
+    # [One Source One Use] 필요 시 검색 수행 (기존 source_url이 있다면 활용)
+    source_url = current_section.get('source_url')
+    research_content = ""
+    
+    if not source_url:
+        search_query = f"{magazine_title} {current_section.get('heading', '')} {instruction}"
+        try:
+            results, _ = search_with_tavily(search_query)
+            if results:
+                source_url = results[0].get('url')
+                research_content = results[0].get('content', '')[:1000]
+        except: pass
     
     system_prompt = """
-    You are rewriting a section of a premium lifestyle magazine.
-    Follow the user's instruction while maintaining HIGH-DENSITY, INFORMATIVE content.
-    
-    [EDITORIAL STANDARDS]
-    1. **Hyper-Specificity**: Use concrete brand names, numbers, historical facts, and technical data.
-    2. **Insightful Narrative**: Don't just list facts. Explain the *significance* and *context*.
-    3. **Tone**: Refined, sophisticated, and authoritative formal Korean (습니다/입니다).
-    
-    [MARKDOWN FORMATTING RULES]
-    - Use ### or #### for subheadings to break long text naturally.
-    - Use standard Markdown paragraphs (double line breaks).
-    - Use **bold** for technical terms or key findings.
-    - Use > (blockquote) for powerful quotes or striking statistics.
-    - Use - or 1. lists for structured data (only for 3+ items).
-    - NEVER use HTML tags like <p>, <h3>, <strong>.
+    You are REWRITING a section for a premium lifestyle magazine.
+    Follow the user's instruction and expand the content into EXACTLY 3 paragraphs.
 
-    [CRITICAL CONSTRAINTS]
-    - **Content Length**: 800-1,500 characters (Korean).
-    - **Image URL**: ALWAYS preserve the original image_url exactly as provided.
-    - **No Vague Statements**: Avoid generic praise; prove value with evidence.
-    
-    Output JSON (snake_case):
+    [CRITICAL STRUCTURE RULES]
+    - Return EXACTLY 3 paragraphs in the "paragraphs" array
+    - Each paragraph: subtitle (10-30 chars) + text (600-800 chars) + image_search_keyword (3 words)
+    - Heading: Korean, concise
+    - thumbnail_search_keyword: English noun for a landscape/lifestyle photo
+    - NO Markdown formatting like ### or > in text fields
+
+    [TONE & STYLE]
+    - Refined, formal Korean (습니다/입니다)
+    - Use specific details (numbers, brands, facts)
+    - Instruction to follow: {instruction}
+
+    Output JSON EXACTLY:
     {
-        "heading": "Clear, brand-like heading",
-        "content": "High-quality Markdown content...",
-        "image_url": "EXACT URL provided",
-        "layout_hint": "image_left | full_width"
+        "heading": "섹션 제목",
+        "thumbnail_search_keyword": "keyword",
+        "paragraphs": [
+            {"subtitle": "소제목 1", "text": "본문 1", "image_search_keyword": "kw1"},
+            {"subtitle": "소제목 2", "text": "본문 2", "image_search_keyword": "kw2"},
+            {"subtitle": "소제목 3", "text": "본문 3", "image_search_keyword": "kw3"}
+        ]
     }
-    """
+    """.replace("{instruction}", instruction)
     
     user_prompt = f"""
-    Current section:
-    Heading: {current_section.get('heading', '')}
-    Content: {current_section.get('content', '')}
-    Image URL: {current_image_url}
-    
-    User instruction: {instruction}
-    
-    Rewrite this section following the instruction.
-    Keep it in Korean, 800-1500 characters for content.
-    Make it INFORMATIVE and SPECIFIC, not vague or overly poetic.
-    
-    IMPORTANT: Use this EXACT image_url in your response: {current_image_url}
+    Magazine: {magazine_title}
+    Current Section Heading: {current_section.get('heading')}
+    Current Section Text: {current_section.get('paragraphs', [{}])[0].get('text', '')[:200]}...
+    Instruction: {instruction}
+    Research: {research_content}
     """
     
-    from app.core.llm_client import llm_client
-    new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+    new_data = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
     
-    # Force preserve original image URL
-    new_section['image_url'] = current_image_url
+    # 이미지 검색 (기존 이미지 활용 또는 신규 검색)
+    current_paras = current_section.get('paragraphs', [])
+    for i, para in enumerate(new_data.get('paragraphs', [])):
+        keyword = para.get('image_search_keyword')
+        para['image_url'] = None
+        # 기존 이미지가 있다면 최대한 유지, 없거나 키워드가 명확하면 신규 검색
+        if i < len(current_paras):
+            para['image_url'] = current_paras[i].get('imageUrl') or current_paras[i].get('image_url')
+        
+        if not para['image_url'] and keyword:
+            try:
+                imgs = search_with_pexels(keyword, orientation='landscape', per_page=1)
+                if imgs: para['image_url'] = imgs[0]
+            except: pass
+
+    # 썸네일 처리
+    new_data['thumbnail_url'] = current_section.get('thumbnail_url') or current_section.get('image_url')
+    if not new_data['thumbnail_url']:
+        try:
+            imgs = search_with_pexels(new_data.get('thumbnail_search_keyword', 'lifestyle'), orientation='landscape', per_page=1)
+            if imgs: new_data['thumbnail_url'] = imgs[0]
+        except: pass
     
-    return new_section
+    if source_url: new_data['source_url'] = source_url
+    
+    return new_data
 
 
 def add_new_section(magazine_data: dict, instruction: str) -> dict:
     """
-    새 섹션 추가 - 품질 향상을 위해 실제 정보 검색
+    새 섹션 추가 - Spring Boot가 기대하는 paragraphs 배열 구조(3개 문단)로 반환
     """
-    from app.core.searcher import search_with_tavily
+    from app.core.searcher import search_with_tavily, search_with_pexels
+    from app.core.llm_client import llm_client
+    import json
     
     # 1. 주제 추출 및 검색
     magazine_title = magazine_data.get('title', '')
@@ -166,96 +194,102 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     
     print(f"🔍 Searching for: {search_query}")
     
+    source_url = None
     try:
         search_results, images = search_with_tavily(search_query, topic=magazine_title)
+        if search_results:
+            source_url = search_results[0].get('url')
     except Exception as e:
         print(f"⚠️ Search failed: {e}, using fallback")
         search_results, images = [], []
     
-    # 검색 결과에서 정보 추출
     research_content = ""
     if search_results:
-        research_content = "\n".join([
+        research_content = "
+".join([
             f"- {result.get('title', '')}: {result.get('content', '')[:200]}"
             for result in search_results[:3]
         ])
     else:
         research_content = "No specific research available. Create content based on general knowledge."
     
+    # 기존 섹션 헤딩 (중복 방지)
+    existing_headings = [s.get('heading', '') for s in magazine_data.get('sections', [])]
+    
     system_prompt = """
     You are adding a new section to a premium lifestyle magazine.
-    Create a high-density, authoritative editorial based on the provided research.
-    
+    Create a high-quality section with EXACTLY 3 paragraphs.
+
+    [CRITICAL STRUCTURE RULES]
+    - Return EXACTLY 3 paragraphs in the "paragraphs" array
+    - Each paragraph: subtitle (Korean, 10-30 chars) + text (Korean, 150-300 chars) + image_search_keyword (English, max 3 words)
+    - Section heading: Korean, concise and brand-like
+    - thumbnail_search_keyword: English noun for a wide landscape photo
+    - DO NOT use Markdown formatting like ### or > in text fields
+
     [EDITORIAL STANDARDS]
-    1. **Data-Driven**: Use specific information from [Research Results] (numbers, names, specs).
-    2. **Depth**: Provide context and background. Connect the new section to the magazine's theme.
-    3. **Visual Structure**: Use Markdown tags to create a structured, readable layout.
-    
-    [MARKDOWN FORMATTING RULES]
-    - Use ### or #### for subheadings (Mandatory for sections over 1000 chars)
-    - Use standard Markdown paragraphs.
-    - Use **bold** for key technical terms or to emphasize points.
-    - Use > (blockquote) for quotes from research or core insights.
-    - Use - or 1. lists for facts or features.
-    - NEVER use HTML tags like <p>, <h3>, <strong>.
-    
-    [CRITICAL RULES]
-    - **Length**: 800-1,500 characters (Korean).
-    - **Persona**: Editor-in-Chief with deep domain knowledge.
-    - **Originality**: Do not repeat existing section topics. Bring a fresh perspective.
-    - **Image Keyword**: Generate an English noun keyword for Pexels search.
-    
-    Output JSON (snake_case):
+    - Data-Driven: Use specific facts from [Research Results]
+    - Tone: Refined, sophisticated Korean (습니다/입니다)
+    - Originality: Do not repeat existing section topics
+
+    Output JSON EXACTLY:
     {
-        "heading": "Sophisticated heading",
-        "content": "Masterpiece Markdown content...",
-        "image_search_keyword": "english noun keyword",
-        "layout_hint": "image_left | full_width"
+        "heading": "섹션 제목",
+        "thumbnail_search_keyword": "english landscape keyword",
+        "paragraphs": [
+            {
+                "subtitle": "소제목 1",
+                "text": "본문 내용 1",
+                "image_search_keyword": "keyword1"
+            },
+            {
+                "subtitle": "소제목 2",
+                "text": "본문 내용 2",
+                "image_search_keyword": "keyword2"
+            },
+            {
+                "subtitle": "소제목 3",
+                "text": "본문 내용 3",
+                "image_search_keyword": "keyword3"
+            }
+        ]
     }
     """
     
     user_prompt = f"""
     Magazine title: {magazine_title}
-    Existing sections: {len(magazine_data.get('sections', []))}
-    
     User wants to add: {instruction}
-    
+    Existing headings: {existing_headings}
     [Research Results]
     {research_content}
-    
-    [Available Images]
-    {images[:5] if images else "No images available"}
-    
-    Create a new section with SPECIFIC, INFORMATIVE content.
-    Keep it in Korean, 800-1500 characters for content.
-    Use facts and details from the research.
-    Make it as good as the original magazine sections.
     """
     
-    from app.core.llm_client import llm_client
     new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
     
-    # Evaluate Pexels image search
-    search_keyword = new_section.get('image_search_keyword', '')
-    new_section['image_url'] = None
+    # 2. 이미지 검색 (Pexels)
+    for para in new_section.get('paragraphs', []):
+        keyword = para.get('image_search_keyword')
+        para['image_url'] = None
+        if keyword:
+            try:
+                imgs = search_with_pexels(keyword, orientation='landscape', per_page=1)
+                if imgs: para['image_url'] = imgs[0]
+            except: pass
+        if not para['image_url'] and images: para['image_url'] = images[0]
+
+    thumb_kw = new_section.get('thumbnail_search_keyword', magazine_title)
+    new_section['thumbnail_url'] = None
+    try:
+        imgs = search_with_pexels(thumb_kw, orientation='landscape', per_page=1)
+        if imgs: new_section['thumbnail_url'] = imgs[0]
+    except: pass
+    if not new_section['thumbnail_url'] and images: new_section['thumbnail_url'] = images[0]
     
-    if search_keyword:
-        from app.core.searcher import search_with_pexels
-        print(f"📸 add_new_section: Pexels search for '{search_keyword}'")
-        try:
-            pexels_imgs = search_with_pexels(search_keyword, orientation='landscape', per_page=1)
-            if pexels_imgs:
-                new_section['image_url'] = pexels_imgs[0]
-                print(f"✅ Assigned Pexels image: {pexels_imgs[0]}")
-        except Exception as e:
-            print(f"⚠️ Pexels failed for add_new_section: {e}")
-            
-    # Fallback to Tavily if Pexels fails
-    if not new_section['image_url'] and images:
-        new_section['image_url'] = images[0]
-        print(f"📷 Fallback to Tavily image: {images[0]}")
+    # [One Source One Use] source_url 첨부
+    if source_url: new_section['source_url'] = source_url
     
     return new_section
+
 
 
 def change_overall_tone(magazine_data: dict, instruction: str) -> list:
@@ -290,16 +324,18 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
     
     # 1. 주제 및 내용 기반 검색
     search_query = f"{topic} {section_heading} {message}"
-    print(f"🔍 Searching for new paragraph: {search_query}")
+    print(f"Searching for new paragraph: {search_query}")
+    source_url = None
     try:
         search_results, images = search_with_tavily(search_query, topic=topic)
     except Exception as e:
-        print(f"⚠️ Search failed: {e}")
+        print(f"Search failed: {e}")
         search_results, images = [], []
         
     research_content = ""
     if search_results:
-        research_content = "\n".join([f"- {r.get('title')}: {r.get('content')[:200]}" for r in search_results[:3]])
+        source_url = search_results[0].get('url', None)
+        research_content = "\n".join([f"- {r.get('title')}: {r.get('content')[:200]}" for r in search_results[:1]])
     
     # 2. 기존 문단 텍스트 추출 (중복 방지)
     existing_text = "\n".join([f"Subtitle: {p.get('subtitle')}\nText: {p.get('text')}" for p in existing_paragraphs])
@@ -363,7 +399,11 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
     # Fallback to Tavily
     if not result['image_url'] and images:
         result['image_url'] = images[0]
-        print(f"📷 Fallback to Tavily image: {images[0]}")
+        print(f"Fallback to Tavily image: {images[0]}")
+    
+    # [One Source One Use] source_url 첨부
+    if source_url:
+        result['source_url'] = source_url
         
     return result
 

@@ -123,7 +123,9 @@ class LocalDiffusionClient:
             print(f"🎨 Generating image locally with prompt: {prompt[:50]}...")
             
             # Generate
-            image = self.pipe(prompt=prompt, num_inference_steps=30).images[0]
+            # NSFW/Violence negative prompt forced injection
+            negative_prompt = 'nsfw, nude, naked, violence, blood, gore, sexually explicit, weapons, drugs, horror, disturbing, offensive, inappropriate, pornographic, erotic, suggestive'
+            image = self.pipe(prompt=prompt, negative_prompt=negative_prompt, num_inference_steps=30).images[0]
             
             # Convert to Base64
             buffered = BytesIO()

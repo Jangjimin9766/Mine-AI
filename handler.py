@@ -99,6 +99,34 @@ def handler(event):
         return {"error": str(e), "traceback": traceback.format_exc()}
 
 
+def validate_topic(topic: str) -> dict:
+    """
+    Validate topic for meaningless or harmful keywords.
+    Returns None if valid, error dict if invalid.
+    """
+    if not topic or not topic.strip():
+        return {"error": "topic is required"}
+    
+    topic_stripped = topic.strip()
+    
+    # 1. Too short (single character / meaningless)
+    if len(topic_stripped) <= 1:
+        return {"error": "INVALID_TOPIC", "message": "Please provide a more specific topic (at least 2 characters)."}
+    
+    # 2. Harmful/NSFW keyword blocklist
+    blocked_keywords = [
+        "nsfw", "porn", "sex", "nude", "naked", "erotic", "hentai",
+        "kill", "murder", "suicide", "terrorism", "drug",
+        "gore", "torture", "abuse",
+    ]
+    topic_lower = topic_stripped.lower()
+    for keyword in blocked_keywords:
+        if keyword in topic_lower:
+            return {"error": "BLOCKED_TOPIC", "message": "This topic contains inappropriate content and cannot be used."}
+    
+    return None
+
+
 def handle_create_magazine(data: dict) -> dict:
     """
     Handle magazine creation request.
@@ -109,8 +137,10 @@ def handle_create_magazine(data: dict) -> dict:
     user_interests = data.get("user_interests", [])
     user_mood = data.get("user_mood")
     
-    if not topic:
-        return {"error": "topic is required"}
+    # Pre-filtering: block nonsense and harmful topics
+    validation_error = validate_topic(topic)
+    if validation_error:
+        return validation_error
     
     logger.info(f"📰 Creating magazine for topic: {topic}")
     if user_mood:

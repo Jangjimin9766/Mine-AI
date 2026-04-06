@@ -391,3 +391,34 @@ def search_with_pexels(query: str, orientation: str = 'landscape', per_page: int
     except Exception as e:
         print(f"❌ Pexels Error: {e}")
         return []
+
+def scrape_labeled_sources(urls: list, max_count: int = 3) -> tuple:
+    """
+    [One Source One Use] Returns labeled source blocks per URL.
+    Each source is a (url, content) tuple for per-section source tracking.
+    
+    Returns:
+        (labeled_sources, scraped_images) tuple
+        - labeled_sources: [(url, content), ...] list
+        - scraped_images: extracted image URL list
+    """
+    labeled_sources = []
+    scraped_images = []
+    seen_images = set()
+    
+    for i, url in enumerate(urls[:max_count]):
+        print(f"[Source {i+1}] Jina crawling: {url[:80]}...")
+        content = scrape_with_jina(url)
+        if content:
+            labeled_sources.append((url, content))
+            images = extract_images_from_content(content)
+            for img in images:
+                if img not in seen_images:
+                    seen_images.add(img)
+                    scraped_images.append(img)
+            print(f"  Source {i+1}: {len(content)} chars, {len(images)} images")
+        else:
+            print(f"  Source {i+1} failed, skipping...")
+    
+    print(f"Labeled: {len(labeled_sources)} sources, {len(scraped_images)} images")
+    return labeled_sources, scraped_images
