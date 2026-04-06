@@ -121,7 +121,7 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
 
     [CRITICAL STRUCTURE RULES]
     - Return EXACTLY 3 paragraphs in the "paragraphs" array
-    - Each paragraph: subtitle (10-30 chars) + text (600-800 chars) + image_search_keyword (3 words)
+    - Each paragraph: subtitle (10-30 chars) + text (600-800 characters REQUIRED) + image_search_keyword (3 words)
     - Heading: Korean, concise
     - thumbnail_search_keyword: English noun for a landscape/lifestyle photo
     - NO Markdown formatting like ### or > in text fields
@@ -223,7 +223,7 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
 
     [CRITICAL STRUCTURE RULES]
     - Return EXACTLY 3 paragraphs in the "paragraphs" array
-    - Each paragraph: subtitle (Korean, 10-30 chars) + text (Korean, 150-300 chars) + image_search_keyword (English, max 3 words)
+    - Each paragraph: subtitle (Korean, 10-30 chars) + text (Korean, 600-800 characters REQUIRED) + image_search_keyword (English, max 3 words)
     - Section heading: Korean, concise and brand-like
     - thumbnail_search_keyword: English noun for a wide landscape photo
     - DO NOT use Markdown formatting like ### or > in text fields
