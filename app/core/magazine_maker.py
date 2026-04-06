@@ -1,7 +1,7 @@
 from app.core.llm_client import llm_client
 import json
 from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images, scrape_multiple_with_jina, scrape_labeled_sources, validate_image_url, search_with_pexels
-from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V6
+from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V7
 from concurrent.futures import ThreadPoolExecutor
 import threading
 
@@ -21,7 +21,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     # Increase max_results to ensure 9+ unique sources
     search_results, images = search_with_tavily(topic, topic=topic)
     
-    # 2. [One Source One Paragraph] Labeled source scraping (Up to 9)
+    # 2. [Parallel Scraping V2] Labeled source scraping (Up to 9)
     labeled_sources = []
     scraped_images = []
     if search_results:
@@ -40,13 +40,13 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     # 3. Build labeled research material (Source 1 to 9)
     labeled_material = ""
     for i, (url, content) in enumerate(labeled_sources):
-        truncated = content[:1500] if content else "No content available."
+        truncated = content[:2000] if content else "No content available."
         labeled_material += f"\n[Source {i+1}: {url}]\n{truncated}\n"
     
     if not labeled_material.strip():
         labeled_material = "No research material available. Use general knowledge only."
 
-    system_prompt = MAGAZINE_SYSTEM_PROMPT_V6
+    system_prompt = MAGAZINE_SYSTEM_PROMPT_V7
     user_prompt = f"""
     Topic: {topic}
     {interest_context}
@@ -55,13 +55,15 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     {labeled_material}
     [Available Images]
     {json.dumps(images, ensure_ascii=False)}
-    Create a premium magazine article with structured JSON.
-    Remember the flexible source allocation rule: Prioritize one source per paragraph (9 total), but can share if a source is exceptionally deep.
-    Do NOT generate magazine-level subtitle or introduction.
-    Every paragraph MUST include a source_url.
+    
+    당신은 전문적인 한국어 잡지 에디터입니다.
+    1. 출처 9개를 활용하여 3개 섹션(각 3개 문단)을 만드세요.
+    2. 모든 내용은 반드시 한국어로 작성하세요 (소스가 영어여도 한국어로 번역/윤문).
+    3. 매거진 레벨의 subtitle(부제)이나 introduction(표지 소개글)을 생성하지 마세요.
+    4. 모든 문단에 source_url을 반드시 포함하세요.
     """
 
-    print(f"AI Crafting V6 magazine (V2 Schema Sync)...")
+    print(f"AI Crafting V7 magazine (Professional Korean Editor)...")
     result_json = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
     
     # Handle Safety/NSFW Errors
@@ -84,7 +86,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                 elif source_count > 0:
                     para['source_url'] = labeled_sources[0][0]
 
-    # V2 Field Cleanup: Remove unused root fields
+    # V2 Field Cleanup: Remove unused root fields (V7 Safety)
     result_json.pop('subtitle', None)
     result_json.pop('introduction', None)
     
@@ -164,5 +166,5 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
             elif real_tavily_images: result_json['cover_image_url'] = real_tavily_images[0]
             else: result_json['cover_image_url'] = images[0] if images else ""
 
-    print(f"V6 Magazine created: {len(result_json.get('sections', []))} sections with paragraph-level source tracking")
+    print(f"V7 Magazine created: 3 sections with parallel research and paragraph-level source tracking")
     return result_json

@@ -116,20 +116,18 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
         except: pass
     
     system_prompt = """
-    You are REWRITING a section for a premium lifestyle magazine.
-    Follow the user's instruction and expand the content into EXACTLY 3 paragraphs.
-
-    [CRITICAL STRUCTURE RULES]
-    - Return EXACTLY 3 paragraphs in the "paragraphs" array
-    - Each paragraph: subtitle (10-30 chars) + text (600-800 characters REQUIRED) + image_search_keyword (3 words)
-    - Heading: Korean, concise
-    - thumbnail_search_keyword: English noun for a landscape/lifestyle photo
-    - NO Markdown formatting like ### or > in text fields
-
-    [TONE & STYLE]
-    - Refined, formal Korean (습니다/입니다)
-    - Use specific details (numbers, brands, facts)
-    - Instruction to follow: {instruction}
+    You are a professional Korean magazine editor rewriting a section for 'M:ine'.
+    
+    [EDITORIAL MISSION]
+    - Persona: Refined, authoritative Korean editor.
+    - Language: ALL content MUST be in Korean.
+    - Structure: EXACTLY 3 paragraphs in the "paragraphs" array.
+    - Each paragraph: subtitle (10-30 chars) + text (600-800 characters REQUIRED) + image_search_keyword (English, 3 words)
+    - Heading: Korean, concise.
+    
+    [SOURCE INTEGRITY]
+    - Every paragraph MUST include a `source_url`.
+    - Content: {instruction}
 
     Output JSON EXACTLY:
     {
@@ -241,20 +239,19 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     existing_headings = [s.get('heading', '') for s in magazine_data.get('sections', [])]
     
     system_prompt = """
-    You are adding a new section to a premium lifestyle magazine.
-    Create a high-quality section with EXACTLY 3 paragraphs.
+    You are a professional Korean magazine editor adding a new section to 'M:ine'.
+    
+    [EDITORIAL MISSION]
+    - Persona: Professional, data-driven, sophisticated.
+    - Language: ALL content MUST be in Korean.
+    - Structure: EXACTLY 3 sections, 3 paragraphs each.
+    - Every paragraph MUST include a `source_url`.
+    - No Root Metadata: Do NOT include root-level `introduction` or `subtitle`.
 
-    [CRITICAL STRUCTURE RULES]
-    - Return EXACTLY 3 paragraphs in the "paragraphs" array
-    - Each paragraph: subtitle (Korean, 10-30 chars) + text (Korean, 600-800 characters REQUIRED) + image_search_keyword (English, max 3 words)
-    - Section heading: Korean, concise and brand-like
-    - thumbnail_search_keyword: English noun for a wide landscape photo
-    - DO NOT use Markdown formatting like ### or > in text fields
-
-    [EDITORIAL STANDARDS]
-    - Data-Driven: Use specific facts from [Research Results]
-    - Tone: Refined, sophisticated Korean (습니다/입니다)
-    - Originality: Do not repeat existing section topics
+    [CONTENT RULES]
+    - Heading: Korean, brand-like.
+    - Paragraph: subtitle (Korean) + text (600-800 chars Korean) + image_search_keyword (English nouns).
+    - Originality: Do not repeat existing topics: {existing_headings}
 
     Output JSON EXACTLY:
     {
