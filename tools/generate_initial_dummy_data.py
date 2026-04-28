@@ -9,6 +9,7 @@
 - MINE_AI_URL (default: http://localhost:8000)
 - MINE_SERVER_BULK_URL (optional)
 - MINE_SERVER_BEARER_TOKEN (optional)
+- MINE_INTERNAL_SECRET_KEY (optional; for /api/internal/* endpoints)
 """
 
 from __future__ import annotations
@@ -93,6 +94,10 @@ def maybe_upload_to_server(seed_data: List[Dict[str, Any]]) -> None:
     token = os.getenv("MINE_SERVER_BEARER_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
+
+    internal_key = os.getenv("MINE_INTERNAL_SECRET_KEY")
+    if internal_key and "/api/internal/" in bulk_url:
+        headers["X-Internal-Key"] = internal_key
 
     payload = {"items": seed_data, "source": "mine-ai-bootstrap-script"}
     response = requests.post(bulk_url, json=payload, headers=headers, timeout=120)

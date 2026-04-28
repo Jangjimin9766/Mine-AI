@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     
     # 보안 키
     PYTHON_API_KEY: str = "mine-secret-key-1234"
+
+    # Mine-server internal API key (X-Internal-Key)
+    # Must match EC2 `/opt/mine/.env` value.
+    MINE_INTERNAL_SECRET_KEY: str = ""
     
     # Logtail (Better Stack) 로깅
     LOGTAIL_SOURCE_TOKEN: str = ""  # Better Stack에서 발급받은 토큰

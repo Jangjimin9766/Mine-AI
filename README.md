@@ -47,6 +47,16 @@ M:ine AI는 사용자가 원하는 어떤 주제든 실시간으로 웹 검색�
 - Spring 서버가 MySQL 저장 및 비즈니스 로직 처리
 - RESTful API 설계로 완전한 분리
 
+#### Internal Callback (Optional)
+RunPod(Serverless)에서 Mine-server로 직접 저장 콜백을 보내려면 아래 환경변수를 설정합니다.
+- `SPRING_API_URL` (예: `https://api.minelover.com`)
+- `MINE_INTERNAL_SECRET_KEY` (Mine-server EC2 `/opt/mine/.env`의 `MINE_INTERNAL_SECRET_KEY`와 동일)
+- `ENABLE_SPRING_INTERNAL_CALLBACK=true`
+
+동작:
+- `create_magazine` 실행 후 `POST {SPRING_API_URL}/api/internal/magazine`
+- 헤더: `X-Internal-Key: {MINE_INTERNAL_SECRET_KEY}`
+
 ### 🚀 **6. RunPod Serverless 배포 & CI/CD**
 - **GPU 서버리스**: RunPod Serverless로 RTX 4090 GPU 활용
 - **자동 배포**: GitHub Actions → Docker Hub → RunPod 자동 배포

@@ -154,6 +154,26 @@ def handle_create_magazine(data: dict) -> dict:
     
     if not result:
         return {"error": "Failed to generate magazine"}
+
+    # Optional: callback to Mine-server internal API.
+    # Disabled by default to avoid double-write unless explicitly enabled.
+    try:
+        enable_callback = os.getenv("ENABLE_SPRING_INTERNAL_CALLBACK", "").lower() in ("1", "true", "yes")
+        if enable_callback:
+            from app.core.spring_internal_client import SpringInternalClient
+            client = SpringInternalClient.from_env()
+            if client is None:
+                logger.warning("Spring internal callback enabled but missing SPRING_API_URL or MINE_INTERNAL_SECRET_KEY")
+            else:
+                user_email = data.get("user_email") or result.get("userEmail") or result.get("user_email")
+                payload = dict(result)
+                # Ensure userEmail is present for Mine-server save flow
+                if user_email and "userEmail" not in payload:
+                    payload["userEmail"] = user_email
+                client.post_internal("/api/internal/magazine", payload)
+                logger.info("✅ Spring internal callback /api/internal/magazine succeeded")
+    except Exception as e:
+        logger.error(f"❌ Spring internal callback failed: {e}")
     
     return result
 
