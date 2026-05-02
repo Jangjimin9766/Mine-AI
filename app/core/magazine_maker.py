@@ -90,7 +90,7 @@ def _normalize_magazine_contract(result_json: dict, topic: str) -> dict:
 
 
 def _needs_contract_repair(result_json: dict) -> bool:
-    if len(result_json.get('sections', [])) != 3:
+    if len(result_json.get('sections', [])) != 2:
         return True
     for section in result_json.get('sections', []):
         if len(section.get('paragraphs', [])) != 3:
@@ -122,7 +122,7 @@ def _repair_magazine_contract(result_json: dict, topic: str, labeled_material: s
     [Repair Rules]
     - 유효한 JSON 객체만 반환한다. 코드블럭과 설명은 금지한다.
     - 최상위 필드는 `title`, `tags`, `sections`, `cover_image_url`만 유지한다.
-    - 정확히 3개 섹션, 각 섹션 정확히 3개 문단을 유지한다.
+    - 정확히 2개 섹션, 각 섹션 정확히 3개 문단을 유지한다.
     - 섹션에 `layout_type`, `layout_hint`를 넣지 않는다.
     - 각 문단의 `text`는 반드시 한국어 350~550자로 확장한다.
     - 각 문단의 `text` 안에는 URL이나 `[source_url]:` 표기를 넣지 않는다.
@@ -218,15 +218,17 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     search_query = f"{original_topic} {topic}" if original_topic != topic else topic
     search_results, images = search_with_tavily(search_query, topic=topic)
     
-    # 2. [Parallel Scraping V2] Labeled source scraping (Up to 9)
+    # 2. [Parallel Scraping V2] Labeled source scraping
+    # Initial magazines use 2 sections x 3 paragraphs. We try 4 Jina sources
+    # so each section can be grounded by two deeper reads.
     labeled_sources = []
     scraped_images = []
     if search_results:
-        urls = [r['url'] for r in search_results[:12]]
-        labeled_sources, scraped_images = scrape_labeled_sources(urls, max_count=9)
+        urls = [r['url'] for r in search_results[:6]]
+        labeled_sources, scraped_images = scrape_labeled_sources(urls, max_count=4)
         
         if not labeled_sources and search_results:
-            for r in search_results[:9]:
+            for r in search_results[:4]:
                 labeled_sources.append((r.get('url', ''), r.get('content', '')))
         
         scraped_images = [img for img in scraped_images if validate_image_url(img)]
@@ -277,12 +279,15 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         result_json = force_translate_magazine_json(result_json)
         result_json = _normalize_magazine_contract(result_json, topic)
     
-    # 4. Ensure source_url fallback at the paragraph level (V2 Source Fallback Hack)
+    # 4. Ensure source_url fallback at the paragraph level.
+    # For 2-section magazines, map two Jina/Tavily sources per section:
+    # section 0 -> sources 0,1,0 / section 1 -> sources 2,3,2.
     source_count = len(labeled_sources)
     for s_idx, section in enumerate(result_json.get('sections', [])):
         for p_idx, para in enumerate(section.get('paragraphs', [])):
             if not para.get('source_url'):
-                fallback_idx = min(s_idx * 3 + p_idx, 8)
+                section_source_start = s_idx * 2
+                fallback_idx = section_source_start + (p_idx % 2)
                 if fallback_idx < source_count:
                     para['source_url'] = labeled_sources[fallback_idx][0]
                 elif source_count > 0:
@@ -291,8 +296,9 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     result_json = _expand_short_paragraphs(result_json, topic, labeled_material)
     result_json = _normalize_magazine_contract(result_json, topic)
 
-    # 5. Parallel image searching + moodboard generation
-    print(f"Parallelizing image searching and moodboard generation...")
+    # 5. Parallel image searching. Moodboard generation is intentionally
+    # handled by a separate request so magazine creation can return earlier.
+    print(f"Parallelizing image searching...")
     
     used_image_urls = set()
     if result_json.get('cover_image_url') and result_json['cover_image_url'].startswith('http'):
@@ -336,12 +342,6 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
 
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = []
-        from app.core.moodboard_maker import generate_moodboard
-        moodboard_future = executor.submit(
-            generate_moodboard, topic=topic, user_interests=user_interests,
-            magazine_tags=result_json.get('tags', []),
-            magazine_titles=[result_json.get('title', 'Untitled')], user_mood=user_mood
-        )
         for i, section in enumerate(result_json.get('sections', [])):
             section['display_order'] = i
             if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http'):
@@ -353,13 +353,6 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                     futures.append(executor.submit(assign_image_to_target, para, pq))
         for f in futures:
             f.result()
-        try:
-            moodboard_data = moodboard_future.result(timeout=180)
-            if moodboard_data:
-                result_json['moodboard'] = moodboard_data
-                print(f"Parallel Moodboard attached")
-        except Exception as e:
-            print(f"Moodboard parallel generation failed: {e}")
 
     if not result_json.get('cover_image_url') or not result_json['cover_image_url'].startswith('http'):
         with lock:
@@ -367,5 +360,5 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
             elif real_tavily_images: result_json['cover_image_url'] = real_tavily_images[0]
             else: result_json['cover_image_url'] = images[0] if images else ""
 
-    print(f"V8 Magazine created: 3 sections with parallel research and paragraph-level source tracking")
+    print(f"V8 Magazine created: 2 sections with parallel research and paragraph-level source tracking")
     return result_json

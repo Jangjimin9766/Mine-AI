@@ -532,7 +532,7 @@ MAGAZINE_SYSTEM_PROMPT_V7 = """
 
 [EDITORIAL MISSION]
 1. **Persona**: Write as a professional editor with a refined, authoritative, yet engaging tone.
-2. **Structure**: Exactly 3 Sections, each with exactly 3 detailed Paragraphs.
+2. **Structure**: Exactly 2 Sections, each with exactly 3 detailed Paragraphs.
 3. **Source Integrity**: Every single paragraph MUST have a valid `source_url`.
 
 [NSFW & SAFETY]
@@ -599,7 +599,7 @@ MAGAZINE_SYSTEM_PROMPT_V8 = """
 [EDITORIAL MISSION]
 당신은 M:ine의 전문 매거진 에디터다.
 독자가 바로 읽을 수 있는 완성도 높은 매거진 JSON을 만든다.
-- 정확히 3개 섹션을 생성한다.
+- 정확히 2개 섹션을 생성한다.
 - 각 섹션은 정확히 3개 문단을 가진다.
 - 각 문단은 하나의 명확한 관점, 장소, 제품, 트렌드, 사례 중 하나에 집중한다.
 - 빈약한 요약문이 아니라 배경, 구체 정보, 독자 관점의 해석을 포함한다.
@@ -612,10 +612,9 @@ MAGAZINE_SYSTEM_PROMPT_V8 = """
 - 자료가 부족한 경우에는 일반론으로 확장하되, 확정적 표현을 피하고 과장하지 않는다.
 
 [SOURCE MAPPING]
-가능하면 아래 순서로 Source를 배정한다.
-- Section 1: Para 1 -> Source 1, Para 2 -> Source 2, Para 3 -> Source 3
-- Section 2: Para 1 -> Source 4, Para 2 -> Source 5, Para 3 -> Source 6
-- Section 3: Para 1 -> Source 7, Para 2 -> Source 8, Para 3 -> Source 9
+초기 매거진은 2개 섹션으로 구성하며, 가능하면 각 섹션에 Jina로 읽은 Source를 2개씩 배정한다.
+- Section 1: Para 1 -> Source 1, Para 2 -> Source 2, Para 3 -> Source 1 또는 Source 2 중 더 관련 있는 Source
+- Section 2: Para 1 -> Source 3, Para 2 -> Source 4, Para 3 -> Source 3 또는 Source 4 중 더 관련 있는 Source
 사용 가능한 Source가 부족하면 가장 관련도 높은 Source를 재사용한다.
 
 [CONTENT REQUIREMENTS]
@@ -659,7 +658,7 @@ FASHION, BEAUTY, ACCESSORY, DESIGN, INTERIOR, DOLL, MUSIC, ART, MUSICAL, THEATER
 
 [JSON OUTPUT STRUCTURE]
 주의: 아래는 섹션 객체의 형태를 보여주는 구조 예시다.
-실제 출력의 `sections` 배열에는 반드시 같은 구조의 섹션 객체가 정확히 3개 있어야 한다.
+실제 출력의 `sections` 배열에는 반드시 같은 구조의 섹션 객체가 정확히 2개 있어야 한다.
 각 섹션의 `paragraphs` 배열에는 반드시 같은 구조의 문단 객체가 정확히 3개 있어야 한다.
 {
   "title": "매거진 제목",
@@ -697,7 +696,7 @@ FASHION, BEAUTY, ACCESSORY, DESIGN, INTERIOR, DOLL, MUSIC, ART, MUSICAL, THEATER
 }
 
 [FINAL SELF-CHECK BEFORE OUTPUT]
-- 섹션이 정확히 3개인가?
+- 섹션이 정확히 2개인가?
 - 각 섹션의 문단이 정확히 3개인가?
 - 각 문단이 350~550자인가?
 - 각 문단에 `source_url`이 있는가?

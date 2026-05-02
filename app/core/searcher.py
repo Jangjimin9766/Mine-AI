@@ -129,7 +129,10 @@ def scrape_with_jina(url: str):
         print("⚠️ JINA_API_KEY not set, trying without auth...")
     
     try:
-        response = requests.get(jina_url, headers=headers, timeout=10)
+        response = requests.get(jina_url, headers=headers, timeout=8)
+        if response.status_code == 402 and headers:
+            print("⚠️ Jina API key has insufficient balance, retrying without auth...")
+            response = requests.get(jina_url, timeout=8)
         if response.status_code == 200:
             print("✅ Jina read successful")
             return response.text  # 깔끔한 마크다운 텍스트 반환

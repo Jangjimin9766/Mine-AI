@@ -23,6 +23,8 @@ def handle_magazine_request(request: UnifiedMagazineRequest):
         return handle_edit_section(request)
     elif action == "generate_paragraph":
         return handle_generate_paragraph(request)
+    elif action == "generate_moodboard" or action == "create_moodboard":
+        return handle_generate_moodboard(request)
     else:
         raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
 
@@ -169,6 +171,24 @@ def handle_generate_paragraph(request: UnifiedMagazineRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def handle_generate_moodboard(request: UnifiedMagazineRequest):
+    """통합 action 기반 무드보드 생성"""
+    from app.core.moodboard_maker import generate_moodboard
+
+    result = generate_moodboard(
+        topic=request.topic,
+        user_mood=request.user_mood,
+        user_interests=request.user_interests,
+        magazine_tags=request.magazine_tags,
+        magazine_titles=request.magazine_titles
+    )
+
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to generate moodboard")
+
+    return result
 
 
 @router.post("/moodboard", response_model=MoodboardResponse)

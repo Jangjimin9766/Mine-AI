@@ -237,9 +237,17 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     try:
         search_results, images = search_with_tavily(search_query, topic=magazine_title)
         if search_results:
-            from app.core.searcher import scrape_labeled_sources
-            urls = [r['url'] for r in search_results[:5]]
+            urls = [r['url'] for r in search_results[:3]]
             labeled_sources, _ = scrape_labeled_sources(urls, max_count=3)
+            if len(labeled_sources) < 3:
+                used_urls = {url for url, _ in labeled_sources}
+                for r in search_results:
+                    url = r.get('url', '')
+                    if url and url not in used_urls:
+                        labeled_sources.append((url, r.get('content', '')))
+                        used_urls.add(url)
+                    if len(labeled_sources) >= 3:
+                        break
     except Exception as e:
         print(f"⚠️ Search failed: {e}")
     
@@ -259,13 +267,14 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     [EDITORIAL MISSION]
     - Persona: Professional, data-driven, sophisticated.
     - Language: ALL content MUST be in Korean.
-    - Structure: EXACTLY 3 sections, 3 paragraphs each.
+    - Structure: EXACTLY 1 section with EXACTLY 3 paragraphs.
     - Every paragraph MUST include a `source_url`.
+    - Use Source 1 for paragraph 1, Source 2 for paragraph 2, and Source 3 for paragraph 3 whenever available.
     - No Root Metadata: Do NOT include root-level `introduction` or `subtitle`.
 
     [CONTENT RULES]
     - Heading: Korean, brand-like.
-    - Paragraph: subtitle (Korean) + text (600-800 chars Korean) + image_search_keyword (English nouns).
+    - Paragraph: subtitle (Korean) + text (350-550 chars Korean) + image_search_keyword (English nouns).
     - Originality: Do not repeat existing topics: {existing_headings}
 
     Output JSON EXACTLY:
@@ -372,7 +381,7 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
     """
     섹션 맨 끝에 문단을 추가하기 위한 콘텐츠 생성
     """
-    from app.core.searcher import search_with_tavily
+    from app.core.searcher import search_with_tavily, scrape_with_jina
     from app.core.llm_client import llm_client
     import json
     
@@ -389,7 +398,11 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
     research_content = ""
     if search_results:
         source_url = search_results[0].get('url', None)
-        research_content = "\n".join([f"- {r.get('title')}: {r.get('content')[:200]}" for r in search_results[:1]])
+        jina_content = scrape_with_jina(source_url) if source_url else None
+        if jina_content:
+            research_content = f"[Jina Source: {source_url}]\n{jina_content[:1500]}"
+        else:
+            research_content = "\n".join([f"- {r.get('title')}: {r.get('content')[:300]}" for r in search_results[:1]])
     
     # 2. 기존 문단 텍스트 추출 (중복 방지)
     existing_text = "\n".join([f"Subtitle: {p.get('subtitle')}\nText: {p.get('text')}" for p in existing_paragraphs])
@@ -409,7 +422,7 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
     CRITICAL INSTRUCTIONS:
     1. Do NOT repeat what is already in the EXISTING PARAGRAPHS. Provide fresh information or a new perspective.
     2. Directly address the user's specific request: "{message}"
-    3. Use the provided [Research Results] to add specific facts, numbers, or deep insights.
+    3. Use the provided [Research Results], preferring Jina-read page content when available.
     4. Write in sophisticated, editorial Korean (합쇼체/해요체, ~습니다/~입니다).
     5. The 'text' should be a single continuous string in Markdown (NO HTML TAGS), with a length of 300-600 characters. Use **bold** or italics naturally.
     6. Generate a specific `image_search_keyword` in ENGLISH NOUNS ONLY (Max 3 words) optimized for Pexels stock photo search.

@@ -2,8 +2,12 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 
 class MoodboardResponse(BaseModel):
-    image_url: str
-    description: str
+    image_url: Optional[str] = None
+    description: Optional[str] = None
+    success: Optional[bool] = None
+    error: Optional[str] = None
+    error_type: Optional[str] = None
+    fallback_url: Optional[str] = None
 
 
 class Paragraph(BaseModel):
@@ -65,6 +69,8 @@ class UnifiedMagazineRequest(BaseModel):
     user_email: Optional[str] = None
     user_mood: Optional[str] = None
     user_interests: Optional[List[str]] = None
+    magazine_tags: Optional[List[str]] = None
+    magazine_titles: Optional[List[str]] = None
     
     # edit_magazine용
     magazine_id: Optional[int] = None
