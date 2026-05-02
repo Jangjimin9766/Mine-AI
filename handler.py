@@ -76,6 +76,7 @@ def handler(event):
         elif action == "health":
             # 상세 헬스체크 - API 설정 상태 포함
             from app.core.llm_client import llm_client
+            from app.version import get_runtime_info
             try:
                 from app.core.local_diffusion_client import local_diffusion_client
                 diffusion_status = local_diffusion_client.get_status()
@@ -85,6 +86,7 @@ def handler(event):
             return {
                 "status": "healthy", 
                 "message": "M:ine AI Serverless is running",
+                **get_runtime_info(),
                 "config_status": {
                     "openai_configured": llm_client.is_configured(),
                     "diffusion_status": diffusion_status

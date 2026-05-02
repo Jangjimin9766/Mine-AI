@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import agent, analysis, crawling, magazine, chat
 from app.config import settings
+from app.version import get_runtime_info
 
 app = FastAPI(title="M:ine AI Server")
 
@@ -40,8 +41,14 @@ app.include_router(chat.router, prefix="/api/magazine", tags=["chat"], dependenc
 
 @app.get("/")
 def read_root():
-    return {"message": "M:ine AI Server is running"}
+    return {
+        "message": "M:ine AI Server is running",
+        **get_runtime_info()
+    }
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        **get_runtime_info()
+    }
