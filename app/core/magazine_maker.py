@@ -1,6 +1,8 @@
 from app.core.llm_client import llm_client
 import json
 import re
+import time
+import uuid
 from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images, scrape_multiple_with_jina, scrape_labeled_sources, validate_image_url, search_with_pexels
 from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V8
 from app.core.utils import is_mostly_english, translate_to_korean, force_translate_magazine_json
@@ -194,15 +196,46 @@ def _expand_short_paragraphs(result_json: dict, topic: str, labeled_material: st
             print(f"⚠️ Paragraph expansion failed for section '{section.get('heading', '')}': {e}")
     return result_json
 
-def generate_magazine_content(topic: str, user_interests: list = None, user_mood: str = None):
-    print(f"Magazine Editor started for: {topic}")
+def _log_create_timing(request_id: str, timings: dict, result_json: dict, errors: list, skipped_steps: list):
+    sections = result_json.get('sections', []) if isinstance(result_json, dict) else []
+    paragraph_counts = [len(section.get('paragraphs', [])) for section in sections]
+    moodboard = result_json.get('moodboard') if isinstance(result_json, dict) else None
+    summary = {
+        **timings,
+        "sections_count": len(sections),
+        "paragraph_counts": paragraph_counts,
+        "has_moodboard": bool(moodboard),
+        "moodboard_image_url_present": bool(moodboard and moodboard.get('image_url')),
+        "errors": errors,
+        "skipped_steps": skipped_steps,
+    }
+    print(f"[create_magazine][request_id={request_id}] timing: {json.dumps(summary, ensure_ascii=False)}")
+
+
+def generate_magazine_content(topic: str, user_interests: list = None, user_mood: str = None, request_id: str = None, runpod_handler_start_time: float = 0):
+    request_id = request_id or str(uuid.uuid4())[:8]
+    total_start = time.perf_counter()
+    timings = {
+        "request_received_time": 0,
+        "runpod_handler_start_time": round(runpod_handler_start_time, 3),
+        "paragraph_image_download_time": 0,
+        "s3_upload_time": 0,
+        "moodboard_upload_time": 0,
+    }
+    errors = []
+    skipped_steps = []
+    print(f"[create_magazine][request_id={request_id}] Magazine Editor started for: {topic}")
     
     # [Language Guard] Translate English topic to Korean to set the "Korean Persona" early
     original_topic = topic
     if is_mostly_english(topic):
+        translation_start = time.perf_counter()
         korean_topic = translate_to_korean(topic, "magazine topic")
+        timings["topic_translation_time"] = round(time.perf_counter() - translation_start, 3)
         print(f"  -> Input translation: {original_topic} -> {korean_topic}")
         topic = korean_topic
+    else:
+        timings["topic_translation_time"] = 0
 
     # 1. Context building
     interest_context = ""
@@ -214,9 +247,20 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     if user_mood:
         mood_context = f"[User Mood]\nThe user wants a '{user_mood}' style.\n"
 
+    moodboard_executor = ThreadPoolExecutor(max_workers=1)
+    from app.core.moodboard_maker import generate_moodboard
+    moodboard_future = moodboard_executor.submit(
+        generate_moodboard, topic=topic, user_interests=user_interests,
+        magazine_tags=[], magazine_titles=[topic], user_mood=user_mood,
+        request_id=request_id
+    )
+    timings["moodboard_submit_time"] = round(time.perf_counter() - total_start, 3)
+
     # Search with original (if English) + Korean for maximum relevance
     search_query = f"{original_topic} {topic}" if original_topic != topic else topic
+    web_search_start = time.perf_counter()
     search_results, images = search_with_tavily(search_query, topic=topic)
+    timings["web_search_time"] = round(time.perf_counter() - web_search_start, 3)
     
     # 2. [Parallel Scraping V2] Labeled source scraping
     # Initial magazines use 2 sections x 3 paragraphs. We try 4 Jina sources
@@ -225,13 +269,22 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     scraped_images = []
     if search_results:
         urls = [r['url'] for r in search_results[:6]]
+        scrape_start = time.perf_counter()
         labeled_sources, scraped_images = scrape_labeled_sources(urls, max_count=4)
+        timings["jina_scrape_time"] = round(time.perf_counter() - scrape_start, 3)
         
         if not labeled_sources and search_results:
             for r in search_results[:4]:
                 labeled_sources.append((r.get('url', ''), r.get('content', '')))
+            skipped_steps.append("jina_all_failed_used_tavily_snippets")
         
+        validation_start = time.perf_counter()
         scraped_images = [img for img in scraped_images if validate_image_url(img)]
+        timings["scraped_image_validation_time"] = round(time.perf_counter() - validation_start, 3)
+    else:
+        timings["jina_scrape_time"] = 0
+        timings["scraped_image_validation_time"] = 0
+        skipped_steps.append("no_search_results_for_jina")
 
     # 3. Build labeled research material
     labeled_material = ""
@@ -260,11 +313,17 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     """
 
     print(f"AI Crafting V8 magazine (Source-grounded Korean Editor)...")
+    content_start = time.perf_counter()
     result_json = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+    timings["content_generation_time"] = round(time.perf_counter() - content_start, 3)
     
     # Handle Safety/NSFW Errors
     if "error" in result_json:
         print(f"⚠️ AI Server Policy Triggered: {result_json.get('error')}")
+        errors.append(f"content_error:{result_json.get('error')}")
+        moodboard_executor.shutdown(wait=False, cancel_futures=True)
+        timings["total_time"] = round(time.perf_counter() - total_start, 3)
+        _log_create_timing(request_id, timings, result_json, errors, skipped_steps)
         return result_json
 
     if result_json.get('thought_process'):
@@ -275,9 +334,13 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     result_json = _normalize_magazine_contract(result_json, topic)
     if _needs_contract_repair(result_json):
         print("🛠️ Repairing magazine contract (length/schema)...")
+        repair_start = time.perf_counter()
         result_json = _repair_magazine_contract(result_json, topic, labeled_material)
+        timings["contract_repair_time"] = round(time.perf_counter() - repair_start, 3)
         result_json = force_translate_magazine_json(result_json)
         result_json = _normalize_magazine_contract(result_json, topic)
+    else:
+        timings["contract_repair_time"] = 0
     
     # 4. Ensure source_url fallback at the paragraph level.
     # For 2-section magazines, map two Jina/Tavily sources per section:
@@ -293,7 +356,9 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                 elif source_count > 0:
                     para['source_url'] = labeled_sources[0][0]
 
+    expand_start = time.perf_counter()
     result_json = _expand_short_paragraphs(result_json, topic, labeled_material)
+    timings["paragraph_expansion_time"] = round(time.perf_counter() - expand_start, 3)
     result_json = _normalize_magazine_contract(result_json, topic)
 
     # 5. Parallel image searching + moodboard generation.
@@ -342,12 +407,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
 
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = []
-        from app.core.moodboard_maker import generate_moodboard
-        moodboard_future = executor.submit(
-            generate_moodboard, topic=topic, user_interests=user_interests,
-            magazine_tags=result_json.get('tags', []),
-            magazine_titles=[result_json.get('title', 'Untitled')], user_mood=user_mood
-        )
+        image_search_start = time.perf_counter()
         for i, section in enumerate(result_json.get('sections', [])):
             section['display_order'] = i
             if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http'):
@@ -359,26 +419,44 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                     futures.append(executor.submit(assign_image_to_target, para, pq))
         for f in futures:
             f.result()
+        timings["paragraph_image_search_time"] = round(time.perf_counter() - image_search_start, 3)
         try:
             # Do not use a timeout here. If this times out inside the
             # ThreadPoolExecutor context, Python still waits for the running
             # future during executor shutdown, but the moodboard result is
             # discarded. Spring expects create_magazine to include moodboard
             # when generation eventually succeeds.
+            moodboard_wait_start = time.perf_counter()
             moodboard_data = moodboard_future.result()
+            timings["moodboard_wait_after_content_time"] = round(time.perf_counter() - moodboard_wait_start, 3)
             if moodboard_data and moodboard_data.get('image_url'):
                 result_json['moodboard'] = moodboard_data
+                if isinstance(moodboard_data.get("timing"), dict):
+                    timings.update(moodboard_data["timing"])
                 print(f"Parallel Moodboard attached: {moodboard_data.get('image_url', '')[:40]}")
             else:
+                errors.append(f"moodboard_no_usable_image:{moodboard_data}")
                 print(f"Moodboard generation returned no usable image: {moodboard_data}")
         except Exception as e:
+            timings["moodboard_wait_after_content_time"] = round(time.perf_counter() - moodboard_wait_start, 3)
+            errors.append(f"moodboard_exception:{type(e).__name__}:{e}")
             print(f"Moodboard parallel generation failed: {type(e).__name__}: {e}")
+        finally:
+            moodboard_executor.shutdown(wait=True)
 
+    assembly_start = time.perf_counter()
     if not result_json.get('cover_image_url') or not result_json['cover_image_url'].startswith('http'):
         with lock:
             if scraped_images: result_json['cover_image_url'] = scraped_images[0]
             elif real_tavily_images: result_json['cover_image_url'] = real_tavily_images[0]
             else: result_json['cover_image_url'] = images[0] if images else ""
+    timings["final_json_assembly_time"] = round(time.perf_counter() - assembly_start, 3)
+    timings["total_time"] = round(time.perf_counter() - total_start, 3)
+
+    if not result_json.get("moodboard") or not result_json["moodboard"].get("image_url"):
+        _log_create_timing(request_id, timings, result_json, errors, skipped_steps)
+        raise RuntimeError("Moodboard generation is required for create_magazine but no moodboard.image_url was produced")
 
     print(f"V8 Magazine created: 2 sections with parallel research and paragraph-level source tracking")
+    _log_create_timing(request_id, timings, result_json, errors, skipped_steps)
     return result_json

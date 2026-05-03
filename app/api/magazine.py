@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from app.models.magazine import Magazine, MagazineRequest, MoodboardRequest, MoodboardResponse, UnifiedMagazineRequest
 from app.core.magazine_maker import generate_magazine_content
+import uuid
 
 router = APIRouter()
 
@@ -36,10 +37,12 @@ def handle_create_magazine(request: UnifiedMagazineRequest):
         raise HTTPException(status_code=400, detail="topic is required for create_magazine")
     
     try:
+        request_id = str(uuid.uuid4())[:8]
         magazine_data = generate_magazine_content(
             topic=request.topic,
             user_interests=request.user_interests,
-            user_mood=request.user_mood
+            user_mood=request.user_mood,
+            request_id=request_id
         )
         
         if not magazine_data:

@@ -16,4 +16,8 @@ def get_runtime_info() -> dict:
         "paragraphs_per_section": 3,
         "moodboard_in_create": True,
         "moodboard_generation": "included_in_create_magazine",
+        "timing_logging_enabled": True,
+        "moodboard_required_in_create": True,
+        "sdxl_inference_steps_default": int(os.getenv("SDXL_INFERENCE_STEPS", "20")),
+        "optimization_profile": "timed_create_magazine_fast_sdxl",
     }

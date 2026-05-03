@@ -1,8 +1,9 @@
 from app.core.llm_client import llm_client
 from app.core.local_diffusion_client import local_diffusion_client
 import traceback
+import time
 
-def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None) -> str:
+def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None, request_id: str = None) -> str:
     """
     Generate a detailed prompt for Stable Diffusion (SDXL) based on the user's magazine context.
     Focus on creating an atmospheric BACKGROUND/WALLPAPER.
@@ -81,7 +82,7 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     5. **Style**: Premium magazine editorial style (Kinfolk, Magazine B, Vogue quality).
     
     [PROMPT STRUCTURE]
-    [Subject Detail with concrete objects], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: 8k, photorealistic, mastery, masterpiece]
+    [Subject Detail with concrete objects], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: photorealistic, premium editorial]
     
     [CRITICAL CONSTRAINTS]
     - **NSFW POLICY**: NEVER generate prompts for pornography, explicit sexual acts, extreme violence, or illegal content.
@@ -106,7 +107,7 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
 FALLBACK_MOODBOARD_IMAGES = []
 
 
-def generate_moodboard(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None) -> dict:
+def generate_moodboard(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None, request_id: str = None) -> dict:
     """
     Orchestrates the moodboard generation process using Stable Diffusion.
     Returns structured response with success indicator and fallback on failure.
@@ -120,14 +121,20 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
     # 토픽이 없으면 태그나 타이틀로 대체 토픽 설정 (로깅용)
     display_topic = topic or (magazine_titles[0] if magazine_titles else "User Profile")
     
-    print(f"🎨 Generating Background Moodboard (SDXL) for: {display_topic}")
+    start_time = time.perf_counter()
+    timings = {}
+    log_prefix = f"[moodboard][request_id={request_id}]" if request_id else "[moodboard]"
+    print(f"{log_prefix} 🎨 Generating Background Moodboard (SDXL) for: {display_topic}")
 
     # 1. Generate Prompt
     try:
-        sd_prompt = generate_moodboard_prompt(topic, user_mood, user_interests, magazine_tags, magazine_titles)
-        print(f"✨ SDXL Prompt: {sd_prompt}")
+        prompt_start = time.perf_counter()
+        sd_prompt = generate_moodboard_prompt(topic, user_mood, user_interests, magazine_tags, magazine_titles, request_id=request_id)
+        timings["moodboard_prompt_generation_time"] = round(time.perf_counter() - prompt_start, 3)
+        print(f"{log_prefix} ✨ SDXL Prompt: {sd_prompt}")
     except Exception as e:
-        print(f"❌ Prompt generation failed: {e}")
+        timings["moodboard_prompt_generation_time"] = round(time.perf_counter() - start_time, 3)
+        print(f"{log_prefix} ❌ Prompt generation failed: {e}")
         sd_prompt = None
 
     if not sd_prompt or sd_prompt.strip() == "FORBIDDEN_CONTENT":
@@ -137,15 +144,23 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
             "success": False,
             "fallback_url": None,
             "image_url": None,
-            "description": f"Safety filter blocked prompt generation for: {display_topic}"
+            "description": f"Safety filter blocked prompt generation for: {display_topic}",
+            "timing": {**timings, "moodboard_generation_time": round(time.perf_counter() - start_time, 3)}
         }
 
     # 2. Generate Image (Local SDXL)
     try:
-        print("🖼️ Generating image with SDXL...")
+        print(f"{log_prefix} 🖼️ Generating image with SDXL...")
+        image_start = time.perf_counter()
         image_url = local_diffusion_client.generate_image(sd_prompt)
+        timings["moodboard_image_generation_time"] = round(time.perf_counter() - image_start, 3)
+        timings.update({
+            f"diffusion_{key}": value
+            for key, value in getattr(local_diffusion_client, "last_timing", {}).items()
+        })
     except Exception as e:
-        print(f"❌ Image generation exception: {e}")
+        timings["moodboard_image_generation_time"] = round(time.perf_counter() - start_time, 3)
+        print(f"{log_prefix} ❌ Image generation exception: {e}")
         traceback.print_exc()
         image_url = None
     
@@ -156,13 +171,17 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
             "success": False,
             "fallback_url": None,
             "image_url": None,
-            "description": sd_prompt
+            "description": sd_prompt,
+            "timing": {**timings, "moodboard_generation_time": round(time.perf_counter() - start_time, 3)}
         }
         
-    print(f"✅ Moodboard Generated (Data URI)")
+    timings["moodboard_generation_time"] = round(time.perf_counter() - start_time, 3)
+    print(f"{log_prefix} ✅ Moodboard Generated (Data URI)")
+    print(f"{log_prefix} timing: {timings}")
 
     return {
         "image_url": image_url,  # This will be a Data URI (base64)
         "description": sd_prompt,
-        "success": True
+        "success": True,
+        "timing": timings
     }

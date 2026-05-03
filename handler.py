@@ -8,6 +8,8 @@ import os
 import json
 import traceback
 import sys
+import time
+import uuid
 
 # 로깅 설정 (Logtail + 콘솔)
 from app.core.logging_config import get_logger
@@ -134,6 +136,8 @@ def handle_create_magazine(data: dict) -> dict:
     Handle magazine creation request.
     """
     from app.core.magazine_maker import generate_magazine_content
+    handler_start = time.perf_counter()
+    request_id = data.get("request_id") or str(uuid.uuid4())[:8]
     
     topic = data.get("topic")
     user_interests = data.get("user_interests", [])
@@ -145,13 +149,16 @@ def handle_create_magazine(data: dict) -> dict:
         return validation_error
     
     logger.info(f"📰 Creating magazine for topic: {topic}")
+    logger.info(f"📰 create_magazine request_id={request_id}")
     if user_mood:
         logger.info(f"🎭 User mood: {user_mood}")
     
     result = generate_magazine_content(
         topic=topic,
         user_interests=user_interests,
-        user_mood=user_mood
+        user_mood=user_mood,
+        request_id=request_id,
+        runpod_handler_start_time=time.perf_counter() - handler_start
     )
     
     if not result:
