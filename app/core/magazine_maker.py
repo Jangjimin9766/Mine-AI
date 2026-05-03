@@ -296,9 +296,9 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     result_json = _expand_short_paragraphs(result_json, topic, labeled_material)
     result_json = _normalize_magazine_contract(result_json, topic)
 
-    # 5. Parallel image searching. Moodboard generation is intentionally
-    # handled by a separate request so magazine creation can return earlier.
-    print(f"Parallelizing image searching...")
+    # 5. Parallel image searching + moodboard generation.
+    # Spring expects create_magazine to return the moodboard when generation succeeds.
+    print(f"Parallelizing image searching and moodboard generation...")
     
     used_image_urls = set()
     if result_json.get('cover_image_url') and result_json['cover_image_url'].startswith('http'):
@@ -342,6 +342,12 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
 
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = []
+        from app.core.moodboard_maker import generate_moodboard
+        moodboard_future = executor.submit(
+            generate_moodboard, topic=topic, user_interests=user_interests,
+            magazine_tags=result_json.get('tags', []),
+            magazine_titles=[result_json.get('title', 'Untitled')], user_mood=user_mood
+        )
         for i, section in enumerate(result_json.get('sections', [])):
             section['display_order'] = i
             if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http'):
@@ -353,6 +359,15 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                     futures.append(executor.submit(assign_image_to_target, para, pq))
         for f in futures:
             f.result()
+        try:
+            moodboard_data = moodboard_future.result(timeout=180)
+            if moodboard_data and moodboard_data.get('image_url'):
+                result_json['moodboard'] = moodboard_data
+                print(f"Parallel Moodboard attached")
+            else:
+                print(f"Moodboard generation returned no usable image")
+        except Exception as e:
+            print(f"Moodboard parallel generation failed: {e}")
 
     if not result_json.get('cover_image_url') or not result_json['cover_image_url'].startswith('http'):
         with lock:

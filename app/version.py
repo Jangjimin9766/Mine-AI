@@ -14,6 +14,6 @@ def get_runtime_info() -> dict:
         "magazine_shape": "2x3",
         "sections_per_magazine": 2,
         "paragraphs_per_section": 3,
-        "moodboard_in_create": False,
-        "moodboard_generation": "separate_generate_moodboard_action",
+        "moodboard_in_create": True,
+        "moodboard_generation": "included_in_create_magazine",
     }
