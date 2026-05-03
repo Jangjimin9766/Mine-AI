@@ -360,14 +360,19 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         for f in futures:
             f.result()
         try:
-            moodboard_data = moodboard_future.result(timeout=180)
+            # Do not use a timeout here. If this times out inside the
+            # ThreadPoolExecutor context, Python still waits for the running
+            # future during executor shutdown, but the moodboard result is
+            # discarded. Spring expects create_magazine to include moodboard
+            # when generation eventually succeeds.
+            moodboard_data = moodboard_future.result()
             if moodboard_data and moodboard_data.get('image_url'):
                 result_json['moodboard'] = moodboard_data
-                print(f"Parallel Moodboard attached")
+                print(f"Parallel Moodboard attached: {moodboard_data.get('image_url', '')[:40]}")
             else:
-                print(f"Moodboard generation returned no usable image")
+                print(f"Moodboard generation returned no usable image: {moodboard_data}")
         except Exception as e:
-            print(f"Moodboard parallel generation failed: {e}")
+            print(f"Moodboard parallel generation failed: {type(e).__name__}: {e}")
 
     if not result_json.get('cover_image_url') or not result_json['cover_image_url'].startswith('http'):
         with lock:
