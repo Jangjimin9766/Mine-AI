@@ -1,5 +1,6 @@
 from app.core.llm_client import llm_client
 import json
+import os
 import re
 import time
 import uuid
@@ -221,6 +222,19 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         "paragraph_image_download_time": 0,
         "s3_upload_time": 0,
         "moodboard_upload_time": 0,
+        "spring_callback_enabled": os.getenv("ENABLE_SPRING_INTERNAL_CALLBACK", "").lower() in ("1", "true", "yes"),
+        "spring_callback_attempted": False,
+        "spring_callback_time": 0,
+        "spring_callback_success": False,
+        "spring_callback_error": "",
+        "spring_callback_payload_bytes": 0,
+        "spring_callback_payload_had_base64": False,
+        "jina_auth_disabled_for_request": False,
+        "jina_auth_failure_count": 0,
+        "jina_timeout_count": 0,
+        "jina_urls_attempted": 0,
+        "jina_urls_succeeded": 0,
+        "jina_urls_failed": 0,
     }
     errors = []
     skipped_steps = []
@@ -267,11 +281,26 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     # so each section can be grounded by two deeper reads.
     labeled_sources = []
     scraped_images = []
+    jina_state = {
+        "auth_disabled": False,
+        "auth_failure_count": 0,
+        "timeout_count": 0,
+        "urls_attempted": 0,
+        "urls_succeeded": 0,
+        "urls_failed": 0,
+    }
     if search_results:
-        urls = [r['url'] for r in search_results[:6]]
+        jina_max_urls = int(os.getenv("JINA_MAX_URLS", "3"))
+        urls = [r['url'] for r in search_results[:jina_max_urls]]
         scrape_start = time.perf_counter()
-        labeled_sources, scraped_images = scrape_labeled_sources(urls, max_count=4)
+        labeled_sources, scraped_images = scrape_labeled_sources(urls, max_count=jina_max_urls, request_state=jina_state)
         timings["jina_scrape_time"] = round(time.perf_counter() - scrape_start, 3)
+        timings["jina_auth_disabled_for_request"] = bool(jina_state.get("auth_disabled"))
+        timings["jina_auth_failure_count"] = jina_state.get("auth_failure_count", 0)
+        timings["jina_timeout_count"] = jina_state.get("timeout_count", 0)
+        timings["jina_urls_attempted"] = jina_state.get("urls_attempted", 0)
+        timings["jina_urls_succeeded"] = jina_state.get("urls_succeeded", 0)
+        timings["jina_urls_failed"] = jina_state.get("urls_failed", 0)
         
         if not labeled_sources and search_results:
             for r in search_results[:4]:

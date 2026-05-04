@@ -51,11 +51,17 @@ M:ine AI는 사용자가 원하는 어떤 주제든 실시간으로 웹 검색�
 RunPod(Serverless)에서 Mine-server로 직접 저장 콜백을 보내려면 아래 환경변수를 설정합니다.
 - `SPRING_API_URL` (예: `https://api.minelover.com`)
 - `MINE_INTERNAL_SECRET_KEY` (Mine-server EC2 `/opt/mine/.env`의 `MINE_INTERNAL_SECRET_KEY`와 동일)
-- `ENABLE_SPRING_INTERNAL_CALLBACK=true`
+- `ENABLE_SPRING_INTERNAL_CALLBACK=true` (기본값: `false`)
 
 동작:
 - `create_magazine` 실행 후 `POST {SPRING_API_URL}/api/internal/magazine`
 - 헤더: `X-Internal-Key: {MINE_INTERNAL_SECRET_KEY}`
+- callback payload에서는 `data:image/...;base64` 인라인 이미지를 제거해 413 Payload Too Large를 방지합니다.
+
+#### Jina Reader Speed Controls
+- `JINA_READ_TIMEOUT_SECONDS=5` (기본값: `5`)
+- `JINA_MAX_URLS=3` (기본값: `3`)
+- Jina 인증 잔액/권한 실패가 감지되면 같은 `create_magazine` 요청 안에서는 무인증 모드로 전환해 반복 재시도를 줄입니다.
 
 ### 🚀 **6. RunPod Serverless 배포 & CI/CD**
 - **GPU 서버리스**: RunPod Serverless로 RTX 4090 GPU 활용
@@ -215,9 +221,12 @@ TAVILY_API_KEY=tvly-...
 
 # Jina AI Reader API Key (선택, 없어도 작동)
 JINA_API_KEY=jina_...
+JINA_READ_TIMEOUT_SECONDS=5
+JINA_MAX_URLS=3
 
 # Spring Boot 서버 URL (Gateway 연동용)
 SPRING_API_URL=http://localhost:8080
+ENABLE_SPRING_INTERNAL_CALLBACK=false
 ```
 
 ### **5. 서버 실행 (로컬)**

@@ -10,6 +10,7 @@ import traceback
 import sys
 import time
 import uuid
+import threading
 
 # 로깅 설정 (Logtail + 콘솔)
 from app.core.logging_config import get_logger
@@ -45,6 +46,50 @@ logger.info("=" * 50)
 
 # Ensure environment variables are set for API clients
 # These will be passed via RunPod's environment configuration
+
+
+def _sanitize_callback_payload(value):
+    """
+    Remove inline base64 images before optional Spring callback.
+    Spring's normal create flow receives the full RunPod response directly;
+    this callback is only a legacy/optional path and must stay lightweight.
+    """
+    had_base64 = False
+
+    def sanitize(item):
+        nonlocal had_base64
+        if isinstance(item, str):
+            if item.startswith("data:image/") and "base64," in item[:64]:
+                had_base64 = True
+                return ""
+            return item
+        if isinstance(item, list):
+            return [sanitize(child) for child in item]
+        if isinstance(item, dict):
+            return {key: sanitize(child) for key, child in item.items()}
+        return item
+
+    return sanitize(value), had_base64
+
+
+def _post_spring_callback_async(client, payload, request_id: str, payload_bytes: int, had_base64: bool):
+    callback_start = time.perf_counter()
+    try:
+        client.post_internal("/api/internal/magazine", payload)
+        logger.info(
+            f"[create_magazine][request_id={request_id}] callback_timing: "
+            f"spring_callback_success=true spring_callback_time={time.perf_counter() - callback_start:.3f} "
+            f"spring_callback_payload_bytes={payload_bytes} spring_callback_payload_had_base64={had_base64}"
+        )
+        logger.info("✅ Spring internal callback /api/internal/magazine succeeded")
+    except Exception as e:
+        logger.error(
+            f"[create_magazine][request_id={request_id}] callback_timing: "
+            f"spring_callback_success=false spring_callback_time={time.perf_counter() - callback_start:.3f} "
+            f"spring_callback_payload_bytes={payload_bytes} spring_callback_payload_had_base64={had_base64} "
+            f"spring_callback_error={type(e).__name__}:{e}"
+        )
+        logger.error(f"❌ Spring internal callback failed: {e}")
 
 def handler(event):
     """
@@ -165,24 +210,34 @@ def handle_create_magazine(data: dict) -> dict:
         return {"error": "Failed to generate magazine"}
 
     # Optional: callback to Mine-server internal API.
-    # Disabled by default to avoid double-write unless explicitly enabled.
-    try:
-        enable_callback = os.getenv("ENABLE_SPRING_INTERNAL_CALLBACK", "").lower() in ("1", "true", "yes")
-        if enable_callback:
+    # Disabled by default to avoid double-write and 413s from inline base64 images.
+    enable_callback = os.getenv("ENABLE_SPRING_INTERNAL_CALLBACK", "false").lower() in ("1", "true", "yes")
+    if not enable_callback:
+        logger.info(f"[create_magazine][request_id={request_id}] Spring internal callback disabled")
+    else:
+        try:
             from app.core.spring_internal_client import SpringInternalClient
             client = SpringInternalClient.from_env()
             if client is None:
                 logger.warning("Spring internal callback enabled but missing SPRING_API_URL or MINE_INTERNAL_SECRET_KEY")
             else:
                 user_email = data.get("user_email") or result.get("userEmail") or result.get("user_email")
-                payload = dict(result)
+                payload, had_base64 = _sanitize_callback_payload(result)
                 # Ensure userEmail is present for Mine-server save flow
                 if user_email and "userEmail" not in payload:
                     payload["userEmail"] = user_email
-                client.post_internal("/api/internal/magazine", payload)
-                logger.info("✅ Spring internal callback /api/internal/magazine succeeded")
-    except Exception as e:
-        logger.error(f"❌ Spring internal callback failed: {e}")
+                payload_bytes = len(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+                logger.info(
+                    f"[create_magazine][request_id={request_id}] Spring internal callback enabled: "
+                    f"payload_bytes={payload_bytes}, payload_had_base64={had_base64}"
+                )
+                threading.Thread(
+                    target=_post_spring_callback_async,
+                    args=(client, payload, request_id, payload_bytes, had_base64),
+                    daemon=True,
+                ).start()
+        except Exception as e:
+            logger.error(f"❌ Spring internal callback setup failed: {e}")
     
     return result
 

@@ -1,4 +1,5 @@
 from tavily import TavilyClient
+import os
 import requests
 from app.config import settings
 
@@ -111,35 +112,65 @@ def search_with_tavily(query: str, topic: str = None):
         print(f"❌ Tavily Error: {e}, using fallback")
         return [], FALLBACK_IMAGES
 
-def scrape_with_jina(url: str):
+def _is_jina_auth_failure(status_code: int) -> bool:
+    return status_code in (401, 402, 403)
+
+
+def _jina_timeout_seconds() -> float:
+    return float(os.getenv("JINA_READ_TIMEOUT_SECONDS", "5"))
+
+
+def scrape_with_jina(url: str, request_state: dict = None):
     """
     Jina AI Reader를 사용하여 URL의 본문을 마크다운으로 깔끔하게 가져옵니다.
     실패해도 None을 반환하여 매거진 생성이 계속 진행됩니다.
     """
+    request_state = request_state if request_state is not None else {}
+    request_state.setdefault("auth_disabled", False)
+    request_state.setdefault("auth_failure_count", 0)
+    request_state.setdefault("timeout_count", 0)
+    request_state.setdefault("urls_attempted", 0)
+    request_state.setdefault("urls_succeeded", 0)
+    request_state.setdefault("urls_failed", 0)
+
+    request_state["urls_attempted"] += 1
     print(f"📖 Jina Reading: {url}")
     
     # Jina는 URL 앞에 'https://r.jina.ai/'만 붙이면 됩니다.
     jina_url = f"https://r.jina.ai/{url}"
     
     # API 키가 있을 때만 Authorization 헤더 추가 (없으면 무인증으로 시도)
+    timeout_seconds = _jina_timeout_seconds()
     headers = {}
-    if settings.JINA_API_KEY:
+    if settings.JINA_API_KEY and not request_state.get("auth_disabled"):
         headers["Authorization"] = f"Bearer {settings.JINA_API_KEY}"
-    else:
+    elif not settings.JINA_API_KEY:
         print("⚠️ JINA_API_KEY not set, trying without auth...")
+    else:
+        print("⚠️ Jina auth disabled for this request, trying without auth...")
     
     try:
-        response = requests.get(jina_url, headers=headers, timeout=8)
-        if response.status_code == 402 and headers:
+        response = requests.get(jina_url, headers=headers, timeout=timeout_seconds)
+        if _is_jina_auth_failure(response.status_code) and headers:
+            request_state["auth_failure_count"] += 1
+            request_state["auth_disabled"] = True
             print("⚠️ Jina API key has insufficient balance, retrying without auth...")
-            response = requests.get(jina_url, timeout=8)
+            response = requests.get(jina_url, timeout=timeout_seconds)
         if response.status_code == 200:
             print("✅ Jina read successful")
+            request_state["urls_succeeded"] += 1
             return response.text  # 깔끔한 마크다운 텍스트 반환
         else:
             print(f"⚠️ Jina request failed with status: {response.status_code}, continuing without deep content")
+            request_state["urls_failed"] += 1
             return None
+    except requests.exceptions.Timeout as e:
+        request_state["timeout_count"] += 1
+        request_state["urls_failed"] += 1
+        print(f"⚠️ Jina Timeout: {e}, continuing without deep content")
+        return None
     except Exception as e:
+        request_state["urls_failed"] += 1
         print(f"⚠️ Jina Error: {e}, continuing without deep content")
         return None
 
@@ -259,7 +290,7 @@ def get_topic_fallback_images(topic: str, count: int = 5) -> list:
     return results
 
 
-def scrape_multiple_with_jina(urls: list, max_count: int = 3) -> tuple:
+def scrape_multiple_with_jina(urls: list, max_count: int = 3, request_state: dict = None) -> tuple:
     """
     상위 N개 URL을 순차 크롤링하여 이미지 풀을 최대한 확보합니다.
     
@@ -278,7 +309,7 @@ def scrape_multiple_with_jina(urls: list, max_count: int = 3) -> tuple:
     
     for i, url in enumerate(urls[:max_count]):
         print(f"📖 Jina crawling [{i+1}/{min(len(urls), max_count)}]: {url[:80]}...")
-        content = scrape_with_jina(url)
+        content = scrape_with_jina(url, request_state=request_state)
         if content:
             # 첫 번째 성공한 본문을 AI 프롬프트용으로 저장
             if not deep_content:
@@ -397,7 +428,7 @@ def search_with_pexels(query: str, orientation: str = 'landscape', per_page: int
 
 import concurrent.futures
 
-def scrape_labeled_sources(urls: list, max_count: int = 9) -> tuple:
+def scrape_labeled_sources(urls: list, max_count: int = 9, request_state: dict = None) -> tuple:
     """
     [Parallel Scraping V2] Returns labeled source blocks per URL.
     Uses ThreadPoolExecutor to scrape multiple URLs concurrently.
@@ -409,21 +440,31 @@ def scrape_labeled_sources(urls: list, max_count: int = 9) -> tuple:
     scraped_images = []
     seen_images = set()
     
-    # max_count default is now 9 to match the 3x3 paragraph requirement
-    target_urls = urls[:max_count]
+    # Initial create_magazine uses fewer Jina reads for latency; env can tune.
+    env_max_urls = int(os.getenv("JINA_MAX_URLS", str(max_count)))
+    effective_max_count = max(1, min(max_count, env_max_urls))
+    target_urls = urls[:effective_max_count]
     print(f"🚀 Parallel Scraping started for {len(target_urls)} URLs...")
 
     def scrape_job(url_info):
         idx, url = url_info
-        content = scrape_with_jina(url)
+        content = scrape_with_jina(url, request_state=request_state)
         if content:
             return (idx, url, content)
         return (idx, url, None)
 
-    # Scrape in parallel
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(target_urls) or 1) as executor:
-        # Pass index to maintain order after parallel execution
-        results = list(executor.map(scrape_job, enumerate(target_urls)))
+    results = []
+    remaining_urls = list(enumerate(target_urls))
+    if remaining_urls:
+        # Probe the first URL before fan-out. If the configured Jina key has
+        # insufficient balance, the request_state switches to no-auth and the
+        # rest of this create_magazine request avoids repeated auth failures.
+        results.append(scrape_job(remaining_urls.pop(0)))
+
+    # Scrape remaining URLs in parallel after request-level auth state is known.
+    if remaining_urls:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(remaining_urls)) as executor:
+            results.extend(executor.map(scrape_job, remaining_urls))
 
     # Process and sort results by original index to keep Source 1, 2, 3... order
     results.sort(key=lambda x: x[0])
