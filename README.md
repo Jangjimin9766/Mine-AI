@@ -48,15 +48,15 @@ M:ine AI는 사용자가 원하는 어떤 주제든 실시간으로 웹 검색�
 - RESTful API 설계로 완전한 분리
 
 #### Internal Callback (Optional)
-RunPod(Serverless)에서 Mine-server로 직접 저장 콜백을 보내려면 아래 환경변수를 설정합니다.
+`create_magazine`은 env 설정과 무관하게 Mine-server로 직접 저장 콜백을 보내지 않습니다.
+RunPod(Serverless)에서 Mine-server로 직접 저장 콜백을 보내려면 별도 action을 명시적으로 호출해야 합니다.
 - `SPRING_API_URL` (예: `https://api.minelover.com`)
 - `MINE_INTERNAL_SECRET_KEY` (Mine-server EC2 `/opt/mine/.env`의 `MINE_INTERNAL_SECRET_KEY`와 동일)
-- `ENABLE_SPRING_INTERNAL_CALLBACK=true` (기본값: `false`)
 
 동작:
-- `create_magazine` 실행 후 `POST {SPRING_API_URL}/api/internal/magazine`
+- `spring_internal_callback` action + `internal_mode=true`일 때만 `POST {SPRING_API_URL}/api/internal/magazine`
 - 헤더: `X-Internal-Key: {MINE_INTERNAL_SECRET_KEY}`
-- callback payload에서는 `data:image/...;base64` 인라인 이미지를 제거해 413 Payload Too Large를 방지합니다.
+- callback payload에 `data:image/...;base64` 인라인 이미지가 감지되면 실패로 처리하고 Spring으로 전송하지 않습니다.
 
 #### Jina Reader Speed Controls
 - `JINA_READ_TIMEOUT_SECONDS=5` (기본값: `5`)
@@ -226,7 +226,6 @@ JINA_MAX_URLS=3
 
 # Spring Boot 서버 URL (Gateway 연동용)
 SPRING_API_URL=http://localhost:8080
-ENABLE_SPRING_INTERNAL_CALLBACK=false
 ```
 
 ### **5. 서버 실행 (로컬)**

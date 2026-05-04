@@ -20,7 +20,8 @@ def get_runtime_info() -> dict:
         "moodboard_required_in_create": True,
         "sdxl_inference_steps_default": int(os.getenv("SDXL_INFERENCE_STEPS", "20")),
         "optimization_profile": "timed_create_magazine_fast_sdxl",
-        "spring_internal_callback_default_enabled": os.getenv("ENABLE_SPRING_INTERNAL_CALLBACK", "false").lower() in ("1", "true", "yes"),
+        "spring_internal_callback_in_create_magazine": False,
+        "spring_internal_callback_action": "spring_internal_callback",
         "jina_read_timeout_seconds": float(os.getenv("JINA_READ_TIMEOUT_SECONDS", "5")),
         "jina_max_urls": int(os.getenv("JINA_MAX_URLS", "3")),
     }

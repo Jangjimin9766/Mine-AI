@@ -222,7 +222,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         "paragraph_image_download_time": 0,
         "s3_upload_time": 0,
         "moodboard_upload_time": 0,
-        "spring_callback_enabled": os.getenv("ENABLE_SPRING_INTERNAL_CALLBACK", "").lower() in ("1", "true", "yes"),
+        "spring_callback_enabled": False,
         "spring_callback_attempted": False,
         "spring_callback_time": 0,
         "spring_callback_success": False,
