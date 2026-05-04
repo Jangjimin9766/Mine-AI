@@ -26,6 +26,7 @@ class LLMClient:
     def __init__(self):
         self.openai_client = None
         self.gemini_model = None
+        self.call_count = 0
         self._initialize_clients()
 
     def _initialize_clients(self):
@@ -75,7 +76,7 @@ class LLMClient:
         """API 키가 올바르게 설정되어 있는지 확인 (OpenAI 또는 Gemini 중 하나라도 설정되어 있으면 True)"""
         return bool(self.openai_client or self.gemini_model)
 
-    def generate_text(self, system_prompt: str, user_prompt: str, temperature: float = 0.7) -> str:
+    def generate_text(self, system_prompt: str, user_prompt: str, temperature: float = 0.7, response_format: dict = None) -> str:
         """
         Generates text using the available LLM provider.
         Strategy: If Gemini is available, use it first (for users without OpenAI).
@@ -86,6 +87,8 @@ class LLMClient:
         # If only one is available, use that one
         # If the first fails, fallback to the other
         
+        self.call_count += 1
+
         # Try Gemini first if available (for users who have Gemini but not OpenAI)
         if self.gemini_model:
             try:
@@ -113,15 +116,18 @@ class LLMClient:
         # Fallback to OpenAI (standard/default) if Gemini failed or not available
         if self.openai_client:
             try:
-                response = self.openai_client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
+                request_kwargs = {
+                    "model": "gpt-4o-mini",
+                    "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
-                    temperature=temperature,
-                    max_tokens=16000
-                )
+                    "temperature": temperature,
+                    "max_tokens": 16000,
+                }
+                if response_format:
+                    request_kwargs["response_format"] = response_format
+                response = self.openai_client.chat.completions.create(**request_kwargs)
                 return response.choices[0].message.content
             except Exception as e:
                 logger.error(f"❌ OpenAI generation failed: {e}")
@@ -136,11 +142,16 @@ class LLMClient:
         error_msg += "Please set at least one API key in .env file."
         raise ValueError(error_msg)
 
-    def generate_json(self, system_prompt: str, user_prompt: str, temperature: float = 0.7) -> dict:
+    def generate_json(self, system_prompt: str, user_prompt: str, temperature: float = 0.7, response_format: dict = None) -> dict:
         """
         Generates a JSON response and ensures it is valid.
         """
-        text_response = self.generate_text(system_prompt, user_prompt, temperature)
+        text_response = self.generate_text(
+            system_prompt,
+            user_prompt,
+            temperature,
+            response_format=response_format or {"type": "json_object"},
+        )
         
         # Strip markdown code blocks if present
         cleaned_response = text_response.strip()

@@ -51,6 +51,71 @@ DEFAULT_IMAGE_KEYWORDS_BY_TAG = {
     "TECH": "modern office technology",
 }
 
+MAGAZINE_RESPONSE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "mine_magazine_create_response",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["title", "tags", "cover_image_url", "sections"],
+            "properties": {
+                "title": {"type": "string"},
+                "tags": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 4,
+                    "items": {"type": "string"},
+                },
+                "cover_image_url": {"type": ["string", "null"]},
+                "sections": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["heading", "thumbnail_url", "paragraphs", "display_order"],
+                        "properties": {
+                            "heading": {"type": "string"},
+                            "thumbnail_url": {"type": ["string", "null"]},
+                            "display_order": {"type": "integer"},
+                            "paragraphs": {
+                                "type": "array",
+                                "minItems": 3,
+                                "maxItems": 3,
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "required": [
+                                        "subtitle", "text", "image_search_keyword",
+                                        "source_url", "image_url"
+                                    ],
+                                    "properties": {
+                                        "subtitle": {"type": "string"},
+                                        "text": {"type": "string"},
+                                        "image_search_keyword": {"type": "string"},
+                                        "source_url": {"type": "string"},
+                                        "image_url": {"type": ["string", "null"]},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+}
+
+STRUCTURAL_REPAIR_REASONS = {
+    "invalid_json_schema",
+    "section_count_mismatch",
+    "paragraph_count_mismatch",
+    "missing_required_field",
+}
+
 
 def _strip_source_markers(text: str) -> str:
     if not text:
@@ -92,20 +157,132 @@ def _normalize_magazine_contract(result_json: dict, topic: str) -> dict:
     return result_json
 
 
-def _needs_contract_repair(result_json: dict) -> bool:
-    if len(result_json.get('sections', [])) != 2:
-        return True
-    for section in result_json.get('sections', []):
-        if len(section.get('paragraphs', [])) != 3:
-            return True
+def _repair_reasons(result_json: dict) -> list:
+    reasons = set()
+    if not isinstance(result_json, dict):
+        return ["invalid_json_schema"]
+
+    if not result_json.get('title') or not isinstance(result_json.get('title'), str):
+        reasons.add("missing_required_field:title")
+    if not result_json.get('tags') or not isinstance(result_json.get('tags'), list):
+        reasons.add("missing_required_field:tags")
+
+    sections = result_json.get('sections')
+    if not isinstance(sections, list):
+        reasons.add("invalid_json_schema")
+        return sorted(reasons)
+    if len(sections) != 2:
+        reasons.add("section_count_mismatch")
+
+    for s_idx, section in enumerate(sections):
+        if not isinstance(section, dict):
+            reasons.add("invalid_json_schema")
+            continue
+        if not section.get('heading'):
+            reasons.add(f"missing_required_field:section[{s_idx}].heading")
+        paragraphs = section.get('paragraphs')
+        if not isinstance(paragraphs, list):
+            reasons.add("invalid_json_schema")
+            continue
+        if len(paragraphs) != 3:
+            reasons.add("paragraph_count_mismatch")
         if 'layout_type' in section or 'layout_hint' in section:
-            return True
-        for para in section.get('paragraphs', []):
-            if not para.get('source_url') or not para.get('image_search_keyword'):
-                return True
+            reasons.add("forbidden_field_present")
+        for p_idx, para in enumerate(paragraphs):
+            if not isinstance(para, dict):
+                reasons.add("invalid_json_schema")
+                continue
+            for field in ("subtitle", "text"):
+                if not para.get(field):
+                    reasons.add(f"missing_required_field:section[{s_idx}].paragraph[{p_idx}].{field}")
+            if not para.get('source_url'):
+                reasons.add("missing_source_url")
+            if not para.get('image_search_keyword'):
+                reasons.add("missing_required_field:image_search_keyword")
+            if 'image_url' not in para:
+                reasons.add("missing_image_url")
             if len(para.get('text') or '') < 350:
-                return True
+                reasons.add("paragraph_too_short")
+    return sorted(reasons)
+
+
+def _needs_contract_repair(result_json: dict, reasons: list = None) -> bool:
+    reasons = reasons if reasons is not None else _repair_reasons(result_json)
+    for reason in reasons:
+        if reason in STRUCTURAL_REPAIR_REASONS or reason.startswith("missing_required_field"):
+            if reason in ("missing_required_field:title", "missing_required_field:tags", "missing_required_field:image_search_keyword"):
+                continue
+            return True
     return False
+
+
+def _fallback_source_url(labeled_sources: list, search_results: list, section_idx: int, paragraph_idx: int) -> str:
+    source_count = len(labeled_sources or [])
+    section_source_start = section_idx * 2
+    fallback_idx = section_source_start + (paragraph_idx % 2)
+    if fallback_idx < source_count:
+        return labeled_sources[fallback_idx][0]
+    if source_count > 0:
+        return labeled_sources[0][0]
+    if search_results:
+        return search_results[min(paragraph_idx, len(search_results) - 1)].get('url', '')
+    return ""
+
+
+def _apply_local_contract_fixes(result_json: dict, topic: str, labeled_sources: list, search_results: list) -> dict:
+    """Fix cheap schema gaps before spending another LLM call on repair."""
+    if not isinstance(result_json, dict):
+        return result_json
+    if not result_json.get('title'):
+        result_json['title'] = topic[:22]
+    if not result_json.get('tags') or not isinstance(result_json.get('tags'), list):
+        result_json['tags'] = ["LIFESTYLE", "TREND"]
+    if 'cover_image_url' not in result_json:
+        result_json['cover_image_url'] = None
+
+    sections = result_json.get('sections')
+    if not isinstance(sections, list):
+        return result_json
+    if len(sections) > 2:
+        result_json['sections'] = sections[:2]
+
+    for s_idx, section in enumerate(result_json.get('sections', [])):
+        if not isinstance(section, dict):
+            continue
+        if not section.get('heading'):
+            section['heading'] = f"{topic} 관점 {s_idx + 1}"
+        if 'thumbnail_url' not in section:
+            section['thumbnail_url'] = None
+        section['display_order'] = s_idx
+        paragraphs = section.get('paragraphs')
+        if not isinstance(paragraphs, list):
+            continue
+        if len(paragraphs) > 3:
+            section['paragraphs'] = paragraphs[:3]
+        for p_idx, para in enumerate(section.get('paragraphs', [])):
+            if not isinstance(para, dict):
+                continue
+            if not para.get('source_url'):
+                para['source_url'] = _fallback_source_url(labeled_sources, search_results, s_idx, p_idx)
+            if not para.get('image_search_keyword'):
+                para['image_search_keyword'] = _fallback_image_keyword(result_json.get('tags', []), topic, section.get('heading', ''))
+            if 'image_url' not in para:
+                para['image_url'] = None
+    return result_json
+
+
+def _fill_missing_final_images(result_json: dict, fallback_image_url: str) -> dict:
+    if not fallback_image_url:
+        return result_json
+    if not result_json.get('cover_image_url'):
+        result_json['cover_image_url'] = fallback_image_url
+    for section in result_json.get('sections', []):
+        if not section.get('thumbnail_url'):
+            section['thumbnail_url'] = result_json.get('cover_image_url') or fallback_image_url
+        for para in section.get('paragraphs', []):
+            if not para.get('image_url'):
+                para['image_url'] = section.get('thumbnail_url') or fallback_image_url
+    return result_json
 
 
 def _repair_magazine_contract(result_json: dict, topic: str, labeled_material: str) -> dict:
@@ -235,6 +412,13 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         "jina_urls_attempted": 0,
         "jina_urls_succeeded": 0,
         "jina_urls_failed": 0,
+        "contract_repair_needed": False,
+        "contract_repair_reason": [],
+        "contract_repair_time": 0,
+        "initial_generation_time": 0,
+        "openai_call_count": 0,
+        "final_section_count": 0,
+        "final_paragraph_counts": [],
     }
     errors = []
     skipped_steps = []
@@ -342,9 +526,16 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     """
 
     print(f"AI Crafting V8 magazine (Source-grounded Korean Editor)...")
+    llm_call_count_start = getattr(llm_client, "call_count", 0)
     content_start = time.perf_counter()
-    result_json = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+    result_json = llm_client.generate_json(
+        system_prompt,
+        user_prompt,
+        temperature=0.7,
+        response_format=MAGAZINE_RESPONSE_FORMAT,
+    )
     timings["content_generation_time"] = round(time.perf_counter() - content_start, 3)
+    timings["initial_generation_time"] = timings["content_generation_time"]
     
     # Handle Safety/NSFW Errors
     if "error" in result_json:
@@ -361,12 +552,25 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     # [Final Language Guard] If the LLM still returns English, force translate the whole object
     result_json = force_translate_magazine_json(result_json)
     result_json = _normalize_magazine_contract(result_json, topic)
-    if _needs_contract_repair(result_json):
-        print("🛠️ Repairing magazine contract (length/schema)...")
+    pre_fix_reasons = _repair_reasons(result_json)
+    if pre_fix_reasons:
+        print(f"🔎 Contract check before local fix: {pre_fix_reasons}")
+    result_json = _apply_local_contract_fixes(result_json, topic, labeled_sources, search_results)
+    result_json = _normalize_magazine_contract(result_json, topic)
+    repair_reasons = _repair_reasons(result_json)
+    repair_needed = _needs_contract_repair(result_json, repair_reasons)
+    timings["contract_repair_needed"] = repair_needed
+    timings["contract_repair_reason"] = repair_reasons
+    if repair_reasons:
+        print(f"🔎 Contract check after local fix: {repair_reasons}")
+    if repair_needed:
+        print(f"🛠️ Repairing magazine contract: {repair_reasons}")
         repair_start = time.perf_counter()
         result_json = _repair_magazine_contract(result_json, topic, labeled_material)
         timings["contract_repair_time"] = round(time.perf_counter() - repair_start, 3)
         result_json = force_translate_magazine_json(result_json)
+        result_json = _normalize_magazine_contract(result_json, topic)
+        result_json = _apply_local_contract_fixes(result_json, topic, labeled_sources, search_results)
         result_json = _normalize_magazine_contract(result_json, topic)
     else:
         timings["contract_repair_time"] = 0
@@ -479,8 +683,15 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
             if scraped_images: result_json['cover_image_url'] = scraped_images[0]
             elif real_tavily_images: result_json['cover_image_url'] = real_tavily_images[0]
             else: result_json['cover_image_url'] = images[0] if images else ""
+    if result_json.get("moodboard") and result_json["moodboard"].get("image_url"):
+        result_json = _fill_missing_final_images(result_json, result_json["moodboard"]["image_url"])
     timings["final_json_assembly_time"] = round(time.perf_counter() - assembly_start, 3)
     timings["total_time"] = round(time.perf_counter() - total_start, 3)
+    timings["openai_call_count"] = getattr(llm_client, "call_count", 0) - llm_call_count_start
+    timings["final_section_count"] = len(result_json.get('sections', []))
+    timings["final_paragraph_counts"] = [
+        len(section.get('paragraphs', [])) for section in result_json.get('sections', [])
+    ]
 
     if not result_json.get("moodboard") or not result_json["moodboard"].get("image_url"):
         _log_create_timing(request_id, timings, result_json, errors, skipped_steps)
