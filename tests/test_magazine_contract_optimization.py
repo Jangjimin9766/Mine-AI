@@ -15,21 +15,21 @@ def _valid_magazine_json():
                 "paragraphs": [
                     {
                         "subtitle": "조명의 기준",
-                        "text": "문단 본문입니다. " * 40,
+                        "text": "문단 본문입니다. " * 80,
                         "image_search_keyword": "home office lighting",
                         "source_url": "https://example.com/a",
                         "image_url": None,
                     },
                     {
                         "subtitle": "동선의 기준",
-                        "text": "문단 본문입니다. " * 40,
+                        "text": "문단 본문입니다. " * 80,
                         "image_search_keyword": "home office desk",
                         "source_url": "https://example.com/b",
                         "image_url": None,
                     },
                     {
                         "subtitle": "정리의 기준",
-                        "text": "문단 본문입니다. " * 40,
+                        "text": "문단 본문입니다. " * 80,
                         "image_search_keyword": "organized desk",
                         "source_url": "https://example.com/a",
                         "image_url": None,
@@ -43,21 +43,21 @@ def _valid_magazine_json():
                 "paragraphs": [
                     {
                         "subtitle": "시간의 기준",
-                        "text": "문단 본문입니다. " * 40,
+                        "text": "문단 본문입니다. " * 80,
                         "image_search_keyword": "daily routine desk",
                         "source_url": "https://example.com/c",
                         "image_url": None,
                     },
                     {
                         "subtitle": "소음의 기준",
-                        "text": "문단 본문입니다. " * 40,
+                        "text": "문단 본문입니다. " * 80,
                         "image_search_keyword": "quiet home office",
                         "source_url": "https://example.com/d",
                         "image_url": None,
                     },
                     {
                         "subtitle": "휴식의 기준",
-                        "text": "문단 본문입니다. " * 40,
+                        "text": "문단 본문입니다. " * 80,
                         "image_search_keyword": "home office break",
                         "source_url": "https://example.com/c",
                         "image_url": None,
@@ -161,3 +161,37 @@ def test_repair_reason_detection_and_local_fix():
     after = magazine_maker._repair_reasons(fixed)
     assert "missing_source_url" not in after
     assert "missing_image_url" not in after
+    assert "paragraph_too_short" in after
+
+
+def test_paragraph_too_short_uses_targeted_expansion(monkeypatch):
+    magazine = _valid_magazine_json()
+    magazine["sections"][0]["paragraphs"][1]["text"] = "짧은 문단입니다."
+    full_repair_called = False
+
+    def fail_full_repair(*args, **kwargs):
+        nonlocal full_repair_called
+        full_repair_called = True
+        raise AssertionError("full contract repair should not be called for paragraph_too_short only")
+
+    def targeted_expand(system_prompt, user_prompt, temperature=0.7, response_format=None):
+        return [
+            {
+                "section": 0,
+                "paragraph": 1,
+                "text": "확장된 문단입니다. " * 80,
+            }
+        ]
+
+    mock_llm = MockLLM(magazine)
+    mock_llm.generate_json = targeted_expand
+    monkeypatch.setattr(magazine_maker, "llm_client", mock_llm)
+    monkeypatch.setattr(magazine_maker, "_repair_magazine_contract", fail_full_repair)
+
+    reasons = magazine_maker._repair_reasons(magazine)
+    assert reasons == ["paragraph_too_short"]
+    assert magazine_maker._needs_contract_repair(magazine, reasons) is False
+
+    expanded = magazine_maker._expand_short_paragraphs(magazine, "홈 오피스", "research")
+    assert full_repair_called is False
+    assert len(expanded["sections"][0]["paragraphs"][1]["text"]) >= magazine_maker.PARAGRAPH_MIN_CHARS

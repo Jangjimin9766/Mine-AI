@@ -620,7 +620,9 @@ MAGAZINE_SYSTEM_PROMPT_V8 = """
 [CONTENT REQUIREMENTS]
 - `title`: 22자 이내.
 - `tags`: 반드시 허용 목록에서만 2~4개 선택한다.
-- 각 `text`: 한국어 기준 350~550자. Markdown 문법, URL, 공백을 제외해도 충분한 본문 밀도를 가져야 한다.
+- 각 paragraph의 `text`는 반드시 한국어 기준 450자 이상, 700자 이하로 작성한다.
+- 450자 미만 문단은 실패로 간주된다. 짧은 요약문 대신 최소 5문장 이상으로 배경, 구체 정보, 독자 관점의 해석을 포함한다.
+- Markdown 문법, URL, 공백을 제외해도 충분한 본문 밀도를 가져야 한다.
 - 각 `text`: Markdown으로 작성한다. HTML 태그는 쓰지 않는다.
 - 각 `text` 안에 `[source_url]: ...`, URL 원문, 출처 표기 문장을 넣지 않는다. 출처는 오직 `source_url` 필드에만 넣는다.
 - 각 `text`: 필요할 때 `**굵게**`, `> 인용`, `- 목록`을 자연스럽게 사용한다.
@@ -676,21 +678,21 @@ FASHION, BEAUTY, ACCESSORY, DESIGN, INTERIOR, DOLL, MUSIC, ART, MUSICAL, THEATER
       "paragraphs": [
         {
           "subtitle": "문단 소제목",
-          "text": "350~550자의 한국어 Markdown 본문",
+          "text": "450~700자의 한국어 Markdown 본문",
           "image_search_keyword": "english nouns",
           "source_url": "https://...",
           "image_url": null
         },
         {
           "subtitle": "문단 소제목",
-          "text": "350~550자의 한국어 Markdown 본문",
+          "text": "450~700자의 한국어 Markdown 본문",
           "image_search_keyword": "english nouns",
           "source_url": "https://...",
           "image_url": null
         },
         {
           "subtitle": "문단 소제목",
-          "text": "350~550자의 한국어 Markdown 본문",
+          "text": "450~700자의 한국어 Markdown 본문",
           "image_search_keyword": "english nouns",
           "source_url": "https://...",
           "image_url": null
@@ -704,7 +706,7 @@ FASHION, BEAUTY, ACCESSORY, DESIGN, INTERIOR, DOLL, MUSIC, ART, MUSICAL, THEATER
 [FINAL SELF-CHECK BEFORE OUTPUT]
 - 섹션이 정확히 2개인가?
 - 각 섹션의 문단이 정확히 3개인가?
-- 각 문단이 350~550자인가?
+- 각 문단이 450~700자인가?
 - 각 문단에 `source_url`이 있는가?
 - 각 문단에 `subtitle`, `text`, `image_search_keyword`, `image_url` 필드가 모두 있는가?
 - 각 문단의 `text` 안에 source URL을 중복 삽입하지 않았는가?

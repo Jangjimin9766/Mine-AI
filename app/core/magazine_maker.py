@@ -51,6 +51,9 @@ DEFAULT_IMAGE_KEYWORDS_BY_TAG = {
     "TECH": "modern office technology",
 }
 
+PARAGRAPH_MIN_CHARS = 450
+PARAGRAPH_MAX_CHARS = 700
+
 MAGAZINE_RESPONSE_FORMAT = {
     "type": "json_schema",
     "json_schema": {
@@ -94,6 +97,9 @@ MAGAZINE_RESPONSE_FORMAT = {
                                     ],
                                     "properties": {
                                         "subtitle": {"type": "string"},
+                                        # OpenAI Structured Outputs does not reliably support
+                                        # every JSON Schema validation keyword across models.
+                                        # Keep length enforcement in prompt + Python checks.
                                         "text": {"type": "string"},
                                         "image_search_keyword": {"type": "string"},
                                         "source_url": {"type": "string"},
@@ -201,9 +207,59 @@ def _repair_reasons(result_json: dict) -> list:
                 reasons.add("missing_required_field:image_search_keyword")
             if 'image_url' not in para:
                 reasons.add("missing_image_url")
-            if len(para.get('text') or '') < 350:
+            if len(para.get('text') or '') < PARAGRAPH_MIN_CHARS:
                 reasons.add("paragraph_too_short")
     return sorted(reasons)
+
+
+def _short_paragraphs(result_json: dict, min_chars: int = PARAGRAPH_MIN_CHARS) -> list:
+    short_items = []
+    if not isinstance(result_json, dict):
+        return short_items
+    for s_idx, section in enumerate(result_json.get('sections', [])):
+        for p_idx, para in enumerate(section.get('paragraphs', [])):
+            text = para.get('text') or ''
+            if len(text) < min_chars:
+                short_items.append({
+                    "section": s_idx,
+                    "paragraph": p_idx,
+                    "length": len(text),
+                    "min": min_chars,
+                })
+    return short_items
+
+
+def _paragraphs_over_limit(result_json: dict, max_chars: int = PARAGRAPH_MAX_CHARS) -> list:
+    over_items = []
+    if not isinstance(result_json, dict):
+        return over_items
+    for s_idx, section in enumerate(result_json.get('sections', [])):
+        for p_idx, para in enumerate(section.get('paragraphs', [])):
+            text = para.get('text') or ''
+            if len(text) > max_chars:
+                over_items.append({
+                    "section": s_idx,
+                    "paragraph": p_idx,
+                    "length": len(text),
+                    "max": max_chars,
+                })
+    return over_items
+
+
+def _trim_to_sentence_limit(text: str, max_chars: int = PARAGRAPH_MAX_CHARS) -> str:
+    if not text or len(text) <= max_chars:
+        return text
+    sentences = re.split(r'(?<=[.!?。！？다요죠음함됨임])\s+', text.strip())
+    kept = []
+    for sentence in sentences:
+        candidate = " ".join(kept + [sentence]).strip()
+        if len(candidate) > max_chars:
+            break
+        kept.append(sentence)
+    trimmed = " ".join(kept).strip()
+    if trimmed and len(trimmed) >= PARAGRAPH_MIN_CHARS:
+        return trimmed
+    return text
 
 
 def _needs_contract_repair(result_json: dict, reasons: list = None) -> bool:
@@ -304,7 +360,7 @@ def _repair_magazine_contract(result_json: dict, topic: str, labeled_material: s
     - 최상위 필드는 `title`, `tags`, `sections`, `cover_image_url`만 유지한다.
     - 정확히 2개 섹션, 각 섹션 정확히 3개 문단을 유지한다.
     - 섹션에 `layout_type`, `layout_hint`를 넣지 않는다.
-    - 각 문단의 `text`는 반드시 한국어 350~550자로 확장한다.
+    - 각 문단의 `text`는 반드시 한국어 450~700자로 확장한다.
     - 각 문단의 `text` 안에는 URL이나 `[source_url]:` 표기를 넣지 않는다.
     - 기존 `source_url`과 `image_search_keyword`는 최대한 보존한다.
     - `source_url`과 `image_search_keyword`가 비어 있으면 채운다.
@@ -322,56 +378,89 @@ def _repair_magazine_contract(result_json: dict, topic: str, labeled_material: s
         return result_json
 
 
-def _expand_short_paragraphs(result_json: dict, topic: str, labeled_material: str) -> dict:
-    for section in result_json.get('sections', []):
-        paragraphs = section.get('paragraphs', [])
-        if not any(len(para.get('text') or '') < 350 for para in paragraphs):
+def _apply_targeted_expansion_items(result_json: dict, expanded: list) -> dict:
+    if not isinstance(expanded, list):
+        return result_json
+    for item in expanded:
+        if not isinstance(item, dict):
             continue
+        s_idx = item.get("section")
+        p_idx = item.get("paragraph")
+        text = item.get("text")
+        if not isinstance(s_idx, int) or not isinstance(p_idx, int) or not text:
+            continue
+        text = _trim_to_sentence_limit(text)
+        try:
+            result_json['sections'][s_idx]['paragraphs'][p_idx]['text'] = text
+        except (IndexError, KeyError, TypeError):
+            continue
+    return result_json
+
+
+def _expand_short_paragraphs(result_json: dict, topic: str, labeled_material: str, max_attempts: int = 2) -> dict:
+    short_items = _short_paragraphs(result_json)
+    if not short_items:
+        return result_json
+
+    attempts = 0
+    while short_items and attempts < max_attempts:
+        attempts += 1
+        targets = []
+        for item in short_items:
+            section = result_json.get('sections', [])[item["section"]]
+            para = section.get('paragraphs', [])[item["paragraph"]]
+            targets.append({
+                **item,
+                "section_heading": section.get('heading', ''),
+                "subtitle": para.get('subtitle', ''),
+                "source_url": para.get('source_url', ''),
+                "current_text": para.get('text', ''),
+            })
 
         expand_prompt = f"""
-        아래 섹션의 문단 본문을 프리미엄 한국어 매거진 문체로 확장하라.
+        아래의 짧은 문단들만 프리미엄 한국어 매거진 문체로 확장하라.
+        전체 매거진 구조, 섹션 수, 문단 수, subtitle, source_url, image_search_keyword, image_url은 절대 변경하지 않는다.
 
         [Topic]
         {topic}
 
-        [Section Heading]
-        {section.get('heading', '')}
-
         [Research Material]
         {labeled_material}
 
-        [Current Paragraphs]
-        {json.dumps(paragraphs, ensure_ascii=False)}
+        [Short Paragraph Targets]
+        {json.dumps(targets, ensure_ascii=False)}
 
         [Rules]
         - 유효한 JSON 배열만 반환한다. 설명과 코드블럭은 금지한다.
-        - 배열 길이는 정확히 3개다.
-        - 각 객체의 `subtitle`, `source_url`, `image_search_keyword`, `image_url`은 보존한다.
-        - 각 객체의 `text`만 확장한다.
-        - 각 `text`는 한국어 350~550자로 작성한다.
+        - 배열의 각 객체는 `section`, `paragraph`, `text`만 가진다.
+        - 입력된 target 개수와 같은 개수의 객체를 반환한다.
+        - 각 `text`는 한국어 {PARAGRAPH_MIN_CHARS}~{PARAGRAPH_MAX_CHARS}자로 작성한다.
         - 각 `text`는 최소 5문장 이상으로 구성한다.
-        - 각 `text`에는 배경 맥락, 구체적인 실행 팁, 독자 관점의 해석, 감각적/공간적 묘사를 모두 포함한다.
+        - 기존 문장의 관점은 유지하되, 배경 맥락, 구체적인 실행 팁, 독자 관점의 해석, 감각적/공간적 묘사를 보강한다.
         - 각 `text` 안에 URL, `[source_url]:`, 출처 표기 문장을 넣지 않는다.
         - Markdown은 `**굵게**`, `> 인용`, `- 목록`을 필요한 만큼 자연스럽게 사용한다.
         """
         try:
             expanded = llm_client.generate_json(
-                "You expand short Korean magazine paragraphs. Output a valid JSON array only.",
+                "You expand only selected short Korean magazine paragraph texts. Output a valid JSON array only.",
                 expand_prompt,
-                temperature=0.5
+                temperature=0.45
             )
-            if isinstance(expanded, list) and len(expanded) == 3:
-                for idx, para in enumerate(expanded):
-                    original = paragraphs[idx] if idx < len(paragraphs) else {}
-                    if not para.get('source_url') and original.get('source_url'):
-                        para['source_url'] = original['source_url']
-                    if not para.get('image_search_keyword') and original.get('image_search_keyword'):
-                        para['image_search_keyword'] = original['image_search_keyword']
-                    if 'image_url' not in para and 'image_url' in original:
-                        para['image_url'] = original.get('image_url')
-                section['paragraphs'] = expanded
+            result_json = _apply_targeted_expansion_items(result_json, expanded)
+            target_positions = {(item["section"], item["paragraph"]) for item in short_items}
+            over_limit = [
+                item for item in _paragraphs_over_limit(result_json)
+                if (item["section"], item["paragraph"]) in target_positions
+            ]
+            if over_limit:
+                print(f"🔎 Trimming overlong targeted expansion paragraphs by sentence: {over_limit}")
+                for item in over_limit:
+                    para = result_json['sections'][item["section"]]['paragraphs'][item["paragraph"]]
+                    para['text'] = _trim_to_sentence_limit(para.get('text', ''))
+            short_items = _short_paragraphs(result_json)
         except Exception as e:
-            print(f"⚠️ Paragraph expansion failed for section '{section.get('heading', '')}': {e}")
+            print(f"⚠️ Targeted paragraph expansion failed: {e}")
+            break
     return result_json
 
 def _log_create_timing(request_id: str, timings: dict, result_json: dict, errors: list, skipped_steps: list):
@@ -415,10 +504,16 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         "contract_repair_needed": False,
         "contract_repair_reason": [],
         "contract_repair_time": 0,
+        "targeted_expansion_needed": False,
+        "targeted_expansion_reason": [],
+        "targeted_expansion_time": 0,
+        "targeted_expansion_count": 0,
         "initial_generation_time": 0,
         "openai_call_count": 0,
         "final_section_count": 0,
         "final_paragraph_counts": [],
+        "short_paragraphs": [],
+        "short_paragraphs_after_expansion": [],
     }
     errors = []
     skipped_steps = []
@@ -558,9 +653,15 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     result_json = _apply_local_contract_fixes(result_json, topic, labeled_sources, search_results)
     result_json = _normalize_magazine_contract(result_json, topic)
     repair_reasons = _repair_reasons(result_json)
-    repair_needed = _needs_contract_repair(result_json, repair_reasons)
+    targeted_expansion_reasons = []
+    if "paragraph_too_short" in repair_reasons:
+        targeted_expansion_reasons.append("paragraph_too_short")
+    contract_repair_reasons = [reason for reason in repair_reasons if reason != "paragraph_too_short"]
+    repair_needed = _needs_contract_repair(result_json, contract_repair_reasons)
     timings["contract_repair_needed"] = repair_needed
-    timings["contract_repair_reason"] = repair_reasons
+    timings["contract_repair_reason"] = contract_repair_reasons
+    timings["targeted_expansion_needed"] = bool(targeted_expansion_reasons)
+    timings["targeted_expansion_reason"] = targeted_expansion_reasons
     if repair_reasons:
         print(f"🔎 Contract check after local fix: {repair_reasons}")
     if repair_needed:
@@ -589,10 +690,17 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                 elif source_count > 0:
                     para['source_url'] = labeled_sources[0][0]
 
+    short_before_expansion = _short_paragraphs(result_json)
+    timings["short_paragraphs"] = short_before_expansion
+    if short_before_expansion:
+        print(f"🔎 Short paragraphs targeted for expansion: {short_before_expansion}")
     expand_start = time.perf_counter()
     result_json = _expand_short_paragraphs(result_json, topic, labeled_material)
     timings["paragraph_expansion_time"] = round(time.perf_counter() - expand_start, 3)
+    timings["targeted_expansion_time"] = timings["paragraph_expansion_time"]
+    timings["targeted_expansion_count"] = len(short_before_expansion)
     result_json = _normalize_magazine_contract(result_json, topic)
+    timings["short_paragraphs_after_expansion"] = _short_paragraphs(result_json)
 
     # 5. Parallel image searching + moodboard generation.
     # Spring expects create_magazine to return the moodboard when generation succeeds.
