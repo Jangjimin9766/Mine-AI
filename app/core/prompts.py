@@ -620,12 +620,15 @@ MAGAZINE_SYSTEM_PROMPT_V8 = """
 [CONTENT REQUIREMENTS]
 - `title`: 22자 이내.
 - `tags`: 반드시 허용 목록에서만 2~4개 선택한다.
-- 각 paragraph의 `text`는 반드시 한국어 기준 450자 이상, 700자 이하로 작성한다.
-- 450자 미만 문단은 실패로 간주된다. 짧은 요약문 대신 최소 5문장 이상으로 배경, 구체 정보, 독자 관점의 해석을 포함한다.
-- Markdown 문법, URL, 공백을 제외해도 충분한 본문 밀도를 가져야 한다.
-- 각 `text`: Markdown으로 작성한다. HTML 태그는 쓰지 않는다.
+- 각 paragraph의 `text`는 반드시 Python `len(text)` 기준 450자 이상, 700자 이하로 작성한다.
+- 450자 미만 문단은 실패로 간주된다. 250~300자 요약문은 절대 금지한다.
+- 각 paragraph의 `text`는 최소 6개의 완전한 한국어 문장으로 구성한다.
+- 각 paragraph는 반드시 다음 흐름을 모두 포함한다: `개념 설명 → 구체 예시 → 실천 방법 → 기대 효과`.
+- 각 문장은 단순 주장으로 끝내지 말고 구체적인 설명, 이유, 예시, 적용 방법 중 최소 하나를 포함한다.
+- bullet list, 번호 목록, 과도한 Markdown 강조(`**굵게**`)는 금지한다. 문단형 산문으로 작성한다.
+- 공백과 문장부호를 포함해도 450자를 넘겨야 한다. 짧은 요약, 카피 문구, 한두 문장 설명은 금지한다.
+- HTML 태그는 쓰지 않는다.
 - 각 `text` 안에 `[source_url]: ...`, URL 원문, 출처 표기 문장을 넣지 않는다. 출처는 오직 `source_url` 필드에만 넣는다.
-- 각 `text`: 필요할 때 `**굵게**`, `> 인용`, `- 목록`을 자연스럽게 사용한다.
 - 흔한 홍보 문구와 근거 없는 칭찬을 피한다.
 - "아름다운", "멋진", "특별한", "좋은" 같은 일반 형용사는 구체 근거 없이 남발하지 않는다.
 
@@ -662,6 +665,7 @@ FASHION, BEAUTY, ACCESSORY, DESIGN, INTERIOR, DOLL, MUSIC, ART, MUSICAL, THEATER
 - `title`, `tags`, `cover_image_url`, `sections`, `heading`, `thumbnail_url`, `paragraphs`, `display_order`,
   `subtitle`, `text`, `image_search_keyword`, `source_url`, `image_url` 필드는 절대 생략하지 않는다.
 - 자료가 부족해도 빈 문단이나 누락 필드를 만들지 말고, 제공된 Source와 일반 맥락을 사용해 완성 문단을 작성한다.
+- source 내용이 짧아도 각 paragraph는 `개념 설명 → 구체 예시 → 실천 방법 → 기대 효과` 흐름으로 확장해 450자 이상을 채운다.
 - JSON 외 텍스트는 단 한 글자도 출력하지 않는다.
 
 [JSON OUTPUT STRUCTURE]
@@ -678,21 +682,21 @@ FASHION, BEAUTY, ACCESSORY, DESIGN, INTERIOR, DOLL, MUSIC, ART, MUSICAL, THEATER
       "paragraphs": [
         {
           "subtitle": "문단 소제목",
-          "text": "450~700자의 한국어 Markdown 본문",
+          "text": "450~700자의 한국어 산문 본문. 개념 설명, 구체 예시, 실천 방법, 기대 효과를 모두 포함",
           "image_search_keyword": "english nouns",
           "source_url": "https://...",
           "image_url": null
         },
         {
           "subtitle": "문단 소제목",
-          "text": "450~700자의 한국어 Markdown 본문",
+          "text": "450~700자의 한국어 산문 본문. 개념 설명, 구체 예시, 실천 방법, 기대 효과를 모두 포함",
           "image_search_keyword": "english nouns",
           "source_url": "https://...",
           "image_url": null
         },
         {
           "subtitle": "문단 소제목",
-          "text": "450~700자의 한국어 Markdown 본문",
+          "text": "450~700자의 한국어 산문 본문. 개념 설명, 구체 예시, 실천 방법, 기대 효과를 모두 포함",
           "image_search_keyword": "english nouns",
           "source_url": "https://...",
           "image_url": null
@@ -707,6 +711,7 @@ FASHION, BEAUTY, ACCESSORY, DESIGN, INTERIOR, DOLL, MUSIC, ART, MUSICAL, THEATER
 - 섹션이 정확히 2개인가?
 - 각 섹션의 문단이 정확히 3개인가?
 - 각 문단이 450~700자인가?
+- 각 문단이 최소 6문장 이상이고 `개념 설명 → 구체 예시 → 실천 방법 → 기대 효과` 흐름을 포함하는가?
 - 각 문단에 `source_url`이 있는가?
 - 각 문단에 `subtitle`, `text`, `image_search_keyword`, `image_url` 필드가 모두 있는가?
 - 각 문단의 `text` 안에 source URL을 중복 삽입하지 않았는가?

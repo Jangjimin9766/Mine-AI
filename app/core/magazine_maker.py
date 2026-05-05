@@ -53,6 +53,7 @@ DEFAULT_IMAGE_KEYWORDS_BY_TAG = {
 
 PARAGRAPH_MIN_CHARS = 450
 PARAGRAPH_MAX_CHARS = 700
+PARAGRAPH_LENGTH_METRIC = "python_len_text_including_spaces_and_markdown"
 
 MAGAZINE_RESPONSE_FORMAT = {
     "type": "json_schema",
@@ -100,7 +101,17 @@ MAGAZINE_RESPONSE_FORMAT = {
                                         # OpenAI Structured Outputs does not reliably support
                                         # every JSON Schema validation keyword across models.
                                         # Keep length enforcement in prompt + Python checks.
-                                        "text": {"type": "string"},
+                                        "text": {
+                                            "type": "string",
+                                            "description": (
+                                                "Korean magazine paragraph body. Must be 450-700 characters "
+                                                "by Python len(text), at least 6 complete Korean sentences, "
+                                                "written as dense prose without bullets or markdown emphasis. "
+                                                "Use the flow: concept explanation -> concrete example -> "
+                                                "practical application -> expected reader benefit. "
+                                                "250-300 character summaries are invalid."
+                                            ),
+                                        },
                                         "image_search_keyword": {"type": "string"},
                                         "source_url": {"type": "string"},
                                         "image_url": {"type": ["string", "null"]},
@@ -129,6 +140,21 @@ def _strip_source_markers(text: str) -> str:
     text = re.sub(r"\n?\s*\[source_url\]:\s*https?://\S+\s*", "", text)
     text = re.sub(r"\n?\s*출처\s*:\s*https?://\S+\s*", "", text)
     return text.strip()
+
+
+def _paragraph_length(text: str) -> int:
+    """Production length metric: Python len(text), including spaces and Markdown chars."""
+    return len(text or '')
+
+
+def _paragraph_lengths(result_json: dict) -> list:
+    if not isinstance(result_json, dict):
+        return []
+    lengths = []
+    for section in result_json.get('sections', []):
+        for para in section.get('paragraphs', []):
+            lengths.append(_paragraph_length(para.get('text') if isinstance(para, dict) else ''))
+    return lengths
 
 
 def _fallback_image_keyword(tags: list, topic: str, section_heading: str) -> str:
@@ -207,7 +233,7 @@ def _repair_reasons(result_json: dict) -> list:
                 reasons.add("missing_required_field:image_search_keyword")
             if 'image_url' not in para:
                 reasons.add("missing_image_url")
-            if len(para.get('text') or '') < PARAGRAPH_MIN_CHARS:
+            if _paragraph_length(para.get('text')) < PARAGRAPH_MIN_CHARS:
                 reasons.add("paragraph_too_short")
     return sorted(reasons)
 
@@ -219,11 +245,12 @@ def _short_paragraphs(result_json: dict, min_chars: int = PARAGRAPH_MIN_CHARS) -
     for s_idx, section in enumerate(result_json.get('sections', [])):
         for p_idx, para in enumerate(section.get('paragraphs', [])):
             text = para.get('text') or ''
-            if len(text) < min_chars:
+            length = _paragraph_length(text)
+            if length < min_chars:
                 short_items.append({
                     "section": s_idx,
                     "paragraph": p_idx,
-                    "length": len(text),
+                    "length": length,
                     "min": min_chars,
                 })
     return short_items
@@ -236,28 +263,29 @@ def _paragraphs_over_limit(result_json: dict, max_chars: int = PARAGRAPH_MAX_CHA
     for s_idx, section in enumerate(result_json.get('sections', [])):
         for p_idx, para in enumerate(section.get('paragraphs', [])):
             text = para.get('text') or ''
-            if len(text) > max_chars:
+            length = _paragraph_length(text)
+            if length > max_chars:
                 over_items.append({
                     "section": s_idx,
                     "paragraph": p_idx,
-                    "length": len(text),
+                    "length": length,
                     "max": max_chars,
                 })
     return over_items
 
 
 def _trim_to_sentence_limit(text: str, max_chars: int = PARAGRAPH_MAX_CHARS) -> str:
-    if not text or len(text) <= max_chars:
+    if not text or _paragraph_length(text) <= max_chars:
         return text
     sentences = re.split(r'(?<=[.!?。！？다요죠음함됨임])\s+', text.strip())
     kept = []
     for sentence in sentences:
         candidate = " ".join(kept + [sentence]).strip()
-        if len(candidate) > max_chars:
+        if _paragraph_length(candidate) > max_chars:
             break
         kept.append(sentence)
     trimmed = " ".join(kept).strip()
-    if trimmed and len(trimmed) >= PARAGRAPH_MIN_CHARS:
+    if trimmed and _paragraph_length(trimmed) >= PARAGRAPH_MIN_CHARS:
         return trimmed
     return text
 
@@ -509,6 +537,8 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         "targeted_expansion_time": 0,
         "targeted_expansion_count": 0,
         "initial_generation_time": 0,
+        "paragraph_length_metric": PARAGRAPH_LENGTH_METRIC,
+        "initial_paragraph_lengths": [],
         "openai_call_count": 0,
         "final_section_count": 0,
         "final_paragraph_counts": [],
@@ -647,6 +677,11 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     # [Final Language Guard] If the LLM still returns English, force translate the whole object
     result_json = force_translate_magazine_json(result_json)
     result_json = _normalize_magazine_contract(result_json, topic)
+    timings["initial_paragraph_lengths"] = _paragraph_lengths(result_json)
+    print(
+        f"🔎 Initial paragraph lengths ({PARAGRAPH_LENGTH_METRIC}): "
+        f"{timings['initial_paragraph_lengths']}"
+    )
     pre_fix_reasons = _repair_reasons(result_json)
     if pre_fix_reasons:
         print(f"🔎 Contract check before local fix: {pre_fix_reasons}")
