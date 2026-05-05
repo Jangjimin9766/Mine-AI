@@ -1,6 +1,24 @@
 import os
 
 
+def _magazine_contract_info() -> dict:
+    try:
+        from app.core.magazine_maker import PARAGRAPH_MAX_CHARS, PARAGRAPH_MIN_CHARS
+
+        return {
+            "paragraph_min_chars": PARAGRAPH_MIN_CHARS,
+            "paragraph_max_chars": PARAGRAPH_MAX_CHARS,
+            "paragraph_length_policy": f"{PARAGRAPH_MIN_CHARS}-{PARAGRAPH_MAX_CHARS}",
+        }
+    except Exception as exc:
+        return {
+            "paragraph_min_chars": "unknown",
+            "paragraph_max_chars": "unknown",
+            "paragraph_length_policy": "unknown",
+            "paragraph_contract_error": exc.__class__.__name__,
+        }
+
+
 def get_runtime_info() -> dict:
     commit = (
         os.getenv("GIT_COMMIT")
@@ -11,6 +29,7 @@ def get_runtime_info() -> dict:
     return {
         "version": commit[:12] if commit != "unknown" else commit,
         "git_commit": commit,
+        **_magazine_contract_info(),
         "magazine_shape": "2x3",
         "sections_per_magazine": 2,
         "paragraphs_per_section": 3,

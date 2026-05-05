@@ -14,6 +14,7 @@ from app.config import settings
 from app.version import get_runtime_info
 
 app = FastAPI(title="M:ine AI Server")
+logger.info("Runtime info: %s", get_runtime_info())
 
 # --- Security Configuration ---
 async def verify_api_key(x_api_key: str = Header(...)):

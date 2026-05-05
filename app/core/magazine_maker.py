@@ -10,6 +10,16 @@ from app.core.utils import is_mostly_english, translate_to_korean, force_transla
 from concurrent.futures import ThreadPoolExecutor
 import threading
 
+
+def _runtime_commit() -> str:
+    return (
+        os.getenv("GIT_COMMIT")
+        or os.getenv("APP_VERSION")
+        or os.getenv("RUNPOD_IMAGE_TAG")
+        or "unknown"
+    )
+
+
 DEFAULT_IMAGE_KEYWORDS_BY_TAG = {
     "FASHION": "fashion editorial outfit",
     "BEAUTY": "beauty skincare products",
@@ -548,6 +558,13 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     errors = []
     skipped_steps = []
     print(f"[create_magazine][request_id={request_id}] Magazine Editor started for: {topic}")
+    print(
+        f"[create_magazine][request_id={request_id}] runtime: "
+        f"git_commit={_runtime_commit()} "
+        f"paragraph_min_chars={PARAGRAPH_MIN_CHARS} "
+        f"paragraph_max_chars={PARAGRAPH_MAX_CHARS} "
+        f"paragraph_length_policy={PARAGRAPH_MIN_CHARS}-{PARAGRAPH_MAX_CHARS}"
+    )
     
     # [Language Guard] Translate English topic to Korean to set the "Korean Persona" early
     original_topic = topic

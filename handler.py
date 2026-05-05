@@ -22,6 +22,20 @@ logger.info("=" * 50)
 logger.info(f"✅ Basic imports done. Python: {sys.version}")
 logger.info(f"✅ Working directory: {os.getcwd()}")
 
+try:
+    from app.version import get_runtime_info
+    runtime_info = get_runtime_info()
+    logger.info(
+        "🚀 Runtime info: "
+        f"git_commit={runtime_info.get('git_commit')} "
+        f"paragraph_min_chars={runtime_info.get('paragraph_min_chars')} "
+        f"paragraph_max_chars={runtime_info.get('paragraph_max_chars')} "
+        f"paragraph_length_policy={runtime_info.get('paragraph_length_policy')}"
+    )
+except Exception as e:
+    logger.error(f"❌ Runtime info load failed: {e}")
+    logger.error(traceback.format_exc())
+
 # Test critical imports BEFORE handler runs
 try:
     logger.info("📦 Testing app.core imports...")
@@ -162,7 +176,12 @@ def handle_create_magazine(data: dict) -> dict:
     """
     Handle magazine creation request.
     """
-    from app.core.magazine_maker import generate_magazine_content
+    from app.core.magazine_maker import (
+        PARAGRAPH_MAX_CHARS,
+        PARAGRAPH_MIN_CHARS,
+        generate_magazine_content,
+    )
+    from app.version import get_runtime_info
     handler_start = time.perf_counter()
     request_id = data.get("request_id") or str(uuid.uuid4())[:8]
     
@@ -177,6 +196,13 @@ def handle_create_magazine(data: dict) -> dict:
     
     logger.info(f"📰 Creating magazine for topic: {topic}")
     logger.info(f"📰 create_magazine request_id={request_id}")
+    runtime_info = get_runtime_info()
+    logger.info(
+        f"[create_magazine][request_id={request_id}] runtime: "
+        f"git_commit={runtime_info.get('git_commit')} "
+        f"paragraph_min_chars={PARAGRAPH_MIN_CHARS} "
+        f"paragraph_max_chars={PARAGRAPH_MAX_CHARS}"
+    )
     if user_mood:
         logger.info(f"🎭 User mood: {user_mood}")
     
