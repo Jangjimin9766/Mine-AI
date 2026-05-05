@@ -206,3 +206,21 @@ def test_paragraph_length_metric_is_python_len():
     text = "**강조** 문단입니다. English text"
 
     assert magazine_maker._paragraph_length(text) == len(text)
+
+
+def test_realistic_paragraph_threshold_targets_only_under_300():
+    magazine = _valid_magazine_json()
+    lengths = [371, 346, 300, 305, 275, 273]
+    paragraphs = [
+        para
+        for section in magazine["sections"]
+        for para in section["paragraphs"]
+    ]
+    for para, length in zip(paragraphs, lengths):
+        para["text"] = "가" * length
+
+    shorts = magazine_maker._short_paragraphs(magazine)
+
+    assert magazine_maker.PARAGRAPH_MIN_CHARS == 300
+    assert [item["length"] for item in shorts] == [275, 273]
+    assert all(item["min"] == 300 for item in shorts)

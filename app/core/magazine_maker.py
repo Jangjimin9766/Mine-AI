@@ -51,8 +51,8 @@ DEFAULT_IMAGE_KEYWORDS_BY_TAG = {
     "TECH": "modern office technology",
 }
 
-PARAGRAPH_MIN_CHARS = 450
-PARAGRAPH_MAX_CHARS = 700
+PARAGRAPH_MIN_CHARS = 300
+PARAGRAPH_MAX_CHARS = 600
 PARAGRAPH_LENGTH_METRIC = "python_len_text_including_spaces_and_markdown"
 
 MAGAZINE_RESPONSE_FORMAT = {
@@ -104,12 +104,12 @@ MAGAZINE_RESPONSE_FORMAT = {
                                         "text": {
                                             "type": "string",
                                             "description": (
-                                                "Korean magazine paragraph body. Must be 450-700 characters "
+                                                "Korean magazine paragraph body. Must be 300-600 characters "
                                                 "by Python len(text), at least 6 complete Korean sentences, "
                                                 "written as dense prose without bullets or markdown emphasis. "
                                                 "Use the flow: concept explanation -> concrete example -> "
                                                 "practical application -> expected reader benefit. "
-                                                "250-300 character summaries are invalid."
+                                                "Sub-250 character summaries are invalid."
                                             ),
                                         },
                                         "image_search_keyword": {"type": "string"},
@@ -388,7 +388,7 @@ def _repair_magazine_contract(result_json: dict, topic: str, labeled_material: s
     - 최상위 필드는 `title`, `tags`, `sections`, `cover_image_url`만 유지한다.
     - 정확히 2개 섹션, 각 섹션 정확히 3개 문단을 유지한다.
     - 섹션에 `layout_type`, `layout_hint`를 넣지 않는다.
-    - 각 문단의 `text`는 반드시 한국어 450~700자로 확장한다.
+    - 각 문단의 `text`는 반드시 한국어 300~600자로 확장한다.
     - 각 문단의 `text` 안에는 URL이나 `[source_url]:` 표기를 넣지 않는다.
     - 기존 `source_url`과 `image_search_keyword`는 최대한 보존한다.
     - `source_url`과 `image_search_keyword`가 비어 있으면 채운다.
