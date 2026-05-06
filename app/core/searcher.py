@@ -2,6 +2,7 @@ from tavily import TavilyClient
 import os
 import requests
 from app.config import settings
+import time
 
 # Tavily 클라이언트는 함수 내에서 지연 초기화 (CI 테스트 호환성)
 _tavily_client = None
@@ -117,7 +118,11 @@ def _is_jina_auth_failure(status_code: int) -> bool:
 
 
 def _jina_timeout_seconds() -> float:
-    return float(os.getenv("JINA_READ_TIMEOUT_SECONDS", "5"))
+    return float(os.getenv("JINA_READ_TIMEOUT_SECONDS", "3"))
+
+
+def _jina_scrape_budget_seconds() -> float:
+    return float(os.getenv("JINA_SCRAPE_BUDGET_SECONDS", "8"))
 
 
 def scrape_with_jina(url: str, request_state: dict = None):
@@ -344,13 +349,17 @@ def validate_image_url(url: str) -> bool:
     """
     if not url or not url.startswith('http'):
         return False
+    blocked_extensions = ('.svg', '.html', '.htm', '.txt')
+    if url.lower().split('?')[0].endswith(blocked_extensions):
+        return False
     
     # 캐시 확인
     if url in _validation_cache:
         return _validation_cache[url]
     
     try:
-        response = requests.head(url, timeout=3, allow_redirects=True)
+        timeout_seconds = float(os.getenv("IMAGE_VALIDATION_TIMEOUT_SECONDS", "1"))
+        response = requests.head(url, timeout=timeout_seconds, allow_redirects=True)
         content_type = response.headers.get('Content-Type', '').lower()
         content_length_str = response.headers.get('Content-Length', '0')
         
@@ -439,12 +448,14 @@ def scrape_labeled_sources(urls: list, max_count: int = 9, request_state: dict =
     labeled_sources = []
     scraped_images = []
     seen_images = set()
+    budget_seconds = _jina_scrape_budget_seconds()
+    started_at = time.perf_counter()
     
     # Initial create_magazine uses fewer Jina reads for latency; env can tune.
     env_max_urls = int(os.getenv("JINA_MAX_URLS", str(max_count)))
     effective_max_count = max(1, min(max_count, env_max_urls))
     target_urls = urls[:effective_max_count]
-    print(f"🚀 Parallel Scraping started for {len(target_urls)} URLs...")
+    print(f"🚀 Parallel Scraping started for {len(target_urls)} URLs (budget={budget_seconds}s)...")
 
     def scrape_job(url_info):
         idx, url = url_info
@@ -460,11 +471,28 @@ def scrape_labeled_sources(urls: list, max_count: int = 9, request_state: dict =
         # insufficient balance, the request_state switches to no-auth and the
         # rest of this create_magazine request avoids repeated auth failures.
         results.append(scrape_job(remaining_urls.pop(0)))
+        first_result = results[-1]
+        if first_result[2] and os.getenv("JINA_RETURN_AFTER_FIRST_SUCCESS", "true").lower() != "false":
+            remaining_urls = []
+            print("⚡ Jina first source succeeded; skipping remaining sources for demo latency")
 
     # Scrape remaining URLs in parallel after request-level auth state is known.
     if remaining_urls:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(remaining_urls)) as executor:
-            results.extend(executor.map(scrape_job, remaining_urls))
+        remaining_budget = max(0.1, budget_seconds - (time.perf_counter() - started_at))
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(remaining_urls))
+        future_map = {executor.submit(scrape_job, item): item for item in remaining_urls}
+        try:
+            for future in concurrent.futures.as_completed(future_map, timeout=remaining_budget):
+                results.append(future.result())
+                if any(result[2] for result in results) and os.getenv("JINA_RETURN_AFTER_FIRST_SUCCESS", "true").lower() != "false":
+                    print("⚡ Jina source succeeded within budget; not waiting for slower sources")
+                    break
+        except concurrent.futures.TimeoutError:
+            print(f"⚠️ Jina scraping budget exceeded ({budget_seconds}s), continuing with available sources")
+        finally:
+            for future in future_map:
+                future.cancel()
+            executor.shutdown(wait=False, cancel_futures=True)
 
     # Process and sort results by original index to keep Source 1, 2, 3... order
     results.sort(key=lambda x: x[0])

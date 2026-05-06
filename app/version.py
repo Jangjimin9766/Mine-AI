@@ -41,6 +41,8 @@ def get_runtime_info() -> dict:
         "optimization_profile": "timed_create_magazine_fast_sdxl",
         "spring_internal_callback_in_create_magazine": False,
         "spring_internal_callback_action": "spring_internal_callback",
-        "jina_read_timeout_seconds": float(os.getenv("JINA_READ_TIMEOUT_SECONDS", "5")),
+        "jina_read_timeout_seconds": float(os.getenv("JINA_READ_TIMEOUT_SECONDS", "3")),
+        "jina_scrape_budget_seconds": float(os.getenv("JINA_SCRAPE_BUDGET_SECONDS", "8")),
         "jina_max_urls": int(os.getenv("JINA_MAX_URLS", "3")),
+        "image_validation_timeout_seconds": float(os.getenv("IMAGE_VALIDATION_TIMEOUT_SECONDS", "1")),
     }

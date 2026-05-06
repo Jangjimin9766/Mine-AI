@@ -61,8 +61,9 @@ DEFAULT_IMAGE_KEYWORDS_BY_TAG = {
     "TECH": "modern office technology",
 }
 
-PARAGRAPH_MIN_CHARS = 300
-PARAGRAPH_MAX_CHARS = 600
+PARAGRAPH_MIN_CHARS = 250
+PARAGRAPH_MAX_CHARS = 550
+TARGETED_EXPANSION_MAX_ITEMS = 3
 PARAGRAPH_LENGTH_METRIC = "python_len_text_including_spaces_and_markdown"
 
 MAGAZINE_RESPONSE_FORMAT = {
@@ -114,12 +115,12 @@ MAGAZINE_RESPONSE_FORMAT = {
                                         "text": {
                                             "type": "string",
                                             "description": (
-                                                "Korean magazine paragraph body. Must be 300-600 characters "
+                                                "Korean magazine paragraph body. Must be 250-550 characters "
                                                 "by Python len(text), at least 6 complete Korean sentences, "
                                                 "written as dense prose without bullets or markdown emphasis. "
                                                 "Use the flow: concept explanation -> concrete example -> "
                                                 "practical application -> expected reader benefit. "
-                                                "Sub-250 character summaries are invalid."
+                                                "Sub-220 character summaries are invalid."
                                             ),
                                         },
                                         "image_search_keyword": {"type": "string"},
@@ -398,7 +399,7 @@ def _repair_magazine_contract(result_json: dict, topic: str, labeled_material: s
     - 최상위 필드는 `title`, `tags`, `sections`, `cover_image_url`만 유지한다.
     - 정확히 2개 섹션, 각 섹션 정확히 3개 문단을 유지한다.
     - 섹션에 `layout_type`, `layout_hint`를 넣지 않는다.
-    - 각 문단의 `text`는 반드시 한국어 300~600자로 확장한다.
+    - 각 문단의 `text`는 반드시 한국어 250~550자로 확장한다.
     - 각 문단의 `text` 안에는 URL이나 `[source_url]:` 표기를 넣지 않는다.
     - 기존 `source_url`과 `image_search_keyword`는 최대한 보존한다.
     - `source_url`과 `image_search_keyword`가 비어 있으면 채운다.
@@ -435,8 +436,15 @@ def _apply_targeted_expansion_items(result_json: dict, expanded: list) -> dict:
     return result_json
 
 
-def _expand_short_paragraphs(result_json: dict, topic: str, labeled_material: str, max_attempts: int = 2) -> dict:
-    short_items = _short_paragraphs(result_json)
+def _expand_short_paragraphs(
+    result_json: dict,
+    topic: str,
+    labeled_material: str,
+    short_items: list = None,
+    max_attempts: int = 1,
+) -> dict:
+    short_items = short_items if short_items is not None else _short_paragraphs(result_json)
+    short_items = sorted(short_items, key=lambda item: item.get("length", 0))[:TARGETED_EXPANSION_MAX_ITEMS]
     if not short_items:
         return result_json
 
@@ -495,7 +503,10 @@ def _expand_short_paragraphs(result_json: dict, topic: str, labeled_material: st
                 for item in over_limit:
                     para = result_json['sections'][item["section"]]['paragraphs'][item["paragraph"]]
                     para['text'] = _trim_to_sentence_limit(para.get('text', ''))
-            short_items = _short_paragraphs(result_json)
+            short_items = [
+                item for item in _short_paragraphs(result_json)
+                if (item["section"], item["paragraph"]) in target_positions
+            ]
         except Exception as e:
             print(f"⚠️ Targeted paragraph expansion failed: {e}")
             break
@@ -522,6 +533,9 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     total_start = time.perf_counter()
     timings = {
         "request_received_time": 0,
+        "git_commit": _runtime_commit(),
+        "paragraph_min_chars": PARAGRAPH_MIN_CHARS,
+        "paragraph_max_chars": PARAGRAPH_MAX_CHARS,
         "runpod_handler_start_time": round(runpod_handler_start_time, 3),
         "paragraph_image_download_time": 0,
         "s3_upload_time": 0,
@@ -539,6 +553,8 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         "jina_urls_attempted": 0,
         "jina_urls_succeeded": 0,
         "jina_urls_failed": 0,
+        "scraping_total_time": 0,
+        "jina_total_time": 0,
         "contract_repair_needed": False,
         "contract_repair_reason": [],
         "contract_repair_time": 0,
@@ -553,6 +569,8 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         "final_section_count": 0,
         "final_paragraph_counts": [],
         "short_paragraphs": [],
+        "targeted_expansion_items": [],
+        "remaining_short_paragraphs": [],
         "short_paragraphs_after_expansion": [],
     }
     errors = []
@@ -621,6 +639,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         scrape_start = time.perf_counter()
         labeled_sources, scraped_images = scrape_labeled_sources(urls, max_count=jina_max_urls, request_state=jina_state)
         timings["jina_scrape_time"] = round(time.perf_counter() - scrape_start, 3)
+        timings["jina_total_time"] = timings["jina_scrape_time"]
         timings["jina_auth_disabled_for_request"] = bool(jina_state.get("auth_disabled"))
         timings["jina_auth_failure_count"] = jina_state.get("auth_failure_count", 0)
         timings["jina_timeout_count"] = jina_state.get("timeout_count", 0)
@@ -636,9 +655,12 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         validation_start = time.perf_counter()
         scraped_images = [img for img in scraped_images if validate_image_url(img)]
         timings["scraped_image_validation_time"] = round(time.perf_counter() - validation_start, 3)
+        timings["scraping_total_time"] = round(timings["jina_scrape_time"] + timings["scraped_image_validation_time"], 3)
     else:
         timings["jina_scrape_time"] = 0
+        timings["jina_total_time"] = 0
         timings["scraped_image_validation_time"] = 0
+        timings["scraping_total_time"] = 0
         skipped_steps.append("no_search_results_for_jina")
 
     # 3. Build labeled research material
@@ -685,6 +707,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         errors.append(f"content_error:{result_json.get('error')}")
         moodboard_executor.shutdown(wait=False, cancel_futures=True)
         timings["total_time"] = round(time.perf_counter() - total_start, 3)
+        timings["total_generation_time"] = timings["total_time"]
         _log_create_timing(request_id, timings, result_json, errors, skipped_steps)
         return result_json
 
@@ -743,16 +766,23 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                     para['source_url'] = labeled_sources[0][0]
 
     short_before_expansion = _short_paragraphs(result_json)
+    expansion_targets = sorted(short_before_expansion, key=lambda item: item["length"])[:TARGETED_EXPANSION_MAX_ITEMS]
     timings["short_paragraphs"] = short_before_expansion
+    timings["targeted_expansion_items"] = expansion_targets
     if short_before_expansion:
-        print(f"🔎 Short paragraphs targeted for expansion: {short_before_expansion}")
+        print(f"🔎 Short paragraphs below threshold: {short_before_expansion}")
+    if expansion_targets:
+        print(f"🔎 Short paragraphs targeted for expansion: {expansion_targets}")
     expand_start = time.perf_counter()
-    result_json = _expand_short_paragraphs(result_json, topic, labeled_material)
+    result_json = _expand_short_paragraphs(result_json, topic, labeled_material, short_items=expansion_targets)
     timings["paragraph_expansion_time"] = round(time.perf_counter() - expand_start, 3)
     timings["targeted_expansion_time"] = timings["paragraph_expansion_time"]
-    timings["targeted_expansion_count"] = len(short_before_expansion)
+    timings["targeted_expansion_count"] = len(expansion_targets)
     result_json = _normalize_magazine_contract(result_json, topic)
     timings["short_paragraphs_after_expansion"] = _short_paragraphs(result_json)
+    timings["remaining_short_paragraphs"] = timings["short_paragraphs_after_expansion"]
+    if timings["remaining_short_paragraphs"]:
+        print(f"🔎 Remaining short paragraphs after capped expansion: {timings['remaining_short_paragraphs']}")
 
     # 5. Parallel image searching + moodboard generation.
     # Spring expects create_magazine to return the moodboard when generation succeeds.
@@ -847,6 +877,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         result_json = _fill_missing_final_images(result_json, result_json["moodboard"]["image_url"])
     timings["final_json_assembly_time"] = round(time.perf_counter() - assembly_start, 3)
     timings["total_time"] = round(time.perf_counter() - total_start, 3)
+    timings["total_generation_time"] = timings["total_time"]
     timings["openai_call_count"] = getattr(llm_client, "call_count", 0) - llm_call_count_start
     timings["final_section_count"] = len(result_json.get('sections', []))
     timings["final_paragraph_counts"] = [

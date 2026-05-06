@@ -208,9 +208,9 @@ def test_paragraph_length_metric_is_python_len():
     assert magazine_maker._paragraph_length(text) == len(text)
 
 
-def test_realistic_paragraph_threshold_targets_only_under_300():
+def test_realistic_paragraph_threshold_targets_only_under_250():
     magazine = _valid_magazine_json()
-    lengths = [371, 346, 300, 305, 275, 273]
+    lengths = [275, 235, 235, 258, 238, 230]
     paragraphs = [
         para
         for section in magazine["sections"]
@@ -221,6 +221,64 @@ def test_realistic_paragraph_threshold_targets_only_under_300():
 
     shorts = magazine_maker._short_paragraphs(magazine)
 
-    assert magazine_maker.PARAGRAPH_MIN_CHARS == 300
-    assert [item["length"] for item in shorts] == [275, 273]
-    assert all(item["min"] == 300 for item in shorts)
+    assert magazine_maker.PARAGRAPH_MIN_CHARS == 250
+    assert [item["length"] for item in shorts] == [235, 235, 238, 230]
+    assert all(item["min"] == 250 for item in shorts)
+
+
+def test_targeted_expansion_caps_to_three_shortest(monkeypatch):
+    magazine = _valid_magazine_json()
+    lengths = [275, 235, 235, 258, 238, 230]
+    paragraphs = [
+        para
+        for section in magazine["sections"]
+        for para in section["paragraphs"]
+    ]
+    for para, length in zip(paragraphs, lengths):
+        para["text"] = "가" * length
+
+    expanded_targets = []
+
+    def targeted_expand(system_prompt, user_prompt, temperature=0.7, response_format=None):
+        import json
+        import re
+
+        match = re.search(r"\\[Short Paragraph Targets\\]\\s*(\\[.*?\\])\\s*\\n\\s*\\[Rules\\]", user_prompt, re.S)
+        targets = json.loads(match.group(1))
+        expanded_targets.extend((item["section"], item["paragraph"], item["length"]) for item in targets)
+        return [
+            {
+                "section": item["section"],
+                "paragraph": item["paragraph"],
+                "text": "확장된 문단입니다. " * 40,
+            }
+            for item in targets
+        ]
+
+    mock_llm = MockLLM(magazine)
+    mock_llm.generate_json = targeted_expand
+    monkeypatch.setattr(magazine_maker, "llm_client", mock_llm)
+
+    shorts = magazine_maker._short_paragraphs(magazine)
+    expanded = magazine_maker._expand_short_paragraphs(magazine, "홈 오피스", "research", short_items=shorts)
+
+    assert len(expanded_targets) == 3
+    assert [target[2] for target in expanded_targets] == [230, 235, 235]
+    remaining = magazine_maker._short_paragraphs(expanded)
+    assert [item["length"] for item in remaining] == [238]
+
+
+def test_second_operational_distribution_targets_two_or_fewer():
+    magazine = _valid_magazine_json()
+    lengths = [300, 280, 274, 263, 240, 220]
+    paragraphs = [
+        para
+        for section in magazine["sections"]
+        for para in section["paragraphs"]
+    ]
+    for para, length in zip(paragraphs, lengths):
+        para["text"] = "가" * length
+
+    shorts = magazine_maker._short_paragraphs(magazine)
+
+    assert [item["length"] for item in shorts] == [240, 220]
