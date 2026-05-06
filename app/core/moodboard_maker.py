@@ -10,10 +10,17 @@ NO_HUMAN_NEGATIVE_PROMPT = (
     "person, people, human, face, portrait, hands, arms, legs, feet, body, mannequin, model"
 )
 
+NO_TEXT_BRAND_NEGATIVE_PROMPT = (
+    "no logos, no text, no labels, no brand marks, no typography, no letters, "
+    "no words, no watermark, no signature, no product label close-up, logos, text, labels, "
+    "brand marks, typography, letters, words, watermark"
+)
+
 BASE_MOODBOARD_NEGATIVE_PROMPT = (
     "nsfw, nude, naked, violence, blood, gore, sexually explicit, weapons, drugs, horror, "
     "disturbing, offensive, inappropriate, pornographic, erotic, suggestive, low quality, blurry, "
-    "messy composition, random snapshot, distorted objects, extra limbs"
+    "messy composition, random snapshot, distorted objects, extra limbs, single product shot, "
+    "single product photo, product advertisement, catalog photo, isolated object, oversized clothing item"
 )
 
 
@@ -43,7 +50,7 @@ def get_moodboard_generation_config() -> dict:
 
 
 def build_no_human_negative_prompt() -> str:
-    return f"{BASE_MOODBOARD_NEGATIVE_PROMPT}, {NO_HUMAN_NEGATIVE_PROMPT}"
+    return f"{BASE_MOODBOARD_NEGATIVE_PROMPT}, {NO_HUMAN_NEGATIVE_PROMPT}, {NO_TEXT_BRAND_NEGATIVE_PROMPT}"
 
 
 def select_visual_elements(topic: str = None, user_interests: list = None, magazine_tags: list = None) -> dict:
@@ -55,7 +62,7 @@ def select_visual_elements(topic: str = None, user_interests: list = None, magaz
         (
             "fashion_clothing_sportswear",
             ["fashion", "clothing", "golfwear", "golf wear", "sportswear", "운동복", "골프웨어", "패션", "의류"],
-            "folded garments, polo shirt fabric, technical textile texture, accessories, golf gloves, golf balls, club head, tee, premium textile swatches, premium color swatches",
+            "folded polo fabric swatch, cropped folded garment details, technical textile texture, stitching detail, golf glove, golf ball, tee, club head detail, green grass texture, color palette cards, premium textile swatches",
         ),
         (
             "interior_home_furniture",
@@ -95,15 +102,24 @@ def select_visual_elements(topic: str = None, user_interests: list = None, magaz
 def enforce_no_human_moodboard_prompt(prompt: str, visual_elements: dict) -> str:
     style = (
         "premium editorial moodboard, aesthetic product collage, clean wallpaper composition, "
-        "curated object flatlay, cohesive color palette, tasteful lighting, design magazine style"
+        "curated object flatlay, cohesive color palette, tasteful lighting, design magazine style, "
+        "balanced layout, multiple curated objects, material swatches, color palette cards, "
+        "magazine brand board, not a single product shot"
+    )
+    layout_rule = (
+        "5 to 8 related objects and material or color elements arranged with balanced spacing, "
+        "no single item dominates the frame, no full shirt as the main subject, "
+        "fabric swatches and folded garment details instead of a whole clothing product"
     )
     no_human_rule = (
         "strictly no people, no humans, no person, no face, no portrait, no hands, no arms, "
         "no legs, no feet, no body, no mannequin, no model, no silhouette"
     )
+    no_text_rule = "no logos, no text, no labels, no brand marks, no typography"
     return (
         f"{prompt}, {style}, visual elements: {visual_elements['elements']}, "
-        f"object and material focused, brand board composition, {no_human_rule}"
+        f"{layout_rule}, object and material focused, brand board composition, "
+        f"{no_human_rule}, {no_text_rule}"
     )
 
 def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None, request_id: str = None) -> str:
@@ -166,9 +182,11 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     The image MUST clearly feature elements of: {topic_emphasis}
     It MUST show object/product/material elements instead of humans.
     Selected visual object palette: {visual_elements['elements']}
+    The result must feel like an editorial moodboard or magazine brand board, not a single product photo or advertisement.
+    It must show 5 to 8 related objects/material/color elements with balanced spacing.
     Match the topic to the most relevant category and follow its guidance:
     - **Food/Cafe**: Detail-oriented food photography. Focus on textures (steam, moisture, crumbs). Artisan ceramics.
-    - **Fashion/Beauty**: High-fashion editorial object look. Focus on folded garments, fabric textures (silk, wool, leather), packaging, bottles, botanicals, and luxury accessories. Never use a wearing model.
+    - **Fashion/Beauty**: High-fashion editorial object board. Focus on fabric swatches, cropped folded garment details, stitching, accessories, packaging, bottles, botanicals, and luxury textures. Never use a wearing model, never make one full clothing item dominate the frame.
     - **Travel/Architecture**: Atmospheric object/location-inspired board. Focus on maps, tickets, luggage details, local objects, lighting, scale, and architectural materials. No tourists.
     - **Art/Design**: Abstract or conceptual visuals. Focus on color harmony, shadow play, and artistic objects.
     - **Tech/Minimal**: Futuristic and clean. Focus on sleek surfaces, light-ray effects, and UI-inspired aesthetics.
@@ -177,15 +195,16 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     - **Music/Entertainment**: Dynamic and expressive. Focus on instruments, concert lighting, vinyl records, headphones, stage atmospheres.
     
     [CONCRETE OBJECTS REQUIRED]
-    You MUST include at least 2-3 specific physical objects in the prompt that are directly related to the topic.
+    You MUST include 5-8 specific physical objects/material/color elements in the prompt that are directly related to the topic.
     - BAD: "fitness concept, healthy lifestyle, motivation" (too abstract)
     - BAD: "model wearing golfwear, athlete portrait, person exercising" (humans are forbidden)
+    - BAD: "single polo shirt product photo, centered clothing advertisement, logo label close-up" (too much like a product ad)
     - GOOD: "yoga mat with resistance bands and water bottle, bright home interior" (concrete objects)
-    - GOOD: "folded polo shirt fabric, golf gloves, golf balls, club head, tee, green grass texture, premium textile swatches"
+    - GOOD: "folded polo fabric swatch, golf glove, golf ball, tee, club head detail, grass texture, color palette cards, stitching detail"
     
     [PHOTOGRAPHY PARAMETERS]
     1. **Subject**: Specific, high-definition product/object/material subjects related to the Topic ({topic_emphasis}). Include real objects.
-    2. **Composition**: premium editorial moodboard, aesthetic product collage, clean wallpaper composition, curated object flatlay, cohesive color palette, tasteful lighting, design magazine style.
+    2. **Composition**: balanced layout, multiple curated objects, material swatches, color palette cards, magazine brand board, premium editorial moodboard, aesthetic product collage, clean wallpaper composition, curated object flatlay, cohesive color palette, tasteful lighting, design magazine style, not a single product shot.
     3. **Lighting**: Cinematic lighting (Volumetric light, Soft natural dawn light, Dramatic REMBRANDT shadows).
     4. **Camera/Film**: 85mm lens for products, 24mm for landscapes. High-speed film grain (minimal), crisp focus.
     5. **Style**: Premium magazine editorial style (Kinfolk, Magazine B, Vogue quality).
@@ -199,6 +218,8 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     - Output ONLY the prompt text in ENGLISH. Nothing else.
     - Do NOT use abstract words only. Include SPECIFIC OBJECTS related to the topic.
     - ABSOLUTELY NO HUMANS: no people, no humans, no person, no face, no portrait, no hands, no arms, no legs, no feet, no body, no mannequin, no model, no silhouette.
+    - ABSOLUTELY NO TEXT OR BRANDING: no logos, no text, no labels, no brand marks, no typography.
+    - Avoid product advertisement composition. No single product should occupy most of the frame.
     - For fashion, golfwear, sportswear, fitness, and beauty topics, show products, equipment, packaging, fabric, texture, and accessories only.
     - Ensure the mood aligns with: {user_mood or "Sophisticated"}
     """
@@ -207,8 +228,9 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     [User Context]
     {full_context}
     
-    Create a comma-separated ENGLISH prompt for a sophisticated people-free moodboard/wallpaper image.
-    Remember: ENGLISH ONLY, include CONCRETE OBJECTS related to the topic, and do not include people or body parts.
+    Create a comma-separated ENGLISH prompt for a sophisticated people-free editorial moodboard/wallpaper image.
+    Remember: ENGLISH ONLY, include 5-8 balanced curated objects/material/color elements related to the topic.
+    Do not include people, body parts, logos, text, labels, brand marks, or typography.
     """
 
     prompt = llm_client.generate_text(system_prompt, user_prompt)

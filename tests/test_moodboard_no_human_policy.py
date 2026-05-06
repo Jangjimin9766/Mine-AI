@@ -19,6 +19,16 @@ def test_no_human_negative_prompt_contains_body_terms():
     ]:
         assert term in negative_prompt
 
+    for term in [
+        "no logos",
+        "no text",
+        "no labels",
+        "no brand marks",
+        "no typography",
+        "single product shot",
+    ]:
+        assert term in negative_prompt
+
 
 def test_golfwear_prompt_uses_product_object_material_palette(monkeypatch):
     monkeypatch.setattr(
@@ -32,6 +42,14 @@ def test_golfwear_prompt_uses_product_object_material_palette(monkeypatch):
     assert "golf gloves" in prompt
     assert "golf balls" in prompt
     assert "premium textile swatches" in prompt
+    assert "folded polo fabric swatch" in prompt
+    assert "club head detail" in prompt
+    assert "color palette cards" in prompt
+    assert "stitching detail" in prompt
+    assert "multiple curated objects" in prompt
+    assert "not a single product shot" in prompt
+    assert "no logos" in prompt
+    assert "no text" in prompt
     assert "no people" in prompt
     assert "no model" in prompt
 
