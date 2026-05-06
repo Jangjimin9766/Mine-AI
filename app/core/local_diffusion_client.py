@@ -51,6 +51,26 @@ from diffusers import DiffusionPipeline
 import base64
 from io import BytesIO
 
+DEFAULT_NEGATIVE_PROMPT = (
+    "nsfw, nude, naked, violence, blood, gore, sexually explicit, weapons, drugs, horror, "
+    "disturbing, offensive, inappropriate, pornographic, erotic, suggestive"
+)
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
 class LocalDiffusionClient:
     def __init__(self):
         self.pipe = None
@@ -113,7 +133,17 @@ class LocalDiffusionClient:
             "error": self._load_error
         }
 
-    def generate_image(self, prompt: str) -> str:
+    def generate_image(
+        self,
+        prompt: str,
+        width: int = None,
+        height: int = None,
+        num_inference_steps: int = None,
+        guidance_scale: float = None,
+        negative_prompt: str = None,
+        output_format: str = None,
+        quality: int = None,
+    ) -> str:
         """
         Generate image using local Stable Diffusion XL.
         Returns: Data URI (Base64) on success, None on failure
@@ -128,6 +158,10 @@ class LocalDiffusionClient:
                 "image_generation_time": 0,
                 "total_time": round(time.perf_counter() - request_start, 3),
                 "inference_steps": None,
+                "image_width": width,
+                "image_height": height,
+                "guidance_scale": guidance_scale,
+                "negative_prompt_applied": bool(negative_prompt),
                 "device": self.device,
                 "error": self._load_error,
             }
@@ -136,31 +170,57 @@ class LocalDiffusionClient:
 
         try:
             print(f"🎨 Generating image locally with prompt: {prompt[:50]}...")
-            inference_steps = int(os.getenv("SDXL_INFERENCE_STEPS", "20"))
+            width = width or _env_int("MOODBOARD_WIDTH", 1024)
+            height = height or _env_int("MOODBOARD_HEIGHT", 1024)
+            inference_steps = num_inference_steps or _env_int("MOODBOARD_STEPS", _env_int("SDXL_INFERENCE_STEPS", 14))
+            guidance_scale = guidance_scale if guidance_scale is not None else _env_float("MOODBOARD_GUIDANCE_SCALE", 6.0)
+            negative_prompt = negative_prompt or DEFAULT_NEGATIVE_PROMPT
+            output_format = (output_format or os.getenv("MOODBOARD_IMAGE_FORMAT", "JPEG")).upper()
+            if output_format == "JPG":
+                output_format = "JPEG"
+            quality = quality or _env_int("MOODBOARD_IMAGE_QUALITY", 82)
             
             # Generate
-            # NSFW/Violence negative prompt forced injection
-            negative_prompt = 'nsfw, nude, naked, violence, blood, gore, sexually explicit, weapons, drugs, horror, disturbing, offensive, inappropriate, pornographic, erotic, suggestive'
             generation_start = time.perf_counter()
-            image = self.pipe(prompt=prompt, negative_prompt=negative_prompt, num_inference_steps=inference_steps).images[0]
+            image = self.pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                num_inference_steps=inference_steps,
+                width=width,
+                height=height,
+                guidance_scale=guidance_scale,
+            ).images[0]
             generation_time = time.perf_counter() - generation_start
             
             # Convert to Base64
             buffered = BytesIO()
-            image.save(buffered, format="PNG")
+            if output_format in ("JPEG", "WEBP"):
+                image = image.convert("RGB")
+            save_kwargs = {}
+            if output_format in ("JPEG", "WEBP"):
+                save_kwargs["quality"] = quality
+                save_kwargs["optimize"] = True
+            image.save(buffered, format=output_format, **save_kwargs)
             img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            mime_type = "image/jpeg" if output_format == "JPEG" else f"image/{output_format.lower()}"
             self.last_timing = {
                 "cold_start": cold_start,
                 "model_load_time": round(generation_start - load_start, 3),
                 "image_generation_time": round(generation_time, 3),
                 "total_time": round(time.perf_counter() - request_start, 3),
                 "inference_steps": inference_steps,
+                "image_width": width,
+                "image_height": height,
+                "guidance_scale": guidance_scale,
+                "negative_prompt_applied": bool(negative_prompt),
+                "output_format": output_format,
+                "image_quality": quality,
                 "device": self.device,
                 "error": None,
             }
             
             print(f"✅ Image generated successfully")
-            return f"data:image/png;base64,{img_str}"
+            return f"data:{mime_type};base64,{img_str}"
             
         except Exception as e:
             self.last_timing = {
@@ -168,7 +228,11 @@ class LocalDiffusionClient:
                 "model_load_time": round(time.perf_counter() - load_start, 3),
                 "image_generation_time": 0,
                 "total_time": round(time.perf_counter() - request_start, 3),
-                "inference_steps": int(os.getenv("SDXL_INFERENCE_STEPS", "20")),
+                "inference_steps": num_inference_steps or _env_int("MOODBOARD_STEPS", _env_int("SDXL_INFERENCE_STEPS", 14)),
+                "image_width": width,
+                "image_height": height,
+                "guidance_scale": guidance_scale,
+                "negative_prompt_applied": bool(negative_prompt),
                 "device": self.device,
                 "error": str(e),
             }

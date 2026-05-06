@@ -28,7 +28,8 @@ def test_create_moodboard(mock_generate_image, mock_generate_text):
     assert response.status_code == 200
     data = response.json()
     assert data["image_url"].startswith("data:image/png;base64,")
-    assert data["description"] == "winter, jazz, cozy, warm lighting, 8k"
+    assert "winter, jazz, cozy, warm lighting" in data["description"]
+    assert "no people" in data["description"]
     
     # Verify mock calls
     mock_generate_text.assert_called_once()

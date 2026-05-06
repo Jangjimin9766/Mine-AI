@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 class MoodboardResponse(BaseModel):
     image_url: Optional[str] = None
     description: Optional[str] = None
+    status: Optional[str] = None
     success: Optional[bool] = None
     error: Optional[str] = None
     error_type: Optional[str] = None

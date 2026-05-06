@@ -2,6 +2,109 @@ from app.core.llm_client import llm_client
 from app.core.local_diffusion_client import local_diffusion_client
 import traceback
 import time
+import os
+
+NO_HUMAN_NEGATIVE_PROMPT = (
+    "no people, no humans, no human, no person, no face, no portrait, no hands, "
+    "no arms, no legs, no feet, no body, no mannequin, no model, no silhouette, "
+    "person, people, human, face, portrait, hands, arms, legs, feet, body, mannequin, model"
+)
+
+BASE_MOODBOARD_NEGATIVE_PROMPT = (
+    "nsfw, nude, naked, violence, blood, gore, sexually explicit, weapons, drugs, horror, "
+    "disturbing, offensive, inappropriate, pornographic, erotic, suggestive, low quality, blurry, "
+    "messy composition, random snapshot, distorted objects, extra limbs"
+)
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+def get_moodboard_generation_config() -> dict:
+    return {
+        "width": _env_int("MOODBOARD_WIDTH", 1024),
+        "height": _env_int("MOODBOARD_HEIGHT", 1024),
+        "steps": _env_int("MOODBOARD_STEPS", 14),
+        "guidance_scale": _env_float("MOODBOARD_GUIDANCE_SCALE", 6.0),
+        "output_format": os.getenv("MOODBOARD_IMAGE_FORMAT", "JPEG"),
+        "quality": _env_int("MOODBOARD_IMAGE_QUALITY", 82),
+    }
+
+
+def build_no_human_negative_prompt() -> str:
+    return f"{BASE_MOODBOARD_NEGATIVE_PROMPT}, {NO_HUMAN_NEGATIVE_PROMPT}"
+
+
+def select_visual_elements(topic: str = None, user_interests: list = None, magazine_tags: list = None) -> dict:
+    context = " ".join(
+        str(part).lower()
+        for part in [topic or "", " ".join(user_interests or []), " ".join(magazine_tags or [])]
+    )
+    categories = [
+        (
+            "fashion_clothing_sportswear",
+            ["fashion", "clothing", "golfwear", "golf wear", "sportswear", "운동복", "골프웨어", "패션", "의류"],
+            "folded garments, polo shirt fabric, technical textile texture, accessories, golf gloves, golf balls, club head, tee, premium textile swatches, premium color swatches",
+        ),
+        (
+            "interior_home_furniture",
+            ["interior", "home", "furniture", "인테리어", "홈", "가구", "home office", "홈 오피스"],
+            "furniture details, textile samples, desk lamp, keyboard, notebook, ergonomic chair detail, plant, wall texture, decor objects, soft lighting",
+        ),
+        (
+            "tech",
+            ["tech", "it", "ai", "device", "electronics", "테크", "기술", "전자", "디바이스"],
+            "devices, chips, cables, screens, keyboard detail, glass texture, metal texture, clean desk setup",
+        ),
+        (
+            "food",
+            ["food", "cafe", "restaurant", "coffee", "음식", "푸드", "카페", "맛집", "요리"],
+            "ingredients, plates, utensils, ceramic bowls, table setting, linen texture, steam, natural food textures",
+        ),
+        (
+            "travel",
+            ["travel", "trip", "여행", "트래블", "도시", "휴가"],
+            "map, luggage detail, tickets, local objects, postcards, landscape-inspired color palette, woven textile, no tourists",
+        ),
+        (
+            "beauty_perfume",
+            ["beauty", "perfume", "skincare", "cosmetic", "뷰티", "향수", "화장품", "스킨케어"],
+            "perfume bottles, skincare packaging, botanicals, glass, petals, cream texture, reflective tray, soft fabric",
+        ),
+    ]
+    for category, keywords, elements in categories:
+        if any(keyword in context for keyword in keywords):
+            return {"category": category, "elements": elements}
+    return {
+        "category": "generic_editorial_object_moodboard",
+        "elements": "curated objects, material samples, color swatches, paper textures, decor details, tasteful lighting",
+    }
+
+
+def enforce_no_human_moodboard_prompt(prompt: str, visual_elements: dict) -> str:
+    style = (
+        "premium editorial moodboard, aesthetic product collage, clean wallpaper composition, "
+        "curated object flatlay, cohesive color palette, tasteful lighting, design magazine style"
+    )
+    no_human_rule = (
+        "strictly no people, no humans, no person, no face, no portrait, no hands, no arms, "
+        "no legs, no feet, no body, no mannequin, no model, no silhouette"
+    )
+    return (
+        f"{prompt}, {style}, visual elements: {visual_elements['elements']}, "
+        f"object and material focused, brand board composition, {no_human_rule}"
+    )
 
 def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None, request_id: str = None) -> str:
     """
@@ -47,10 +150,12 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
         topic_keywords.extend(magazine_tags)
     
     topic_emphasis = ", ".join(topic_keywords) if topic_keywords else "general lifestyle"
+    visual_elements = select_visual_elements(topic, user_interests, magazine_tags)
 
     system_prompt = f"""
     You are an award-winning Art Director and Senior Photographer.
     Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's moodboard.
+    The image must be a people-free object moodboard, not a portrait, not a model shot, not a lifestyle photo with humans.
     
     [LANGUAGE RULE — ABSOLUTE]
     Your output MUST be in ENGLISH ONLY. No Korean, Chinese, Japanese, or any non-Latin characters.
@@ -59,24 +164,28 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     
     [SUBJECT-SPECIFIC FOCUS (MANDATORY)]
     The image MUST clearly feature elements of: {topic_emphasis}
+    It MUST show object/product/material elements instead of humans.
+    Selected visual object palette: {visual_elements['elements']}
     Match the topic to the most relevant category and follow its guidance:
     - **Food/Cafe**: Detail-oriented food photography. Focus on textures (steam, moisture, crumbs). Artisan ceramics.
-    - **Fashion/Beauty**: High-fashion editorial look. Focus on fabric textures (silk, wool, leather) and luxury accessories.
-    - **Travel/Architecture**: Atmospheric location shots. Focus on lighting, scale, and unique architectural details.
+    - **Fashion/Beauty**: High-fashion editorial object look. Focus on folded garments, fabric textures (silk, wool, leather), packaging, bottles, botanicals, and luxury accessories. Never use a wearing model.
+    - **Travel/Architecture**: Atmospheric object/location-inspired board. Focus on maps, tickets, luggage details, local objects, lighting, scale, and architectural materials. No tourists.
     - **Art/Design**: Abstract or conceptual visuals. Focus on color harmony, shadow play, and artistic objects.
     - **Tech/Minimal**: Futuristic and clean. Focus on sleek surfaces, light-ray effects, and UI-inspired aesthetics.
-    - **Fitness/Health/Sports**: Athletic and energetic. Focus on workout equipment (yoga mat, dumbbells, resistance bands, running shoes), active body movement, gym or home workout space, sweat details, motivational atmosphere.
+    - **Fitness/Health/Sports**: Athletic and energetic object board. Focus on workout equipment, golf balls, club heads, gloves, shoes, fabric, yoga mat, dumbbells, resistance bands, water bottle, gym or home workout objects. No active body movement and no people.
     - **Lifestyle/Wellness**: Serene and balanced. Focus on self-care items (candles, plants, journals), cozy home interior, morning routines, healthy food prep, mindfulness.
     - **Music/Entertainment**: Dynamic and expressive. Focus on instruments, concert lighting, vinyl records, headphones, stage atmospheres.
     
     [CONCRETE OBJECTS REQUIRED]
     You MUST include at least 2-3 specific physical objects in the prompt that are directly related to the topic.
     - BAD: "fitness concept, healthy lifestyle, motivation" (too abstract)
+    - BAD: "model wearing golfwear, athlete portrait, person exercising" (humans are forbidden)
     - GOOD: "yoga mat with resistance bands and water bottle, bright home interior" (concrete objects)
+    - GOOD: "folded polo shirt fabric, golf gloves, golf balls, club head, tee, green grass texture, premium textile swatches"
     
     [PHOTOGRAPHY PARAMETERS]
-    1. **Subject**: Specific, high-definition subject related to the Topic ({topic_emphasis}). Include real objects.
-    2. **Composition**: Choose most effective (Flatlay, Extreme Close-up, Wide landscape, Golden ratio).
+    1. **Subject**: Specific, high-definition product/object/material subjects related to the Topic ({topic_emphasis}). Include real objects.
+    2. **Composition**: premium editorial moodboard, aesthetic product collage, clean wallpaper composition, curated object flatlay, cohesive color palette, tasteful lighting, design magazine style.
     3. **Lighting**: Cinematic lighting (Volumetric light, Soft natural dawn light, Dramatic REMBRANDT shadows).
     4. **Camera/Film**: 85mm lens for products, 24mm for landscapes. High-speed film grain (minimal), crisp focus.
     5. **Style**: Premium magazine editorial style (Kinfolk, Magazine B, Vogue quality).
@@ -89,6 +198,8 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     - If the topic is inappropriate, your entire response MUST be: "FORBIDDEN_CONTENT"
     - Output ONLY the prompt text in ENGLISH. Nothing else.
     - Do NOT use abstract words only. Include SPECIFIC OBJECTS related to the topic.
+    - ABSOLUTELY NO HUMANS: no people, no humans, no person, no face, no portrait, no hands, no arms, no legs, no feet, no body, no mannequin, no model, no silhouette.
+    - For fashion, golfwear, sportswear, fitness, and beauty topics, show products, equipment, packaging, fabric, texture, and accessories only.
     - Ensure the mood aligns with: {user_mood or "Sophisticated"}
     """
 
@@ -96,11 +207,14 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     [User Context]
     {full_context}
     
-    Create a comma-separated ENGLISH prompt for a sophisticated BACKGROUND image.
-    Remember: ENGLISH ONLY, include CONCRETE OBJECTS related to the topic.
+    Create a comma-separated ENGLISH prompt for a sophisticated people-free moodboard/wallpaper image.
+    Remember: ENGLISH ONLY, include CONCRETE OBJECTS related to the topic, and do not include people or body parts.
     """
 
-    return llm_client.generate_text(system_prompt, user_prompt)
+    prompt = llm_client.generate_text(system_prompt, user_prompt)
+    if prompt and prompt.strip() == "FORBIDDEN_CONTENT":
+        return "FORBIDDEN_CONTENT"
+    return enforce_no_human_moodboard_prompt(prompt, visual_elements)
 
 # 기본 Fallback 이미지 (SDXL 실패 시 사용) — Unsplash 그라디언트 제거
 # 무드보드는 AI 생성이므로, 실패 시 fallback URL 없이 에러 반환
@@ -116,15 +230,33 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
         On success: {"image_url": "...", "description": "...", "success": True}
         On failure: {"error": "...", "error_type": "...", "success": False, "fallback_url": "..."}
     """
-    import random
-    
     # 토픽이 없으면 태그나 타이틀로 대체 토픽 설정 (로깅용)
     display_topic = topic or (magazine_titles[0] if magazine_titles else "User Profile")
+    visual_elements = select_visual_elements(topic or display_topic, user_interests, magazine_tags)
+    generation_config = get_moodboard_generation_config()
+    negative_prompt = build_no_human_negative_prompt()
     
     start_time = time.perf_counter()
-    timings = {}
+    timings = {
+        "moodboard_style_policy": "no_human_editorial",
+        "no_human": True,
+        "image_width": generation_config["width"],
+        "image_height": generation_config["height"],
+        "inference_steps": generation_config["steps"],
+        "guidance_scale": generation_config["guidance_scale"],
+        "negative_prompt_applied": True,
+        "selected_object_palette": visual_elements["category"],
+        "selected_visual_elements": visual_elements["elements"],
+    }
     log_prefix = f"[moodboard][request_id={request_id}]" if request_id else "[moodboard]"
     print(f"{log_prefix} 🎨 Generating Background Moodboard (SDXL) for: {display_topic}")
+    print(
+        f"{log_prefix} policy: moodboard_style_policy=no_human_editorial "
+        f"no_human=true image_width={generation_config['width']} image_height={generation_config['height']} "
+        f"inference_steps={generation_config['steps']} guidance_scale={generation_config['guidance_scale']} "
+        f"negative_prompt_applied=true selected_object_palette={visual_elements['category']} "
+        f"selected_visual_elements={visual_elements['elements']}"
+    )
 
     # 1. Generate Prompt
     try:
@@ -142,6 +274,7 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
             "error": "Forbidden content detected or prompt generation failed",
             "error_type": "FORBIDDEN_CONTENT" if sd_prompt == "FORBIDDEN_CONTENT" else "PROMPT_GENERATION_FAILED",
             "success": False,
+            "status": "FAILED",
             "fallback_url": None,
             "image_url": None,
             "description": f"Safety filter blocked prompt generation for: {display_topic}",
@@ -152,7 +285,16 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
     try:
         print(f"{log_prefix} 🖼️ Generating image with SDXL...")
         image_start = time.perf_counter()
-        image_url = local_diffusion_client.generate_image(sd_prompt)
+        image_url = local_diffusion_client.generate_image(
+            sd_prompt,
+            width=generation_config["width"],
+            height=generation_config["height"],
+            num_inference_steps=generation_config["steps"],
+            guidance_scale=generation_config["guidance_scale"],
+            negative_prompt=negative_prompt,
+            output_format=generation_config["output_format"],
+            quality=generation_config["quality"],
+        )
         timings["moodboard_image_generation_time"] = round(time.perf_counter() - image_start, 3)
         timings.update({
             f"diffusion_{key}": value
@@ -169,6 +311,7 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
             "error": "Failed to generate image - SDXL model may not be loaded",
             "error_type": "IMAGE_GENERATION_FAILED",
             "success": False,
+            "status": "FAILED",
             "fallback_url": None,
             "image_url": None,
             "description": sd_prompt,
@@ -183,5 +326,6 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
         "image_url": image_url,  # This will be a Data URI (base64)
         "description": sd_prompt,
         "success": True,
+        "status": "COMPLETED",
         "timing": timings
     }
