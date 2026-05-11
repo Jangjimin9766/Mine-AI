@@ -40,12 +40,12 @@ def _env_float(name: str, default: float) -> float:
 
 def get_moodboard_generation_config() -> dict:
     return {
-        "width": _env_int("MOODBOARD_WIDTH", 1024),
-        "height": _env_int("MOODBOARD_HEIGHT", 1024),
-        "steps": _env_int("MOODBOARD_STEPS", 14),
-        "guidance_scale": _env_float("MOODBOARD_GUIDANCE_SCALE", 6.0),
+        "width": _env_int("MOODBOARD_WIDTH", 768),
+        "height": _env_int("MOODBOARD_HEIGHT", 768),
+        "steps": _env_int("MOODBOARD_STEPS", 8),
+        "guidance_scale": _env_float("MOODBOARD_GUIDANCE_SCALE", 5.0),
         "output_format": os.getenv("MOODBOARD_IMAGE_FORMAT", "JPEG"),
-        "quality": _env_int("MOODBOARD_IMAGE_QUALITY", 82),
+        "quality": _env_int("MOODBOARD_IMAGE_QUALITY", 70),
     }
 
 
@@ -62,7 +62,7 @@ def select_visual_elements(topic: str = None, user_interests: list = None, magaz
         (
             "fashion_clothing_sportswear",
             ["fashion", "clothing", "golfwear", "golf wear", "sportswear", "운동복", "골프웨어", "패션", "의류"],
-            "folded polo fabric swatch, cropped folded garment details, technical textile texture, stitching detail, golf glove, golf ball, tee, club head detail, green grass texture, color palette cards, premium textile swatches",
+            "folded polo fabric swatch, cropped folded garment details, technical textile texture, stitching detail, golf gloves, golf balls, tee, club head detail, green grass texture, color palette cards, premium textile swatches",
         ),
         (
             "interior_home_furniture",

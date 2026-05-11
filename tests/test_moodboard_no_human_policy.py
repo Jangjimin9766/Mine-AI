@@ -92,10 +92,10 @@ def test_moodboard_generation_defaults(monkeypatch, capsys):
         moodboard_maker.local_diffusion_client,
         "last_timing",
         {
-            "inference_steps": 14,
-            "image_width": 1024,
-            "image_height": 1024,
-            "guidance_scale": 6.0,
+            "inference_steps": 8,
+            "image_width": 768,
+            "image_height": 768,
+            "guidance_scale": 5.0,
             "negative_prompt_applied": True,
         },
     )
@@ -106,10 +106,10 @@ def test_moodboard_generation_defaults(monkeypatch, capsys):
     assert result["image_url"].startswith("data:image/jpeg;base64,")
     assert result["status"] == "COMPLETED"
     assert result["success"] is True
-    assert calls["width"] == 1024
-    assert calls["height"] == 1024
-    assert calls["num_inference_steps"] == 14
-    assert calls["guidance_scale"] == 6.0
+    assert calls["width"] == 768
+    assert calls["height"] == 768
+    assert calls["num_inference_steps"] == 8
+    assert calls["guidance_scale"] == 5.0
     assert "no people" in calls["negative_prompt"]
     assert "no_human=true" in output
-    assert "inference_steps=14" in output
+    assert "inference_steps=8" in output
