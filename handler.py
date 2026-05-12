@@ -324,7 +324,8 @@ def handle_create_moodboard(data: dict) -> dict:
             return {
                 "error": "Failed to generate moodboard - no result returned",
                 "success": False,
-                "image_url": "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200"  # Fallback
+                "image_url": None,
+                "fallback_url": None,
             }
         
         # success 필드 확인 (새로운 응답 형식)
@@ -343,7 +344,8 @@ def handle_create_moodboard(data: dict) -> dict:
             "error": str(e), 
             "success": False,
             "traceback": traceback.format_exc(),
-            "image_url": "https://images.unsplash.com/photo-1557683316-973673baf926?w=1200"  # Fallback
+            "image_url": None,
+            "fallback_url": None,
         }
 
 
@@ -398,6 +400,14 @@ def handle_edit_magazine(data: dict) -> dict:
                 new_sections = [result] if result else []
         elif intent.action == "add_section":
             result = add_new_section(magazine_data, intent.instruction)
+            if isinstance(result, dict) and result.get("success") is False:
+                return {
+                    "intent": "add_section",
+                    "success": False,
+                    "error": result.get("error", "EDIT_REJECTED"),
+                    "message": result.get("message", "요청한 내용을 검증할 수 없어 섹션을 추가하지 않았습니다."),
+                    "updated_magazine": None,
+                }
             new_sections = [result] if result else []
         elif intent.action == "delete_section":
             # 삭제 대상 섹션 ID 추출
@@ -407,6 +417,16 @@ def handle_edit_magazine(data: dict) -> dict:
                     deleted_section_ids = [sections[intent.target_section_index].get('id')]
         elif intent.action == "change_tone":
             result = change_overall_tone(magazine_data, intent.instruction)
+            if isinstance(result, list):
+                rejected = next((item for item in result if isinstance(item, dict) and item.get("success") is False), None)
+                if rejected:
+                    return {
+                        "intent": "change_tone",
+                        "success": False,
+                        "error": rejected.get("error", "EDIT_REJECTED"),
+                        "message": rejected.get("message", "요청한 내용을 검증할 수 없어 톤 변경을 적용하지 않았습니다."),
+                        "updated_magazine": None,
+                    }
             new_sections = result if isinstance(result, list) else []
         else:
             # 기본: 전체 톤 변경으로 처리

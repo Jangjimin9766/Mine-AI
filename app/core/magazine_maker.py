@@ -65,6 +65,44 @@ PARAGRAPH_MIN_CHARS = 250
 PARAGRAPH_MAX_CHARS = 550
 TARGETED_EXPANSION_MAX_ITEMS = 3
 PARAGRAPH_LENGTH_METRIC = "python_len_text_including_spaces_and_markdown"
+ENTITY_RECOMMENDATION_TERMS = [
+    "추천", "recommend", "recommendation", "유튜버", "youtuber", "youtube",
+    "채널", "creator", "크리에이터", "인플루언서", "맛집", "장소", "브랜드",
+    "인물", "사람", "전문가", "계정", "account", "best", "top"
+]
+
+
+def _requires_verified_sources(text: str) -> bool:
+    normalized = (text or "").lower()
+    return any(term in normalized for term in ENTITY_RECOMMENDATION_TERMS)
+
+
+def _moodboard_seed_keywords(topic: str, search_results: list, labeled_sources: list, max_items: int = 12) -> list:
+    keywords = []
+    seen = set()
+
+    def add(value):
+        text = str(value or "").strip()
+        if not text:
+            return
+        text = re.sub(r"https?://\S+", "", text)
+        text = re.sub(r"\s+", " ", text)[:80]
+        normalized = text.lower()
+        if normalized not in seen:
+            seen.add(normalized)
+            keywords.append(text)
+
+    add(topic)
+    for result in search_results or []:
+        add(result.get("title"))
+        add(result.get("content"))
+        if len(keywords) >= max_items:
+            return keywords[:max_items]
+    for _, content in labeled_sources or []:
+        add(content)
+        if len(keywords) >= max_items:
+            return keywords[:max_items]
+    return keywords[:max_items]
 
 MAGAZINE_RESPONSE_FORMAT = {
     "type": "json_schema",
@@ -605,14 +643,9 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     if user_mood:
         mood_context = f"[User Mood]\nThe user wants a '{user_mood}' style.\n"
 
-    moodboard_executor = ThreadPoolExecutor(max_workers=1)
-    from app.core.moodboard_maker import generate_moodboard
-    moodboard_future = moodboard_executor.submit(
-        generate_moodboard, topic=topic, user_interests=user_interests,
-        magazine_tags=[], magazine_titles=[topic], user_mood=user_mood,
-        request_id=request_id
-    )
-    timings["moodboard_submit_time"] = round(time.perf_counter() - total_start, 3)
+    moodboard_executor = None
+    moodboard_future = None
+    timings["moodboard_submit_time"] = 0
 
     # Search with original (if English) + Korean for maximum relevance
     search_query = f"{original_topic} {topic}" if original_topic != topic else topic
@@ -670,7 +703,29 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         labeled_material += f"\n[Source {i+1}: {url}]\n{truncated}\n"
     
     if not labeled_material.strip():
-        labeled_material = "No research material available. Use general knowledge only."
+        if _requires_verified_sources(topic) or _requires_verified_sources(original_topic):
+            if moodboard_executor:
+                moodboard_executor.shutdown(wait=False, cancel_futures=True)
+            return {
+                "error": "INSUFFICIENT_VERIFIED_SOURCES",
+                "message": "검증 가능한 검색 결과가 없어 구체적인 추천 대상을 생성하지 않았습니다.",
+            }
+        labeled_material = "No research material available. Use non-specific general editorial guidance only. Do not name people, creators, brands, places, channels, accounts, products, prices, dates, rankings, or statistics."
+
+    from app.core.moodboard_maker import generate_moodboard
+    moodboard_seed_tags = _moodboard_seed_keywords(topic, search_results, labeled_sources)
+    moodboard_executor = ThreadPoolExecutor(max_workers=1)
+    moodboard_submit_start = time.perf_counter()
+    moodboard_future = moodboard_executor.submit(
+        generate_moodboard,
+        topic=topic,
+        user_interests=user_interests,
+        magazine_tags=moodboard_seed_tags,
+        magazine_titles=[topic, *moodboard_seed_tags[:4]],
+        user_mood=user_mood,
+        request_id=request_id,
+    )
+    timings["moodboard_submit_time"] = round(time.perf_counter() - moodboard_submit_start, 3)
 
     system_prompt = MAGAZINE_SYSTEM_PROMPT_V8
     user_prompt = f"""
@@ -705,7 +760,8 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     if "error" in result_json:
         print(f"⚠️ AI Server Policy Triggered: {result_json.get('error')}")
         errors.append(f"content_error:{result_json.get('error')}")
-        moodboard_executor.shutdown(wait=False, cancel_futures=True)
+        if moodboard_executor:
+            moodboard_executor.shutdown(wait=False, cancel_futures=True)
         timings["total_time"] = round(time.perf_counter() - total_start, 3)
         timings["total_generation_time"] = timings["total_time"]
         _log_create_timing(request_id, timings, result_json, errors, skipped_steps)
@@ -774,7 +830,8 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     if expansion_targets:
         print(f"🔎 Short paragraphs targeted for expansion: {expansion_targets}")
     expand_start = time.perf_counter()
-    result_json = _expand_short_paragraphs(result_json, topic, labeled_material, short_items=expansion_targets)
+    if expansion_targets:
+        result_json = _expand_short_paragraphs(result_json, topic, labeled_material, short_items=expansion_targets)
     timings["paragraph_expansion_time"] = round(time.perf_counter() - expand_start, 3)
     timings["targeted_expansion_time"] = timings["paragraph_expansion_time"]
     timings["targeted_expansion_count"] = len(expansion_targets)
@@ -785,8 +842,9 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         print(f"🔎 Remaining short paragraphs after capped expansion: {timings['remaining_short_paragraphs']}")
 
     # 5. Parallel image searching + moodboard generation.
-    # Spring expects create_magazine to return the moodboard when generation succeeds.
-    print(f"Parallelizing image searching and moodboard generation...")
+    # Moodboard is already running from search/source-derived keywords, not a
+    # hard-coded category palette.
+    print(f"Parallelizing image searching and keyword-grounded moodboard generation...")
     
     used_image_urls = set()
     if result_json.get('cover_image_url') and result_json['cover_image_url'].startswith('http'):

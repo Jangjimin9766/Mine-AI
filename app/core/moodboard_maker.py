@@ -3,6 +3,7 @@ from app.core.local_diffusion_client import local_diffusion_client
 import traceback
 import time
 import os
+import re
 
 NO_HUMAN_NEGATIVE_PROMPT = (
     "no people, no humans, no human, no person, no face, no portrait, no hands, "
@@ -53,50 +54,45 @@ def build_no_human_negative_prompt() -> str:
     return f"{BASE_MOODBOARD_NEGATIVE_PROMPT}, {NO_HUMAN_NEGATIVE_PROMPT}, {NO_TEXT_BRAND_NEGATIVE_PROMPT}"
 
 
-def select_visual_elements(topic: str = None, user_interests: list = None, magazine_tags: list = None) -> dict:
-    context = " ".join(
-        str(part).lower()
-        for part in [topic or "", " ".join(user_interests or []), " ".join(magazine_tags or [])]
-    )
-    categories = [
-        (
-            "fashion_clothing_sportswear",
-            ["fashion", "clothing", "golfwear", "golf wear", "sportswear", "운동복", "골프웨어", "패션", "의류"],
-            "folded polo fabric swatch, cropped folded garment details, technical textile texture, stitching detail, golf gloves, golf balls, tee, club head detail, green grass texture, color palette cards, premium textile swatches",
-        ),
-        (
-            "interior_home_furniture",
-            ["interior", "home", "furniture", "인테리어", "홈", "가구", "home office", "홈 오피스"],
-            "furniture details, textile samples, desk lamp, keyboard, notebook, ergonomic chair detail, plant, wall texture, decor objects, soft lighting",
-        ),
-        (
-            "tech",
-            ["tech", "it", "ai", "device", "electronics", "테크", "기술", "전자", "디바이스"],
-            "devices, chips, cables, screens, keyboard detail, glass texture, metal texture, clean desk setup",
-        ),
-        (
-            "food",
-            ["food", "cafe", "restaurant", "coffee", "음식", "푸드", "카페", "맛집", "요리"],
-            "ingredients, plates, utensils, ceramic bowls, table setting, linen texture, steam, natural food textures",
-        ),
-        (
-            "travel",
-            ["travel", "trip", "여행", "트래블", "도시", "휴가"],
-            "map, luggage detail, tickets, local objects, postcards, landscape-inspired color palette, woven textile, no tourists",
-        ),
-        (
-            "beauty_perfume",
-            ["beauty", "perfume", "skincare", "cosmetic", "뷰티", "향수", "화장품", "스킨케어"],
-            "perfume bottles, skincare packaging, botanicals, glass, petals, cream texture, reflective tray, soft fabric",
-        ),
-    ]
-    for category, keywords, elements in categories:
-        if any(keyword in context for keyword in keywords):
-            return {"category": category, "elements": elements}
-    return {
-        "category": "generic_editorial_object_moodboard",
-        "elements": "curated objects, material samples, color swatches, paper textures, decor details, tasteful lighting",
-    }
+def _english_keyword_phrases(values: list, max_items: int = 10) -> list:
+    phrases = []
+    seen = set()
+    for value in values or []:
+        text = str(value or "").strip()
+        if not text:
+            continue
+        # SDXL prompt suffix must stay English. Korean context is already passed to
+        # the LLM, so the deterministic suffix only preserves English keywords.
+        candidates = re.findall(r"[A-Za-z][A-Za-z0-9&' -]{1,40}", text)
+        for candidate in candidates:
+            normalized = " ".join(candidate.lower().split())
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                phrases.append(normalized)
+            if len(phrases) >= max_items:
+                return phrases
+    return phrases
+
+
+def select_visual_elements(
+    topic: str = None,
+    user_interests: list = None,
+    magazine_tags: list = None,
+    magazine_titles: list = None,
+) -> dict:
+    source_values = [topic or "", *(user_interests or []), *(magazine_tags or []), *(magazine_titles or [])]
+    keyword_phrases = _english_keyword_phrases(source_values)
+    if keyword_phrases:
+        elements = (
+            "use only visual subjects derived from these supplied magazine keywords: "
+            + ", ".join(keyword_phrases)
+        )
+    else:
+        elements = (
+            "use only concrete objects, materials, colors, locations, and visual details "
+            "explicitly implied by the translated topic and supplied magazine context"
+        )
+    return {"category": "keyword_driven", "elements": elements, "keywords": keyword_phrases}
 
 
 def enforce_no_human_moodboard_prompt(prompt: str, visual_elements: dict) -> str:
@@ -108,8 +104,8 @@ def enforce_no_human_moodboard_prompt(prompt: str, visual_elements: dict) -> str
     )
     layout_rule = (
         "5 to 8 related objects and material or color elements arranged with balanced spacing, "
-        "no single item dominates the frame, no full shirt as the main subject, "
-        "fabric swatches and folded garment details instead of a whole clothing product"
+        "no single item dominates the frame, no unrelated props, no category-default objects, "
+        "no objects that are absent from the supplied topic or magazine keywords"
     )
     no_human_rule = (
         "strictly no people, no humans, no person, no face, no portrait, no hands, no arms, "
@@ -117,10 +113,41 @@ def enforce_no_human_moodboard_prompt(prompt: str, visual_elements: dict) -> str
     )
     no_text_rule = "no logos, no text, no labels, no brand marks, no typography"
     return (
-        f"{prompt}, {style}, visual elements: {visual_elements['elements']}, "
+        f"{prompt}, {style}, source constraint: {visual_elements['elements']}, "
         f"{layout_rule}, object and material focused, brand board composition, "
         f"{no_human_rule}, {no_text_rule}"
     )
+
+
+def validate_moodboard_prompt_relevance(prompt: str, topic: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None) -> tuple[bool, str]:
+    context = " ".join(
+        str(part).lower()
+        for part in [
+            topic or "",
+            " ".join(user_interests or []),
+            " ".join(magazine_tags or []),
+            " ".join(magazine_titles or []),
+        ]
+    )
+    prompt_lower = (prompt or "").lower()
+
+    topic_scoped_terms = {
+        "golf": ["golf", "골프"],
+        "food": ["food", "restaurant", "cafe", "coffee", "음식", "맛집", "카페", "요리"],
+        "travel": ["travel", "trip", "journey", "여행", "트래블", "휴가"],
+    }
+    forbidden_when_unrelated = {
+        "golf": ["golf ball", "golf balls", "club head", "golf club", "tee, club", "golf tee"],
+    }
+
+    for scope, prompt_terms in forbidden_when_unrelated.items():
+        context_terms = topic_scoped_terms[scope]
+        if not any(term in context for term in context_terms):
+            for term in prompt_terms:
+                if term in prompt_lower:
+                    return False, f"UNRELATED_OBJECT:{term}"
+
+    return True, ""
 
 def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None, request_id: str = None) -> str:
     """
@@ -166,7 +193,7 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
         topic_keywords.extend(magazine_tags)
     
     topic_emphasis = ", ".join(topic_keywords) if topic_keywords else "general lifestyle"
-    visual_elements = select_visual_elements(topic, user_interests, magazine_tags)
+    visual_elements = select_visual_elements(topic, user_interests, magazine_tags, magazine_titles)
 
     system_prompt = f"""
     You are an award-winning Art Director and Senior Photographer.
@@ -181,29 +208,20 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     [SUBJECT-SPECIFIC FOCUS (MANDATORY)]
     The image MUST clearly feature elements of: {topic_emphasis}
     It MUST show object/product/material elements instead of humans.
-    Selected visual object palette: {visual_elements['elements']}
+    Source keywords and constraints: {visual_elements['elements']}
     The result must feel like an editorial moodboard or magazine brand board, not a single product photo or advertisement.
     It must show 5 to 8 related objects/material/color elements with balanced spacing.
-    Match the topic to the most relevant category and follow its guidance:
-    - **Food/Cafe**: Detail-oriented food photography. Focus on textures (steam, moisture, crumbs). Artisan ceramics.
-    - **Fashion/Beauty**: High-fashion editorial object board. Focus on fabric swatches, cropped folded garment details, stitching, accessories, packaging, bottles, botanicals, and luxury textures. Never use a wearing model, never make one full clothing item dominate the frame.
-    - **Travel/Architecture**: Atmospheric object/location-inspired board. Focus on maps, tickets, luggage details, local objects, lighting, scale, and architectural materials. No tourists.
-    - **Art/Design**: Abstract or conceptual visuals. Focus on color harmony, shadow play, and artistic objects.
-    - **Tech/Minimal**: Futuristic and clean. Focus on sleek surfaces, light-ray effects, and UI-inspired aesthetics.
-    - **Fitness/Health/Sports**: Athletic and energetic object board. Focus on workout equipment, golf balls, club heads, gloves, shoes, fabric, yoga mat, dumbbells, resistance bands, water bottle, gym or home workout objects. No active body movement and no people.
-    - **Lifestyle/Wellness**: Serene and balanced. Focus on self-care items (candles, plants, journals), cozy home interior, morning routines, healthy food prep, mindfulness.
-    - **Music/Entertainment**: Dynamic and expressive. Focus on instruments, concert lighting, vinyl records, headphones, stage atmospheres.
+    Do not use a fixed category palette. Derive every object from the supplied topic, titles, tags, and paragraph image keywords.
     
     [CONCRETE OBJECTS REQUIRED]
-    You MUST include 5-8 specific physical objects/material/color elements in the prompt that are directly related to the topic.
+    You MUST include 5-8 specific physical objects/material/color elements in the prompt that are directly related to the supplied topic and magazine keywords.
     - BAD: "fitness concept, healthy lifestyle, motivation" (too abstract)
     - BAD: "model wearing golfwear, athlete portrait, person exercising" (humans are forbidden)
     - BAD: "single polo shirt product photo, centered clothing advertisement, logo label close-up" (too much like a product ad)
-    - GOOD: "yoga mat with resistance bands and water bottle, bright home interior" (concrete objects)
-    - GOOD: "folded polo fabric swatch, golf glove, golf ball, tee, club head detail, grass texture, color palette cards, stitching detail"
+    - GOOD: concrete objects that appear in or are directly implied by the supplied magazine keywords
     
     [PHOTOGRAPHY PARAMETERS]
-    1. **Subject**: Specific, high-definition product/object/material subjects related to the Topic ({topic_emphasis}). Include real objects.
+    1. **Subject**: Specific, high-definition product/object/material subjects related to the Topic ({topic_emphasis}) and source keywords. Include real objects.
     2. **Composition**: balanced layout, multiple curated objects, material swatches, color palette cards, magazine brand board, premium editorial moodboard, aesthetic product collage, clean wallpaper composition, curated object flatlay, cohesive color palette, tasteful lighting, design magazine style, not a single product shot.
     3. **Lighting**: Cinematic lighting (Volumetric light, Soft natural dawn light, Dramatic REMBRANDT shadows).
     4. **Camera/Film**: 85mm lens for products, 24mm for landscapes. High-speed film grain (minimal), crisp focus.
@@ -220,7 +238,7 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     - ABSOLUTELY NO HUMANS: no people, no humans, no person, no face, no portrait, no hands, no arms, no legs, no feet, no body, no mannequin, no model, no silhouette.
     - ABSOLUTELY NO TEXT OR BRANDING: no logos, no text, no labels, no brand marks, no typography.
     - Avoid product advertisement composition. No single product should occupy most of the frame.
-    - For fashion, golfwear, sportswear, fitness, and beauty topics, show products, equipment, packaging, fabric, texture, and accessories only.
+    - Do not introduce sports equipment, food, travel props, beauty products, devices, or fashion items unless they are present in or directly implied by the supplied keywords.
     - Ensure the mood aligns with: {user_mood or "Sophisticated"}
     """
 
@@ -236,7 +254,18 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     prompt = llm_client.generate_text(system_prompt, user_prompt)
     if prompt and prompt.strip() == "FORBIDDEN_CONTENT":
         return "FORBIDDEN_CONTENT"
-    return enforce_no_human_moodboard_prompt(prompt, visual_elements)
+    enforced_prompt = enforce_no_human_moodboard_prompt(prompt, visual_elements)
+    is_relevant, reason = validate_moodboard_prompt_relevance(
+        enforced_prompt,
+        topic=topic,
+        user_interests=user_interests,
+        magazine_tags=magazine_tags,
+        magazine_titles=magazine_titles,
+    )
+    if not is_relevant:
+        print(f"[moodboard] prompt relevance rejected: {reason}")
+        return "IRRELEVANT_PROMPT"
+    return enforced_prompt
 
 # 기본 Fallback 이미지 (SDXL 실패 시 사용) — Unsplash 그라디언트 제거
 # 무드보드는 AI 생성이므로, 실패 시 fallback URL 없이 에러 반환
@@ -254,7 +283,7 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
     """
     # 토픽이 없으면 태그나 타이틀로 대체 토픽 설정 (로깅용)
     display_topic = topic or (magazine_titles[0] if magazine_titles else "User Profile")
-    visual_elements = select_visual_elements(topic or display_topic, user_interests, magazine_tags)
+    visual_elements = select_visual_elements(topic or display_topic, user_interests, magazine_tags, magazine_titles)
     generation_config = get_moodboard_generation_config()
     negative_prompt = build_no_human_negative_prompt()
     
@@ -291,10 +320,11 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
         print(f"{log_prefix} ❌ Prompt generation failed: {e}")
         sd_prompt = None
 
-    if not sd_prompt or sd_prompt.strip() == "FORBIDDEN_CONTENT":
+    if not sd_prompt or sd_prompt.strip() in ("FORBIDDEN_CONTENT", "IRRELEVANT_PROMPT"):
+        error_type = "FORBIDDEN_CONTENT" if sd_prompt == "FORBIDDEN_CONTENT" else "PROMPT_RELEVANCE_FAILED"
         return {
             "error": "Forbidden content detected or prompt generation failed",
-            "error_type": "FORBIDDEN_CONTENT" if sd_prompt == "FORBIDDEN_CONTENT" else "PROMPT_GENERATION_FAILED",
+            "error_type": error_type if sd_prompt else "PROMPT_GENERATION_FAILED",
             "success": False,
             "status": "FAILED",
             "fallback_url": None,

@@ -30,28 +30,56 @@ def test_no_human_negative_prompt_contains_body_terms():
         assert term in negative_prompt
 
 
-def test_golfwear_prompt_uses_product_object_material_palette(monkeypatch):
+def test_prompt_uses_supplied_magazine_keywords_without_category_palette(monkeypatch):
     monkeypatch.setattr(
         moodboard_maker.llm_client,
         "generate_text",
-        lambda *args, **kwargs: "premium golfwear moodboard",
+        lambda *args, **kwargs: "premium editorial moodboard with golf glove and grass texture",
     )
 
-    prompt = moodboard_maker.generate_moodboard_prompt(topic="골프웨어", magazine_tags=["FASHION", "SPORTS"])
+    prompt = moodboard_maker.generate_moodboard_prompt(
+        topic="골프웨어",
+        magazine_tags=["golf glove", "green grass texture", "folded polo fabric"],
+    )
 
-    assert "golf gloves" in prompt
-    assert "golf balls" in prompt
-    assert "premium textile swatches" in prompt
-    assert "folded polo fabric swatch" in prompt
-    assert "club head detail" in prompt
-    assert "color palette cards" in prompt
-    assert "stitching detail" in prompt
+    assert "source constraint" in prompt
+    assert "golf glove" in prompt
+    assert "green grass texture" in prompt
+    assert "folded polo fabric" in prompt
+    assert "club head detail" not in prompt
+    assert "golf balls" not in prompt
     assert "multiple curated objects" in prompt
     assert "not a single product shot" in prompt
     assert "no logos" in prompt
     assert "no text" in prompt
     assert "no people" in prompt
     assert "no model" in prompt
+
+
+def test_general_fashion_prompt_does_not_include_golf_objects(monkeypatch):
+    monkeypatch.setattr(
+        moodboard_maker.llm_client,
+        "generate_text",
+        lambda *args, **kwargs: "premium fashion moodboard",
+    )
+
+    prompt = moodboard_maker.generate_moodboard_prompt(topic="봄 패션", magazine_tags=["FASHION"])
+
+    assert "category-default objects" in prompt
+    assert "golf balls" not in prompt
+    assert "club head detail" not in prompt
+
+
+def test_unrelated_golf_prompt_is_rejected_for_movie_topic(monkeypatch):
+    monkeypatch.setattr(
+        moodboard_maker.llm_client,
+        "generate_text",
+        lambda *args, **kwargs: "cinema moodboard with golf balls and club head detail",
+    )
+
+    prompt = moodboard_maker.generate_moodboard_prompt(topic="영화", magazine_tags=["MOVIE"])
+
+    assert prompt == "IRRELEVANT_PROMPT"
 
 
 def test_home_office_prompt_uses_interior_object_palette(monkeypatch):
@@ -63,9 +91,8 @@ def test_home_office_prompt_uses_interior_object_palette(monkeypatch):
 
     prompt = moodboard_maker.generate_moodboard_prompt(topic="홈 오피스 생산성 셋업")
 
-    assert "desk lamp" in prompt
-    assert "keyboard" in prompt
-    assert "ergonomic chair detail" in prompt
+    assert "source constraint" in prompt
+    assert "category-default objects" in prompt
     assert "no humans" in prompt
 
 

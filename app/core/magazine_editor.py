@@ -1,7 +1,46 @@
 # FORCE_REDEPLOY_FOR_STRUCTURE_SYNC_V2
 import json
+import re
 from app.core.llm_client import llm_client
 from app.models.chat import AgentIntent
+
+
+ENTITY_RECOMMENDATION_TERMS = [
+    "추천", "recommend", "recommendation", "유튜버", "youtuber", "youtube",
+    "채널", "creator", "크리에이터", "인플루언서", "맛집", "장소", "브랜드",
+    "인물", "사람", "전문가", "계정", "account"
+]
+
+
+def requires_verified_sources(text: str) -> bool:
+    normalized = (text or "").lower()
+    return any(term in normalized for term in ENTITY_RECOMMENDATION_TERMS)
+
+
+def insufficient_verified_sources_error(instruction: str) -> dict:
+    return {
+        "error": "INSUFFICIENT_VERIFIED_SOURCES",
+        "success": False,
+        "message": "검증 가능한 검색 결과가 없어 구체적인 추천 대상을 생성하지 않았습니다.",
+        "instruction": instruction,
+    }
+
+
+def source_urls_from_labeled_sources(labeled_sources: list) -> set:
+    return {url for url, _ in (labeled_sources or []) if url}
+
+
+def validate_section_source_grounding(section: dict, allowed_source_urls: set) -> tuple[bool, str]:
+    if not allowed_source_urls:
+        return False, "NO_VERIFIED_SOURCES"
+    for para in section.get("paragraphs", []):
+        source_url = para.get("source_url")
+        if source_url not in allowed_source_urls:
+            return False, f"UNVERIFIED_SOURCE:{source_url}"
+        text = para.get("text", "")
+        if re.search(r"(출처|source_url|https?://)", text, re.IGNORECASE):
+            return False, "SOURCE_LEAK_IN_TEXT"
+    return True, ""
 
 def analyze_user_intent(user_message: str, magazine_data: dict) -> AgentIntent:
     """
@@ -256,7 +295,9 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
         research_content += f"\n[Source {i+1}: {url}]\n{content[:1000]}\n"
     
     if not research_content:
-        research_content = "No specific research available. Use general knowledge."
+        if requires_verified_sources(instruction):
+            return insufficient_verified_sources_error(instruction)
+        research_content = "No specific research available. Use non-specific general editorial guidance only. Do not name people, creators, brands, places, channels, accounts, products, prices, dates, rankings, or statistics."
     
     # 기존 섹션 헤딩 (중복 방지)
     existing_headings = [s.get('heading', '') for s in magazine_data.get('sections', [])]
@@ -276,6 +317,9 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     - Heading: Korean, brand-like.
     - Paragraph: subtitle (Korean) + text (350-550 chars Korean) + image_search_keyword (English nouns).
     - Originality: Do not repeat existing topics: {existing_headings}
+    - Use only the provided [Research Results] for concrete names, channels, people, places, brands, URLs, rankings, statistics, and recommendations.
+    - If [Research Results] does not verify a concrete recommendation target, do not invent it.
+    - Every `source_url` MUST be one of the Source URLs provided in [Research Results].
 
     Output JSON EXACTLY:
     {
@@ -336,6 +380,13 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
                 if imgs: para['image_url'] = imgs[0]
             except: pass
         if not para['image_url'] and images: para['image_url'] = images[0]
+
+    if requires_verified_sources(instruction):
+        is_grounded, reason = validate_section_source_grounding(new_section, source_urls_from_labeled_sources(labeled_sources))
+        if not is_grounded:
+            error = insufficient_verified_sources_error(instruction)
+            error["reason"] = reason
+            return error
 
     new_section['thumbnail_url'] = None
     try:
@@ -403,6 +454,9 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
             research_content = f"[Jina Source: {source_url}]\n{jina_content[:1500]}"
         else:
             research_content = "\n".join([f"- {r.get('title')}: {r.get('content')[:300]}" for r in search_results[:1]])
+
+    if requires_verified_sources(message) and not source_url:
+        return insufficient_verified_sources_error(message)
     
     # 2. 기존 문단 텍스트 추출 (중복 방지)
     existing_text = "\n".join([f"Subtitle: {p.get('subtitle')}\nText: {p.get('text')}" for p in existing_paragraphs])
@@ -423,6 +477,7 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
     1. Do NOT repeat what is already in the EXISTING PARAGRAPHS. Provide fresh information or a new perspective.
     2. Directly address the user's specific request: "{message}"
     3. Use the provided [Research Results], preferring Jina-read page content when available.
+    3-1. For concrete recommendations, people, YouTubers, channels, places, brands, prices, rankings, statistics, or product names, use ONLY entities verified in [Research Results]. If [Research Results] is empty, return {{"error": "INSUFFICIENT_VERIFIED_SOURCES"}}.
     4. Write in sophisticated, editorial Korean (합쇼체/해요체, ~습니다/~입니다).
     5. The 'text' should be a single continuous string in Markdown (NO HTML TAGS), with a length of 300-600 characters. Use **bold** or italics naturally.
     6. Generate a specific `image_search_keyword` in ENGLISH NOUNS ONLY (Max 3 words) optimized for Pexels stock photo search.
@@ -448,6 +503,9 @@ def generate_paragraph(topic: str, section_heading: str, message: str, user_mood
     """
     
     result = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+
+    if "error" in result:
+        return result
     
     # Request Pexels for new paragraph image
     search_keyword = result.get('image_search_keyword', '')
@@ -555,10 +613,22 @@ def edit_section_content(section_data: dict, message: str, topic: str = "Magazin
             
             print(f"🔍 Searching images for: {message[:30]}...")
             try:
-                _, images = search_with_tavily(message, topic=topic)
+                search_results, images = search_with_tavily(message, topic=topic)
+                if requires_verified_sources(message) and not search_results:
+                    return {
+                        "intent": "append_content",
+                        **insufficient_verified_sources_error(message),
+                        "updated_section": None,
+                    }
                 available_images = json.dumps(images[:5], ensure_ascii=False) if images else "[]"
             except Exception as e:
                 print(f"⚠️ Image search failed: {e}")
+                if requires_verified_sources(message):
+                    return {
+                        "intent": "append_content",
+                        **insufficient_verified_sources_error(message),
+                        "updated_section": None,
+                    }
                 available_images = "[]"
             
             # 기존 내용 유지 + 새 내용 추가 (V2 프롬프트 - 더 명확한 제약)
