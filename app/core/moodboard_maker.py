@@ -42,10 +42,10 @@ def get_moodboard_generation_config() -> dict:
     return {
         "width": _env_int("MOODBOARD_WIDTH", 768),
         "height": _env_int("MOODBOARD_HEIGHT", 768),
-        "steps": _env_int("MOODBOARD_STEPS", 8),
-        "guidance_scale": _env_float("MOODBOARD_GUIDANCE_SCALE", 5.0),
+        "steps": _env_int("MOODBOARD_STEPS", 12),
+        "guidance_scale": _env_float("MOODBOARD_GUIDANCE_SCALE", 6.0),
         "output_format": os.getenv("MOODBOARD_IMAGE_FORMAT", "JPEG"),
-        "quality": _env_int("MOODBOARD_IMAGE_QUALITY", 70),
+        "quality": _env_int("MOODBOARD_IMAGE_QUALITY", 82),
     }
 
 
