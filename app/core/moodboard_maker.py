@@ -80,7 +80,10 @@ def select_visual_elements(
     magazine_tags: list = None,
     magazine_titles: list = None,
 ) -> dict:
-    source_values = [topic or "", *(user_interests or []), *(magazine_tags or []), *(magazine_titles or [])]
+    if topic:
+        source_values = [topic or "", *(magazine_tags or []), *(magazine_titles or [])]
+    else:
+        source_values = [*(user_interests or []), *(magazine_tags or []), *(magazine_titles or [])]
     keyword_phrases = _english_keyword_phrases(source_values)
     if keyword_phrases:
         elements = (
@@ -104,6 +107,7 @@ def enforce_no_human_moodboard_prompt(prompt: str, visual_elements: dict) -> str
     )
     layout_rule = (
         "5 to 8 related objects and material or color elements arranged with balanced spacing, "
+        "wide editorial board crop with clean negative space, no macro close-up, "
         "no single item dominates the frame, no unrelated props, no category-default objects, "
         "no objects that are absent from the supplied topic or magazine keywords"
     )
@@ -181,6 +185,8 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     Source keywords and constraints: {visual_elements['elements']}
     The result must feel like an editorial moodboard or magazine brand board, not a single product photo or advertisement.
     It must show 5 to 8 related objects/material/color elements with balanced spacing.
+    Use a wide, zoomed-out editorial board composition with clean negative space so it works as a cover background.
+    Do not use a macro food close-up, cropped plate close-up, or one oversized object filling the frame.
     Do not use a fixed category palette. Derive every object from the supplied topic, titles, tags, and paragraph image keywords.
     
     [CONCRETE OBJECTS REQUIRED]

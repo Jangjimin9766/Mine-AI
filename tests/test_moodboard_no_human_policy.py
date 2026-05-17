@@ -97,6 +97,24 @@ def test_home_office_prompt_uses_interior_object_palette(monkeypatch):
     assert "no humans" in prompt
 
 
+def test_topic_moodboard_source_constraint_does_not_leak_user_interests(monkeypatch):
+    monkeypatch.setattr(
+        moodboard_maker.llm_client,
+        "generate_text",
+        lambda *args, **kwargs: "kimchi stew editorial ingredient board",
+    )
+
+    prompt = moodboard_maker.generate_moodboard_prompt(
+        topic="김치찌개",
+        user_interests=["fashion", "movie", "instagram"],
+    )
+
+    assert "fashion" not in prompt
+    assert "movie" not in prompt
+    assert "instagram" not in prompt
+    assert "translated topic and supplied magazine context" in prompt
+
+
 def test_moodboard_generation_defaults(monkeypatch, capsys):
     monkeypatch.delenv("MOODBOARD_WIDTH", raising=False)
     monkeypatch.delenv("MOODBOARD_HEIGHT", raising=False)

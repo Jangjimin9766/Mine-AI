@@ -336,6 +336,20 @@ def scrape_multiple_with_jina(urls: list, max_count: int = 3, request_state: dic
 # 이미지 유효성 검증 캐시 (동일 URL 반복 검증 방지)
 _validation_cache = {}
 
+UNSTABLE_IMAGE_HOST_PATTERNS = [
+    "instagram.com",
+    "cdninstagram.com",
+    "facebook.com",
+    "fbcdn.net",
+    "pinterest.com",
+    "pinimg.com",
+    "gettyimages",
+    "istockphoto",
+    "shutterstock",
+    "alamy",
+    "freepik",
+]
+
 def validate_image_url(url: str) -> bool:
     """
     HTTP HEAD 요청으로 이미지 URL의 유효성을 검증합니다.
@@ -349,8 +363,11 @@ def validate_image_url(url: str) -> bool:
     """
     if not url or not url.startswith('http'):
         return False
+    url_lower = url.lower()
+    if any(pattern in url_lower for pattern in UNSTABLE_IMAGE_HOST_PATTERNS):
+        return False
     blocked_extensions = ('.svg', '.html', '.htm', '.txt')
-    if url.lower().split('?')[0].endswith(blocked_extensions):
+    if url_lower.split('?')[0].endswith(blocked_extensions):
         return False
     
     # 캐시 확인
