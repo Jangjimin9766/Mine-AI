@@ -314,6 +314,33 @@ def test_section_thumbnail_sync_prefers_first_paragraph_image():
         ]
     }
 
-    synced = magazine_maker._sync_section_thumbnails_from_paragraphs(magazine)
+    synced = magazine_maker._sync_section_thumbnails_from_paragraphs(magazine, overwrite=True)
 
     assert synced["sections"][0]["thumbnail_url"] == "https://example.com/kimchi-stew-bowl.jpg"
+
+
+def test_topic_thumbnail_query_translates_to_exact_visual_subject(monkeypatch):
+    monkeypatch.setattr(
+        magazine_maker.llm_client,
+        "generate_text",
+        lambda *args, **kwargs: "kimchi stew bowl",
+    )
+
+    query = magazine_maker._topic_thumbnail_query("김치찌개")
+
+    assert query == "kimchi stew bowl"
+
+
+def test_section_thumbnail_sync_keeps_exact_topic_thumbnail_unless_missing():
+    magazine = {
+        "sections": [
+            {
+                "thumbnail_url": "https://example.com/exact-kimchi-stew.jpg",
+                "paragraphs": [{"image_url": "https://example.com/related-kimchi-rice.jpg"}],
+            }
+        ]
+    }
+
+    synced = magazine_maker._sync_section_thumbnails_from_paragraphs(magazine)
+
+    assert synced["sections"][0]["thumbnail_url"] == "https://example.com/exact-kimchi-stew.jpg"

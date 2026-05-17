@@ -231,9 +231,36 @@ def _section_thumbnail_query(topic: str, section: dict) -> str:
     return _fallback_image_keyword([], topic, section.get('heading', '') if isinstance(section, dict) else '')
 
 
-def _sync_section_thumbnails_from_paragraphs(result_json: dict) -> dict:
+def _topic_thumbnail_query(topic: str) -> str:
+    if is_mostly_english(topic):
+        return topic
+    try:
+        query = llm_client.generate_text(
+            "You create concise English image search queries.",
+            f"""
+            Translate this magazine topic into one concrete English visual search query.
+            Topic: {topic}
+
+            Rules:
+            - Return only 2 to 5 English words.
+            - Include the exact main subject, dish, object, place, or product.
+            - Do not use abstract words like history, trend, concept, modern, vibe.
+            - For food topics, include the dish name itself.
+            """
+        )
+        words = re.findall(r"[A-Za-z][A-Za-z0-9'-]*", query or "")
+        if len(words) >= 2:
+            return " ".join(words[:5]).lower()
+    except Exception as e:
+        print(f"Topic thumbnail query translation failed: {e}")
+    return _fallback_image_keyword([], topic, "")
+
+
+def _sync_section_thumbnails_from_paragraphs(result_json: dict, overwrite: bool = False) -> dict:
     for section in result_json.get('sections', []) if isinstance(result_json, dict) else []:
         if not isinstance(section, dict):
+            continue
+        if not overwrite and isinstance(section.get('thumbnail_url'), str) and section['thumbnail_url'].startswith('http'):
             continue
         for para in section.get('paragraphs', []):
             image_url = para.get('image_url') if isinstance(para, dict) else None
@@ -881,7 +908,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     real_tavily_images = [img for img in images]
     indices = {"scraped": 0, "tavily": 0}
 
-    def assign_image_to_target(target, query):
+    def assign_image_to_target(target, query, allow_fallback=True):
         assigned = False
         if query:
             try:
@@ -895,6 +922,8 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                             return True
             except Exception as e:
                 print(f"Pexels failed: {e}")
+        if not allow_fallback:
+            return False
         with lock:
             if not assigned:
                 while indices["scraped"] < len(scraped_images):
@@ -916,8 +945,11 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = []
         image_search_start = time.perf_counter()
+        topic_thumbnail_query = _topic_thumbnail_query(topic)
         for i, section in enumerate(result_json.get('sections', [])):
             section['display_order'] = i
+            section['thumbnail_url'] = None
+            futures.append(executor.submit(assign_image_to_target, section, topic_thumbnail_query, False))
             for para in section.get('paragraphs', []):
                 if not para.get('image_url') or not para['image_url'].startswith('http'):
                     pq = para.get('image_search_keyword', f"{topic} {section.get('heading', '')}")
