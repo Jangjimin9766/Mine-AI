@@ -119,36 +119,6 @@ def enforce_no_human_moodboard_prompt(prompt: str, visual_elements: dict) -> str
     )
 
 
-def validate_moodboard_prompt_relevance(prompt: str, topic: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None) -> tuple[bool, str]:
-    context = " ".join(
-        str(part).lower()
-        for part in [
-            topic or "",
-            " ".join(user_interests or []),
-            " ".join(magazine_tags or []),
-            " ".join(magazine_titles or []),
-        ]
-    )
-    prompt_lower = (prompt or "").lower()
-
-    topic_scoped_terms = {
-        "golf": ["golf", "골프"],
-        "food": ["food", "restaurant", "cafe", "coffee", "음식", "맛집", "카페", "요리"],
-        "travel": ["travel", "trip", "journey", "여행", "트래블", "휴가"],
-    }
-    forbidden_when_unrelated = {
-        "golf": ["golf ball", "golf balls", "club head", "golf club", "tee, club", "golf tee"],
-    }
-
-    for scope, prompt_terms in forbidden_when_unrelated.items():
-        context_terms = topic_scoped_terms[scope]
-        if not any(term in context for term in context_terms):
-            for term in prompt_terms:
-                if term in prompt_lower:
-                    return False, f"UNRELATED_OBJECT:{term}"
-
-    return True, ""
-
 def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None, request_id: str = None) -> str:
     """
     Generate a detailed prompt for Stable Diffusion (SDXL) based on the user's magazine context.
@@ -255,16 +225,6 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     if prompt and prompt.strip() == "FORBIDDEN_CONTENT":
         return "FORBIDDEN_CONTENT"
     enforced_prompt = enforce_no_human_moodboard_prompt(prompt, visual_elements)
-    is_relevant, reason = validate_moodboard_prompt_relevance(
-        enforced_prompt,
-        topic=topic,
-        user_interests=user_interests,
-        magazine_tags=magazine_tags,
-        magazine_titles=magazine_titles,
-    )
-    if not is_relevant:
-        print(f"[moodboard] prompt relevance rejected: {reason}")
-        return "IRRELEVANT_PROMPT"
     return enforced_prompt
 
 # 기본 Fallback 이미지 (SDXL 실패 시 사용) — Unsplash 그라디언트 제거

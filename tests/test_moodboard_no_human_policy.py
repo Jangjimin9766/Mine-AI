@@ -56,30 +56,31 @@ def test_prompt_uses_supplied_magazine_keywords_without_category_palette(monkeyp
     assert "no model" in prompt
 
 
-def test_general_fashion_prompt_does_not_include_golf_objects(monkeypatch):
+def test_general_prompt_uses_keyword_driven_constraints(monkeypatch):
     monkeypatch.setattr(
         moodboard_maker.llm_client,
         "generate_text",
-        lambda *args, **kwargs: "premium fashion moodboard",
+        lambda *args, **kwargs: "premium fashion moodboard with folded linen and color swatches",
     )
 
     prompt = moodboard_maker.generate_moodboard_prompt(topic="봄 패션", magazine_tags=["FASHION"])
 
+    assert "source constraint" in prompt
     assert "category-default objects" in prompt
-    assert "golf balls" not in prompt
-    assert "club head detail" not in prompt
 
 
-def test_unrelated_golf_prompt_is_rejected_for_movie_topic(monkeypatch):
+def test_moodboard_prompt_does_not_use_object_specific_rejection(monkeypatch):
     monkeypatch.setattr(
         moodboard_maker.llm_client,
         "generate_text",
-        lambda *args, **kwargs: "cinema moodboard with golf balls and club head detail",
+        lambda *args, **kwargs: "cinema moodboard with perfume bottles and lipstick tubes",
     )
 
     prompt = moodboard_maker.generate_moodboard_prompt(topic="영화", magazine_tags=["MOVIE"])
 
-    assert prompt == "IRRELEVANT_PROMPT"
+    assert prompt != "IRRELEVANT_PROMPT"
+    assert "source constraint" in prompt
+    assert "no objects that are absent from the supplied topic or magazine keywords" in prompt
 
 
 def test_home_office_prompt_uses_interior_object_palette(monkeypatch):
