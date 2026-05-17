@@ -298,3 +298,22 @@ def test_section_thumbnail_query_uses_paragraph_image_keyword_before_heading():
     assert query == "kimchi stew pot"
     assert "photography" not in query
     assert "현대적" not in query
+
+
+def test_section_thumbnail_sync_prefers_first_paragraph_image():
+    magazine = {
+        "sections": [
+            {
+                "heading": "김치찌개의 개념과 역사",
+                "thumbnail_url": "https://example.com/unrelated-street.jpg",
+                "paragraphs": [
+                    {"image_url": "https://example.com/kimchi-stew-bowl.jpg"},
+                    {"image_url": "https://example.com/another-food.jpg"},
+                ],
+            }
+        ]
+    }
+
+    synced = magazine_maker._sync_section_thumbnails_from_paragraphs(magazine)
+
+    assert synced["sections"][0]["thumbnail_url"] == "https://example.com/kimchi-stew-bowl.jpg"

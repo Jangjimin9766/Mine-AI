@@ -231,6 +231,18 @@ def _section_thumbnail_query(topic: str, section: dict) -> str:
     return _fallback_image_keyword([], topic, section.get('heading', '') if isinstance(section, dict) else '')
 
 
+def _sync_section_thumbnails_from_paragraphs(result_json: dict) -> dict:
+    for section in result_json.get('sections', []) if isinstance(result_json, dict) else []:
+        if not isinstance(section, dict):
+            continue
+        for para in section.get('paragraphs', []):
+            image_url = para.get('image_url') if isinstance(para, dict) else None
+            if isinstance(image_url, str) and image_url.startswith('http'):
+                section['thumbnail_url'] = image_url
+                break
+    return result_json
+
+
 def _normalize_magazine_contract(result_json: dict, topic: str) -> dict:
     """Clean fields the frontend no longer uses and fill safe fallbacks."""
     result_json.pop('subtitle', None)
@@ -420,11 +432,16 @@ def _fill_missing_final_images(result_json: dict, fallback_image_url: str) -> di
     if not result_json.get('cover_image_url'):
         result_json['cover_image_url'] = fallback_image_url
     for section in result_json.get('sections', []):
-        if not section.get('thumbnail_url'):
-            section['thumbnail_url'] = result_json.get('cover_image_url') or fallback_image_url
         for para in section.get('paragraphs', []):
             if not para.get('image_url'):
-                para['image_url'] = section.get('thumbnail_url') or fallback_image_url
+                para['image_url'] = fallback_image_url
+        if not section.get('thumbnail_url'):
+            for para in section.get('paragraphs', []):
+                if para.get('image_url'):
+                    section['thumbnail_url'] = para.get('image_url')
+                    break
+        if not section.get('thumbnail_url'):
+            section['thumbnail_url'] = result_json.get('cover_image_url') or fallback_image_url
     return result_json
 
 
@@ -901,15 +918,13 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         image_search_start = time.perf_counter()
         for i, section in enumerate(result_json.get('sections', [])):
             section['display_order'] = i
-            if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http'):
-                q = _section_thumbnail_query(topic, section)
-                futures.append(executor.submit(assign_image_to_target, section, q))
             for para in section.get('paragraphs', []):
                 if not para.get('image_url') or not para['image_url'].startswith('http'):
                     pq = para.get('image_search_keyword', f"{topic} {section.get('heading', '')}")
                     futures.append(executor.submit(assign_image_to_target, para, pq))
         for f in futures:
             f.result()
+        result_json = _sync_section_thumbnails_from_paragraphs(result_json)
         timings["paragraph_image_search_time"] = round(time.perf_counter() - image_search_start, 3)
         try:
             # Do not use a timeout here. If this times out inside the
