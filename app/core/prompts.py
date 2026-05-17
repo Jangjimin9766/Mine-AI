@@ -639,8 +639,10 @@ FASHION, BEAUTY, ACCESSORY, DESIGN, INTERIOR, DOLL, MUSIC, ART, MUSICAL, THEATER
 
 [IMAGE KEYWORDS]
 - 각 문단의 `image_search_keyword`는 영어 명사 중심 2~4단어로 작성한다.
+- `image_search_keyword`는 반드시 매거진 주제의 실제 시각 대상이 포함된 구체 키워드여야 한다. 예: 김치찌개 주제라면 "kimchi stew bowl", "korean stew pot"처럼 음식 자체가 들어가야 한다.
 - 모든 문단 객체에 `image_search_keyword` 필드를 반드시 포함한다.
 - 문장, 추상어, 감정어만으로 된 키워드는 금지한다.
+- 섹션 제목이 "역사", "현대적 변형", "트렌드"처럼 추상적이어도 이미지 키워드는 추상어가 아니라 실제 사물/장소/재료를 가리켜야 한다.
 - 좋은 예: "korean ceramic bowl", "modern running shoes", "seoul cafe interior"
 - 나쁜 예: "innovation future lifestyle", "beautiful mood", "a photo of people enjoying travel"
 

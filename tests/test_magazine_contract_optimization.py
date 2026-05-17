@@ -282,3 +282,19 @@ def test_second_operational_distribution_targets_two_or_fewer():
     shorts = magazine_maker._short_paragraphs(magazine)
 
     assert [item["length"] for item in shorts] == [240, 220]
+
+
+def test_section_thumbnail_query_uses_paragraph_image_keyword_before_heading():
+    section = {
+        "heading": "김치찌개의 현대적 변형",
+        "paragraphs": [
+            {"image_search_keyword": "kimchi stew pot"},
+            {"image_search_keyword": "korean tofu stew"},
+        ],
+    }
+
+    query = magazine_maker._section_thumbnail_query("김치찌개", section)
+
+    assert query == "kimchi stew pot"
+    assert "photography" not in query
+    assert "현대적" not in query

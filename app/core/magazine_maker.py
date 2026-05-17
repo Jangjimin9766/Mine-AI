@@ -221,6 +221,16 @@ def _fallback_image_keyword(tags: list, topic: str, section_heading: str) -> str
     return " ".join(words) if len(words) >= 2 else "premium lifestyle editorial"
 
 
+def _section_thumbnail_query(topic: str, section: dict) -> str:
+    paragraphs = section.get('paragraphs', []) if isinstance(section, dict) else []
+    for para in paragraphs:
+        keyword = str(para.get('image_search_keyword') or '').strip() if isinstance(para, dict) else ''
+        words = re.findall(r"[A-Za-z][A-Za-z0-9'-]*", keyword)
+        if len(words) >= 2:
+            return " ".join(words[:6])
+    return _fallback_image_keyword([], topic, section.get('heading', '') if isinstance(section, dict) else '')
+
+
 def _normalize_magazine_contract(result_json: dict, topic: str) -> dict:
     """Clean fields the frontend no longer uses and fill safe fallbacks."""
     result_json.pop('subtitle', None)
@@ -892,7 +902,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         for i, section in enumerate(result_json.get('sections', [])):
             section['display_order'] = i
             if not section.get('thumbnail_url') or not section['thumbnail_url'].startswith('http'):
-                q = f"{topic} {section.get('heading', '')} photography"
+                q = _section_thumbnail_query(topic, section)
                 futures.append(executor.submit(assign_image_to_target, section, q))
             for para in section.get('paragraphs', []):
                 if not para.get('image_url') or not para['image_url'].startswith('http'):
