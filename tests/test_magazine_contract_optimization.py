@@ -243,7 +243,7 @@ def test_targeted_expansion_caps_to_three_shortest(monkeypatch):
         import json
         import re
 
-        match = re.search(r"\\[Short Paragraph Targets\\]\\s*(\\[.*?\\])\\s*\\n\\s*\\[Rules\\]", user_prompt, re.S)
+        match = re.search(r"\[Short Paragraph Targets\]\s*(\[.*?\])\s*\n\s*\[Rules\]", user_prompt, re.S)
         targets = json.loads(match.group(1))
         expanded_targets.extend((item["section"], item["paragraph"], item["length"]) for item in targets)
         return [
