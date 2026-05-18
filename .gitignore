@@ -43,4 +43,8 @@ magazine_*.html
 list_response.json
 magazine_demo*.html
 
+# Local debug artifacts
+*.log
+*.bak
+
 
