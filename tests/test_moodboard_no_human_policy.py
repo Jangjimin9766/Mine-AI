@@ -112,11 +112,10 @@ def test_topic_moodboard_source_constraint_does_not_leak_user_interests(monkeypa
     assert "fashion" not in prompt
     assert "movie" not in prompt
     assert "instagram" not in prompt
-    assert "김치찌개" in prompt
-    assert "translate if needed" in prompt
+    assert "kimchi stew editorial ingredient board" in prompt
 
 
-def test_visual_elements_keep_korean_source_keywords_and_drop_weak_topic():
+def test_visual_elements_use_legacy_english_source_keywords():
     visual_elements = moodboard_maker.select_visual_elements(
         topic="my",
         magazine_tags=[
@@ -127,11 +126,10 @@ def test_visual_elements_keep_korean_source_keywords_and_drop_weak_topic():
         magazine_titles=["my", "캡스톤 디자인 전시회"],
     )
 
-    assert "my" not in visual_elements["keywords"]
-    assert "캡스톤 디자인 전시회 현장 리포트" in visual_elements["keywords"]
-    assert "전시 부스와 시연 영상" in visual_elements["keywords"]
+    assert "my" in visual_elements["keywords"]
     assert "printed circuit board prototype" in visual_elements["keywords"]
-    assert "translate if needed" in visual_elements["elements"]
+    assert "캡스톤 디자인 전시회 현장 리포트" not in visual_elements["keywords"]
+    assert "translate if needed" not in visual_elements["elements"]
 
 
 def test_moodboard_generation_defaults(monkeypatch, capsys):
