@@ -16,12 +16,9 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# RunPod may schedule workers on Blackwell GPUs (sm_120). The base image's
-# PyTorch 2.1/CUDA 11.8 build does not include kernels for that architecture,
-# so install a CUDA 12.8 PyTorch wheel with Blackwell support.
-RUN pip install --no-cache-dir --upgrade torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128
+RUN grep -v '^torch' requirements.txt > /tmp/requirements-no-torch.txt \
+    && pip install --no-cache-dir -r /tmp/requirements-no-torch.txt \
+    && pip install --no-cache-dir --upgrade torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128
 
 # Install RunPod SDK
 RUN pip install runpod
