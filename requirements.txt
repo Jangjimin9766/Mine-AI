@@ -1,25 +1,26 @@
 # --- Web Framework ---
-fastapi             # 메인 프레임워크
-uvicorn[standard]   # ASGI 서버
+fastapi==0.136.3             # 메인 프레임워크
+uvicorn[standard]==0.48.0    # ASGI 서버
+runpod==1.9.0
 
 # --- AI & Data ---
-openai              # OpenAI API
-beautifulsoup4      # HTML 파싱 (크롤링)
-requests            # HTTP 요청 (크롤링)
-tavily-python
+openai==2.38.0               # OpenAI API
+beautifulsoup4==4.14.3       # HTML 파싱 (크롤링)
+requests==2.32.5             # HTTP 요청 (크롤링)
+tavily-python==0.7.24
 # --- Config ---
-python-dotenv       # .env 파일 로드용
-pydantic-settings   # 설정 관리
+python-dotenv==1.2.2         # .env 파일 로드용
+pydantic-settings==2.14.1    # 설정 관리
 diffusers==0.25.0   # Stable Diffusion (pinned for compatibility)
-transformers        # Hugging Face Transformers
-accelerate          # Model acceleration
-torch>=2.7.1        # PyTorch 2.7+ includes Blackwell/sm_120 support with CUDA 12.8 wheels
+transformers==4.40.2         # Hugging Face Transformers
+accelerate==1.13.0           # Model acceleration
+torch==2.7.1                 # PyTorch 2.7+ includes Blackwell/sm_120 support with CUDA 12.8 wheels
 huggingface_hub==0.21.0  # Pinned for diffusers compatibility
 
 # --- Logging ---
-logtail-python      # Better Stack (Logtail) logging
+logtail-python==0.3.4        # Better Stack (Logtail) logging
 
 # --- Testing ---
-pytest              # Testing framework
-httpx               # Async HTTP client for testing
-pytest-asyncio      # Asyncio support for pytest
+pytest==9.0.3                # Testing framework
+httpx==0.28.1                # Async HTTP client for testing
+pytest-asyncio==1.4.0        # Asyncio support for pytest
