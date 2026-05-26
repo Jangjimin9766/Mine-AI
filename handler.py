@@ -61,6 +61,21 @@ logger.info("=" * 50)
 # These will be passed via RunPod's environment configuration
 
 
+GENERATION_ACTIONS = {
+    "create_magazine",
+    "create_moodboard",
+    "generate_moodboard",
+    "edit_magazine",
+    "chat",
+    "edit_section",
+    "generate_paragraph",
+}
+
+
+def generation_disabled() -> bool:
+    return os.getenv("GENERATION_DISABLED", "true").lower() not in ("0", "false", "no", "off")
+
+
 def _sanitize_callback_payload(value):
     """
     Remove inline base64 images before optional Spring callback.
@@ -103,6 +118,15 @@ def handler(event):
         data = input_data.get("data", {})
         
         logger.info(f"🚀 RunPod Handler received action: {action}")
+
+        if action in GENERATION_ACTIONS and generation_disabled():
+            logger.warning(f"⛔ Generation disabled. Rejecting action: {action}")
+            return {
+                "error": "GENERATION_DISABLED",
+                "success": False,
+                "message": "AI generation is temporarily disabled.",
+                "action": action,
+            }
         
         if action == "create_magazine":
             return handle_create_magazine(data)

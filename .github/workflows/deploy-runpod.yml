@@ -10,6 +10,10 @@ on:
       - 'requirements.txt'
       - '.github/workflows/deploy-runpod.yml'
 
+concurrency:
+  group: runpod-deploy-main
+  cancel-in-progress: true
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
