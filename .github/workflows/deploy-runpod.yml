@@ -32,28 +32,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      # NOTE:
+      # GitHub's action archive download (codeload.github.com) is intermittently failing for docker/* actions.
+      # Keep this workflow self-contained by using the built-in Docker CLI on ubuntu-latest.
+      - name: Docker Buildx Setup
+        run: |
+          docker version
+          docker buildx version
+          docker buildx create --name mine-builder --use || docker buildx use mine-builder
+          docker buildx inspect --bootstrap
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Docker Hub Login
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile.serverless
-          push: true
-          tags: |
-            jiminjang/mine-ai-serverless:latest
-            jiminjang/mine-ai-serverless:${{ github.sha }}
-          no-cache: true
-          build-args: |
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-            GIT_COMMIT=${{ github.sha }}
+      - name: Build and Push (buildx)
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+          BUILD_DATE: ${{ github.event.head_commit.timestamp }}
+        run: |
+          docker buildx build \
+            --file ./Dockerfile.serverless \
+            --no-cache \
+            --build-arg BUILD_DATE="$BUILD_DATE" \
+            --build-arg GIT_COMMIT="$GIT_COMMIT" \
+            --tag jiminjang/mine-ai-serverless:latest \
+            --tag jiminjang/mine-ai-serverless:"$GIT_COMMIT" \
+            --push \
+            .
 
       - name: Discord Notification
         if: always()
