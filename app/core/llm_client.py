@@ -55,12 +55,13 @@ class LLMClient:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
-                    "temperature": temperature,
                 }
                 # Some newer models (e.g. gpt-5*) use max_completion_tokens instead of max_tokens.
                 if isinstance(model, str) and model.startswith("gpt-5"):
+                    # gpt-5* currently only supports the default temperature (1). Omit parameter to avoid 400s.
                     request_kwargs["max_completion_tokens"] = 16000
                 else:
+                    request_kwargs["temperature"] = temperature
                     request_kwargs["max_tokens"] = 16000
                 if response_format:
                     request_kwargs["response_format"] = response_format
