@@ -49,7 +49,7 @@ class LLMClient:
         if self.openai_client:
             try:
                 request_kwargs = {
-                    "model": "gpt-4o-mini",
+                    "model": settings.OPENAI_TEXT_MODEL,
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}

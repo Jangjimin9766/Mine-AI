@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     )
 
     OPENAI_API_KEY: str = ""
+    OPENAI_TEXT_MODEL: str = "gpt-5-nano"
     SPRING_API_URL: str = "http://localhost:8080"
     
     # 검색용 키 추가

@@ -107,7 +107,7 @@ RunPod(Serverless)에서 Mine-server로 직접 저장 콜백을 보내려면 별
 - **Pydantic**: 데이터 검증 및 설정 관리
 
 ### **AI & NLP**
-- **OpenAI GPT-3.5-turbo**: 매거진 콘텐츠 생성, 채팅 분석
+- **OpenAI GPT-5 nano**: 매거진 콘텐츠 생성, 채팅 분석
 - **Local Stable Diffusion XL**: 무드보드 이미지 생성
 - **Diffusers (Hugging Face)**: Stable Diffusion 파이프라인
 - **PyTorch**: 딥러닝 프레임워크 (MPS 가속)
@@ -215,6 +215,7 @@ pip install -r requirements.txt
 ```env
 # OpenAI API Key (필수)
 OPENAI_API_KEY=sk-...
+OPENAI_TEXT_MODEL=gpt-5-nano
 
 # Tavily Search API Key (필수)
 TAVILY_API_KEY=tvly-...
@@ -463,7 +464,7 @@ if not result_json.get('cover_image_url').startswith('http'):
 1. 사용자가 "2024 겨울 코트 트렌드" 검색
 2. Tavily가 최신 패션 기사 검색 + 고화질 이미지 수집
 3. Jina AI가 상위 1개 기사 본문 깊이 읽기
-4. GPT-3.5가 Vogue 스타일 매거진 작성
+4. GPT-5 nano가 Vogue 스타일 매거진 작성
 5. Stable Diffusion XL이 무드보드 배경 이미지 생성
 
 ### **시나리오 2: AI 채팅으로 매거진 커스터마이징**
@@ -504,7 +505,7 @@ MIT License
 
 ## 🙏 coop
 
-- **OpenAI**: GPT-3.5-turbo API
+- **OpenAI**: GPT-5 nano API
 - **Stability AI**: Stable Diffusion XL 모델
 - **Tavily**: AI 친화적 검색 엔진
 - **Jina AI**: 깔끔한 웹 크롤링 서비스
