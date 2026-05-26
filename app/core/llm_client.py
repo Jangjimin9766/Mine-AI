@@ -40,6 +40,17 @@ class LLMClient:
         """OpenAI API 키가 올바르게 설정되어 있는지 확인"""
         return bool(self.openai_client)
 
+    def _uses_completion_token_param(self, model: str) -> bool:
+        return isinstance(model, str) and (
+            model.startswith("gpt-5")
+            or model.startswith("o1")
+            or model.startswith("o3")
+            or model.startswith("o4")
+        )
+
+    def _supports_custom_temperature(self, model: str) -> bool:
+        return not self._uses_completion_token_param(model)
+
     def generate_text(self, system_prompt: str, user_prompt: str, temperature: float = 0.7, response_format: dict = None) -> str:
         """
         Generates text using OpenAI only.
@@ -56,13 +67,12 @@ class LLMClient:
                         {"role": "user", "content": user_prompt}
                     ],
                 }
-                # Some newer models (e.g. gpt-5*) use max_completion_tokens instead of max_tokens.
-                if isinstance(model, str) and model.startswith("gpt-5"):
-                    # gpt-5* currently only supports the default temperature (1). Omit parameter to avoid 400s.
+                if self._uses_completion_token_param(model):
                     request_kwargs["max_completion_tokens"] = 16000
                 else:
-                    request_kwargs["temperature"] = temperature
                     request_kwargs["max_tokens"] = 16000
+                if self._supports_custom_temperature(model):
+                    request_kwargs["temperature"] = temperature
                 if response_format:
                     request_kwargs["response_format"] = response_format
                 response = self.openai_client.chat.completions.create(**request_kwargs)
