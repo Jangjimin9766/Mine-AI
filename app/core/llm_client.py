@@ -48,15 +48,20 @@ class LLMClient:
 
         if self.openai_client:
             try:
+                model = settings.OPENAI_TEXT_MODEL
                 request_kwargs = {
-                    "model": settings.OPENAI_TEXT_MODEL,
+                    "model": model,
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
                     "temperature": temperature,
-                    "max_tokens": 16000,
                 }
+                # Some newer models (e.g. gpt-5*) use max_completion_tokens instead of max_tokens.
+                if isinstance(model, str) and model.startswith("gpt-5"):
+                    request_kwargs["max_completion_tokens"] = 16000
+                else:
+                    request_kwargs["max_tokens"] = 16000
                 if response_format:
                     request_kwargs["response_format"] = response_format
                 response = self.openai_client.chat.completions.create(**request_kwargs)
