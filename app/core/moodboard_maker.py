@@ -54,21 +54,44 @@ def build_no_human_negative_prompt() -> str:
     return f"{BASE_MOODBOARD_NEGATIVE_PROMPT}, {NO_HUMAN_NEGATIVE_PROMPT}, {NO_TEXT_BRAND_NEGATIVE_PROMPT}"
 
 
-def _english_keyword_phrases(values: list, max_items: int = 10) -> list:
+WEAK_MOODBOARD_KEYWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "for",
+    "from",
+    "how",
+    "my",
+    "of",
+    "or",
+    "the",
+    "this",
+    "to",
+    "what",
+    "with",
+}
+
+
+def _source_keyword_phrases(values: list, max_items: int = 10) -> list:
     phrases = []
     seen = set()
     for value in values or []:
         text = str(value or "").strip()
         if not text:
             continue
-        # SDXL prompt suffix must stay English. Korean context is already passed to
-        # the LLM, so the deterministic suffix only preserves English keywords.
-        candidates = re.findall(r"[A-Za-z][A-Za-z0-9&' -]{1,40}", text)
+        text = re.sub(r"https?://\S+", " ", text)
+        text = re.sub(r"[^\w\s가-힣&'-]", " ", text)
+        candidates = re.findall(r"[A-Za-z][A-Za-z0-9&' -]{1,40}|[가-힣][가-힣A-Za-z0-9\s]{1,40}", text)
         for candidate in candidates:
             normalized = " ".join(candidate.lower().split())
-            if normalized and normalized not in seen:
+            if (
+                normalized
+                and normalized not in WEAK_MOODBOARD_KEYWORDS
+                and normalized not in seen
+            ):
                 seen.add(normalized)
-                phrases.append(normalized)
+                phrases.append(" ".join(candidate.split()))
             if len(phrases) >= max_items:
                 return phrases
     return phrases
@@ -84,10 +107,10 @@ def select_visual_elements(
         source_values = [topic or "", *(magazine_tags or []), *(magazine_titles or [])]
     else:
         source_values = [*(user_interests or []), *(magazine_tags or []), *(magazine_titles or [])]
-    keyword_phrases = _english_keyword_phrases(source_values)
+    keyword_phrases = _source_keyword_phrases(source_values)
     if keyword_phrases:
         elements = (
-            "use only visual subjects derived from these supplied magazine keywords: "
+            "translate if needed and use only visual subjects derived from these supplied magazine keywords: "
             + ", ".join(keyword_phrases)
         )
     else:
