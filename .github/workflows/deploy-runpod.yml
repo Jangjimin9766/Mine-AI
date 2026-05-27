@@ -65,3 +65,54 @@ jobs:
             jiminjang/mine-ai-serverless:${{ github.sha }}
           cache-from: type=registry,ref=jiminjang/mine-ai-serverless:buildcache
           cache-to: type=registry,ref=jiminjang/mine-ai-serverless:buildcache,mode=max
+
+      - name: Update RunPod template image
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          RUNPOD_TEMPLATE_ID: h7xk6t10nx
+          IMAGE_NAME: jiminjang/mine-ai-serverless:${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          api_key = os.environ["RUNPOD_API_KEY"]
+          template_id = os.environ["RUNPOD_TEMPLATE_ID"]
+          image_name = os.environ["IMAGE_NAME"]
+          headers = {
+              "Authorization": f"Bearer {api_key}",
+              "Content-Type": "application/json",
+          }
+
+          def request(method, url, payload=None):
+              data = None if payload is None else json.dumps(payload).encode("utf-8")
+              req = urllib.request.Request(url, data=data, headers=headers, method=method)
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  raw = response.read().decode("utf-8")
+                  return json.loads(raw) if raw else {}
+
+          templates = request(
+              "GET",
+              "https://rest.runpod.io/v1/templates?includeEndpointBoundTemplates=true",
+          )
+          template = next((item for item in templates if item.get("id") == template_id), None)
+          if not template:
+              raise RuntimeError(f"RunPod template not found: {template_id}")
+
+          payload = {
+              "name": template["name"],
+              "imageName": image_name,
+              "containerDiskInGb": template.get("containerDiskInGb", 5),
+              "containerRegistryAuthId": template.get("containerRegistryAuthId"),
+              "env": template.get("env") or [],
+              "readme": template.get("readme") or "",
+              "volumeMountPath": template.get("volumeMountPath") or "",
+          }
+          request(
+              "POST",
+              f"https://rest.runpod.io/v1/templates/{template_id}/update",
+              payload,
+          )
+          print(f"Updated RunPod template {template_id} to {image_name}")
+          PY
