@@ -77,17 +77,27 @@ def _requires_verified_sources(text: str) -> bool:
     return any(term in normalized for term in ENTITY_RECOMMENDATION_TERMS)
 
 
-def _moodboard_seed_keywords(topic: str, search_results: list, labeled_sources: list, max_items: int = 12) -> list:
+MOODBOARD_SEED_BOILERPLATE_TERMS = (
+    "posted", "login", "naver", "blog", "copyright", "로그인", "네이버",
+    "블로그", "댓글", "공유", "구독", "지면보기", "회원가입",
+)
+
+
+def _moodboard_seed_keywords(topic: str, search_results: list, labeled_sources: list, max_items: int = 6) -> list:
     keywords = []
     seen = set()
 
-    def add(value):
+    def add(value, max_len: int = 64):
         text = str(value or "").strip()
         if not text:
             return
         text = re.sub(r"https?://\S+", "", text)
-        text = re.sub(r"\s+", " ", text)[:80]
+        text = re.sub(r"\s+", " ", text)[:max_len]
         normalized = text.lower()
+        if normalized in MOODBOARD_SEED_BOILERPLATE_TERMS:
+            return
+        if any(term in normalized for term in MOODBOARD_SEED_BOILERPLATE_TERMS):
+            return
         if normalized not in seen:
             seen.add(normalized)
             keywords.append(text)
@@ -95,11 +105,10 @@ def _moodboard_seed_keywords(topic: str, search_results: list, labeled_sources: 
     add(topic)
     for result in search_results or []:
         add(result.get("title"))
-        add(result.get("content"))
         if len(keywords) >= max_items:
             return keywords[:max_items]
-    for _, content in labeled_sources or []:
-        add(content)
+    for result in search_results or []:
+        add(result.get("content"), max_len=48)
         if len(keywords) >= max_items:
             return keywords[:max_items]
     return keywords[:max_items]

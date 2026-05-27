@@ -54,21 +54,39 @@ def build_no_human_negative_prompt() -> str:
     return f"{BASE_MOODBOARD_NEGATIVE_PROMPT}, {NO_HUMAN_NEGATIVE_PROMPT}, {NO_TEXT_BRAND_NEGATIVE_PROMPT}"
 
 
-def _english_keyword_phrases(values: list, max_items: int = 10) -> list:
+WEAK_MOODBOARD_KEYWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "how",
+    "in", "is", "it", "its", "my", "of", "on", "or", "the", "this", "to",
+    "what", "with", "posted", "posted oct", "posted nov", "login", "naver",
+    "blog", "로그인", "네이버", "블로그", "본문", "댓글", "공유", "검색",
+    "지면보기", "구독", "회원가입",
+}
+
+
+def _source_keyword_phrases(values: list, max_items: int = 6) -> list:
     phrases = []
     seen = set()
     for value in values or []:
         text = str(value or "").strip()
         if not text:
             continue
-        # SDXL prompt suffix must stay English. Korean context is already passed to
-        # the LLM, so the deterministic suffix only preserves English keywords.
-        candidates = re.findall(r"[A-Za-z][A-Za-z0-9&' -]{1,40}", text)
+        text = re.sub(r"https?://\S+", " ", text)
+        text = re.sub(r"[^\w\s가-힣&'-]", " ", text)
+        candidates = re.findall(
+            r"[A-Za-z][A-Za-z0-9&' -]{1,40}|[가-힣][가-힣A-Za-z0-9\s]{1,40}",
+            text,
+        )
         for candidate in candidates:
             normalized = " ".join(candidate.lower().split())
-            if normalized and normalized not in seen:
+            if (
+                normalized
+                and normalized not in WEAK_MOODBOARD_KEYWORDS
+                and not normalized.startswith("posted ")
+                and not any(term in normalized for term in ("로그인", "지면보기", "구독", "댓글"))
+                and normalized not in seen
+            ):
                 seen.add(normalized)
-                phrases.append(normalized)
+                phrases.append(" ".join(candidate.split()))
             if len(phrases) >= max_items:
                 return phrases
     return phrases
@@ -84,10 +102,10 @@ def select_visual_elements(
         source_values = [topic or "", *(magazine_tags or []), *(magazine_titles or [])]
     else:
         source_values = [*(user_interests or []), *(magazine_tags or []), *(magazine_titles or [])]
-    keyword_phrases = _english_keyword_phrases(source_values)
+    keyword_phrases = _source_keyword_phrases(source_values)
     if keyword_phrases:
         elements = (
-            "use only visual subjects derived from these supplied magazine keywords: "
+            "translate if needed and use only visual subjects derived from these supplied magazine keywords: "
             + ", ".join(keyword_phrases)
         )
     else:
@@ -170,61 +188,28 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     visual_elements = select_visual_elements(topic, user_interests, magazine_tags, magazine_titles)
 
     system_prompt = f"""
-    You are an award-winning Art Director and Senior Photographer.
-    Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's moodboard.
-    The image must be a people-free object moodboard, not a portrait, not a model shot, not a lifestyle photo with humans.
-    
-    [LANGUAGE RULE — ABSOLUTE]
-    Your output MUST be in ENGLISH ONLY. No Korean, Chinese, Japanese, or any non-Latin characters.
-    Even if the topic is in Korean, you MUST translate it to English for the prompt.
-    Example: "홈트레이닝" → "home workout", "부산 맛집" → "Busan restaurant"
-    
-    [SUBJECT-SPECIFIC FOCUS (MANDATORY)]
-    The image MUST clearly feature elements of: {topic_emphasis}
-    It MUST show object/product/material elements instead of humans.
-    Source keywords and constraints: {visual_elements['elements']}
-    The result must feel like an editorial moodboard or magazine brand board, not a single product photo or advertisement.
-    It must show 5 to 8 related objects/material/color elements with balanced spacing.
-    Use a wide, zoomed-out editorial board composition with clean negative space so it works as a cover background.
-    Do not use a macro food close-up, cropped plate close-up, or one oversized object filling the frame.
-    Do not use a fixed category palette. Derive every object from the supplied topic, titles, tags, and paragraph image keywords.
-    
-    [CONCRETE OBJECTS REQUIRED]
-    You MUST include 5-8 specific physical objects/material/color elements in the prompt that are directly related to the supplied topic and magazine keywords.
-    - BAD: "fitness concept, healthy lifestyle, motivation" (too abstract)
-    - BAD: "model wearing golfwear, athlete portrait, person exercising" (humans are forbidden)
-    - BAD: "single polo shirt product photo, centered clothing advertisement, logo label close-up" (too much like a product ad)
-    - GOOD: concrete objects that appear in or are directly implied by the supplied magazine keywords
-    
-    [PHOTOGRAPHY PARAMETERS]
-    1. **Subject**: Specific, high-definition product/object/material subjects related to the Topic ({topic_emphasis}) and source keywords. Include real objects.
-    2. **Composition**: balanced layout, multiple curated objects, material swatches, color palette cards, magazine brand board, premium editorial moodboard, aesthetic product collage, clean wallpaper composition, curated object flatlay, cohesive color palette, tasteful lighting, design magazine style, not a single product shot.
-    3. **Lighting**: Cinematic lighting (Volumetric light, Soft natural dawn light, Dramatic REMBRANDT shadows).
-    4. **Camera/Film**: 85mm lens for products, 24mm for landscapes. High-speed film grain (minimal), crisp focus.
-    5. **Style**: Premium magazine editorial style (Kinfolk, Magazine B, Vogue quality).
-    
-    [PROMPT STRUCTURE]
-    [Subject Detail with concrete objects], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: photorealistic, premium editorial]
-    
-    [CRITICAL CONSTRAINTS]
-    - **NSFW POLICY**: NEVER generate prompts for pornography, explicit sexual acts, extreme violence, or illegal content.
-    - If the topic is inappropriate, your entire response MUST be: "FORBIDDEN_CONTENT"
-    - Output ONLY the prompt text in ENGLISH. Nothing else.
-    - Do NOT use abstract words only. Include SPECIFIC OBJECTS related to the topic.
-    - ABSOLUTELY NO HUMANS: no people, no humans, no person, no face, no portrait, no hands, no arms, no legs, no feet, no body, no mannequin, no model, no silhouette.
-    - ABSOLUTELY NO TEXT OR BRANDING: no logos, no text, no labels, no brand marks, no typography.
-    - Avoid product advertisement composition. No single product should occupy most of the frame.
-    - Do not introduce sports equipment, food, travel props, beauty products, devices, or fashion items unless they are present in or directly implied by the supplied keywords.
-    - Ensure the mood aligns with: {user_mood or "Sophisticated"}
+    You are a senior art director writing one SDXL prompt for M:ine magazine.
+    Output only one comma-separated English prompt. Translate all non-English context.
+    If the topic is explicit, violent, illegal, or otherwise unsafe, output exactly FORBIDDEN_CONTENT.
+
+    Required image: people-free premium editorial moodboard or magazine brand board.
+    Topic focus: {topic_emphasis}
+    Source constraint: {visual_elements['elements']}
+    Mood: {user_mood or "Sophisticated"}
+
+    Include 5-8 concrete physical objects, materials, or color swatches directly derived from the topic and source keywords.
+    Use a wide, zoomed-out flatlay/product-board composition with balanced spacing and clean negative space.
+    Avoid abstract-only concepts, single product ads, macro close-ups, oversized centered objects, unrelated props, and fixed category palettes.
+    No humans, faces, portraits, hands, bodies, mannequins, models, silhouettes.
+    No logos, labels, text, typography, brand marks, watermarks.
+    Style: cinematic dawn light, subtle Rembrandt shadows, 85mm product perspective, crisp photorealistic premium editorial.
     """
 
     user_prompt = f"""
     [User Context]
     {full_context}
     
-    Create a comma-separated ENGLISH prompt for a sophisticated people-free editorial moodboard/wallpaper image.
-    Remember: ENGLISH ONLY, include 5-8 balanced curated objects/material/color elements related to the topic.
-    Do not include people, body parts, logos, text, labels, brand marks, or typography.
+    Create the SDXL prompt now. Include specific object nouns, materials, and color swatches.
     """
 
     prompt = llm_client.generate_text(system_prompt, user_prompt)
