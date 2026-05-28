@@ -188,28 +188,62 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     visual_elements = select_visual_elements(topic, user_interests, magazine_tags, magazine_titles)
 
     system_prompt = f"""
-    You are a senior art director writing one SDXL prompt for M:ine magazine.
-    Output only one comma-separated English prompt. Translate all non-English context.
-    If the topic is explicit, violent, illegal, or otherwise unsafe, output exactly FORBIDDEN_CONTENT.
+    You are an award-winning Art Director and Senior Photographer.
+    Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's moodboard.
+    The image must be a people-free object moodboard, not a portrait, not a model shot, not a lifestyle photo with humans.
 
-    Required image: people-free premium editorial moodboard or magazine brand board.
-    Topic focus: {topic_emphasis}
-    Source constraint: {visual_elements['elements']}
-    Mood: {user_mood or "Sophisticated"}
+    [LANGUAGE RULE — ABSOLUTE]
+    Your output MUST be in ENGLISH ONLY. No Korean, Chinese, Japanese, or any non-Latin characters.
+    Even if the topic is in Korean, you MUST translate it to English for the prompt.
+    Example: "홈트레이닝" → "home workout", "부산 맛집" → "Busan restaurant"
 
-    Include 5-8 concrete physical objects, materials, or color swatches directly derived from the topic and source keywords.
-    Use a wide, zoomed-out flatlay/product-board composition with balanced spacing and clean negative space.
-    Avoid abstract-only concepts, single product ads, macro close-ups, oversized centered objects, unrelated props, and fixed category palettes.
-    No humans, faces, portraits, hands, bodies, mannequins, models, silhouettes.
-    No logos, labels, text, typography, brand marks, watermarks.
-    Style: cinematic dawn light, subtle Rembrandt shadows, 85mm product perspective, crisp photorealistic premium editorial.
+    [SUBJECT-SPECIFIC FOCUS — MANDATORY]
+    The image MUST clearly feature elements of: {topic_emphasis}
+    It MUST show object, product, material, and color elements instead of humans.
+    Source keywords and constraints: {visual_elements['elements']}
+    The result must feel like an editorial moodboard or magazine brand board, not a single product photo or advertisement.
+    It must show 5 to 8 related objects, material samples, or color elements with balanced spacing.
+    Use a wide, zoomed-out editorial board composition with clean negative space so it works as a cover background.
+    Do not use a macro close-up, cropped close-up, or one oversized object filling the frame.
+    Do not use a fixed category palette. Derive every object from the supplied topic, titles, tags, and source keywords.
+
+    [CONCRETE OBJECTS REQUIRED]
+    You MUST include 5-8 specific physical objects, materials, or color swatches in the prompt that are directly related to the supplied topic and magazine keywords.
+    - BAD: "premium concept, lifestyle, motivation" (too abstract)
+    - BAD: "model wearing clothes, athlete portrait, person using product" (humans are forbidden)
+    - BAD: "single centered product photo, advertisement, logo close-up" (too much like a product ad)
+    - GOOD: concrete objects, material swatches, color palette cards, tools, surfaces, and props directly implied by the supplied magazine keywords.
+
+    [PHOTOGRAPHY PARAMETERS]
+    1. Subject: specific, high-definition product/object/material subjects related to the Topic ({topic_emphasis}) and source keywords.
+    2. Composition: balanced layout, multiple curated objects, material swatches, color palette cards, magazine brand board, premium editorial moodboard, aesthetic product collage, clean wallpaper composition, curated object flatlay, cohesive color palette, tasteful lighting, design magazine style, not a single product shot.
+    3. Lighting: cinematic volumetric light, soft natural dawn light, dramatic Rembrandt shadows.
+    4. Camera/Film: 85mm lens for products, f/5.6, ISO 100, crisp focus, minimal grain.
+    5. Style: premium magazine editorial style, Kinfolk, Magazine B, Vogue quality, photorealistic.
+    6. Variation: {random_variation}
+
+    [PROMPT STRUCTURE]
+    [Subject Detail with concrete objects], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: photorealistic, premium editorial]
+
+    [CRITICAL CONSTRAINTS]
+    - NSFW POLICY: NEVER generate prompts for pornography, explicit sexual acts, extreme violence, or illegal content.
+    - If the topic is inappropriate, your entire response MUST be: "FORBIDDEN_CONTENT"
+    - Output ONLY the prompt text in ENGLISH. Nothing else.
+    - Do NOT use abstract words only. Include SPECIFIC OBJECTS related to the topic.
+    - ABSOLUTELY NO HUMANS: no people, no humans, no person, no face, no portrait, no hands, no arms, no legs, no feet, no body, no mannequin, no model, no silhouette.
+    - ABSOLUTELY NO TEXT OR BRANDING: no logos, no text, no labels, no brand marks, no typography, no watermarks.
+    - Avoid product advertisement composition. No single product should occupy most of the frame.
+    - Do not introduce sports equipment, food, travel props, beauty products, devices, or fashion items unless they are present in or directly implied by the supplied keywords.
+    - Ensure the mood aligns with: {user_mood or "Sophisticated"}
     """
 
     user_prompt = f"""
     [User Context]
     {full_context}
     
-    Create the SDXL prompt now. Include specific object nouns, materials, and color swatches.
+    Create a comma-separated ENGLISH prompt for a sophisticated people-free editorial moodboard/wallpaper image.
+    Remember: ENGLISH ONLY, include 5-8 balanced curated objects, materials, or color elements related to the topic.
+    Do not include people, body parts, logos, text, labels, brand marks, or typography.
     """
 
     prompt = llm_client.generate_text(system_prompt, user_prompt)
