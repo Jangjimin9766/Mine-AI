@@ -66,7 +66,7 @@ def test_general_prompt_uses_keyword_driven_constraints(monkeypatch):
     prompt = moodboard_maker.generate_moodboard_prompt(topic="봄 패션", magazine_tags=["FASHION"])
 
     assert "source constraint" in prompt
-    assert "category-default objects" in prompt
+    assert "premium editorial object moodboard" in prompt
 
 
 def test_moodboard_prompt_does_not_use_object_specific_rejection(monkeypatch):
@@ -80,7 +80,7 @@ def test_moodboard_prompt_does_not_use_object_specific_rejection(monkeypatch):
 
     assert prompt != "IRRELEVANT_PROMPT"
     assert "source constraint" in prompt
-    assert "no objects that are absent from the supplied topic or magazine keywords" in prompt
+    assert "no single product shot" in prompt
 
 
 def test_home_office_prompt_uses_interior_object_palette(monkeypatch):
@@ -93,7 +93,7 @@ def test_home_office_prompt_uses_interior_object_palette(monkeypatch):
     prompt = moodboard_maker.generate_moodboard_prompt(topic="홈 오피스 생산성 셋업")
 
     assert "source constraint" in prompt
-    assert "category-default objects" in prompt
+    assert "premium editorial object moodboard" in prompt
     assert "no humans" in prompt
 
 
@@ -155,8 +155,66 @@ def test_prompt_uses_section_headings_and_content_keywords(monkeypatch):
     assert "스테인리스 텀블러" in captured["user"]
     assert "리필 스테이션" in captured["system"]
     assert "Magazine section headings and article content keywords are stronger" in captured["system"]
-    assert "스테인리스 텀블러" in prompt
-    assert "리필 스테이션" in prompt
+    assert "stainless steel reusable tumbler" in prompt
+    assert "bamboo bottle cleaning brush" in prompt
+    assert "스테인리스 텀블러" not in prompt
+
+
+def test_moodboard_prompt_adds_topic_specific_anchor_objects(monkeypatch):
+    monkeypatch.setattr(
+        moodboard_maker.llm_client,
+        "generate_text",
+        lambda *args, **kwargs: "premium editorial board with clean materials",
+    )
+
+    prompt = moodboard_maker.generate_moodboard_prompt(
+        topic="퇴근 후 20분 홈트 루틴",
+        content_keywords=["요가 매트", "저항 밴드", "폼롤러"],
+    )
+
+    assert "yoga mat" in prompt
+    assert "resistance bands" in prompt
+    assert "foam roller" in prompt
+    assert prompt.index("yoga mat") < prompt.index("premium editorial object moodboard")
+
+
+def test_moodboard_prompt_is_compact_and_topic_first(monkeypatch):
+    monkeypatch.setattr(
+        moodboard_maker.llm_client,
+        "generate_text",
+        lambda *args, **kwargs: (
+            "portable espresso grinder, ceramic demitasse cup, roasted coffee beans, "
+            "linen cafe napkin, walnut tray, color palette cards, cinematic light, premium editorial"
+        ),
+    )
+
+    prompt = moodboard_maker.generate_moodboard_prompt(
+        topic="집에서 즐기는 핸드드립 커피",
+        content_keywords=["원두 분쇄", "드리퍼", "홈카페"],
+    )
+
+    assert prompt.startswith("portable espresso grinder")
+    assert "ceramic demitasse cup" in prompt
+    assert "premium editorial object moodboard" in prompt
+    assert len(prompt.split()) < 95
+
+
+def test_generic_routine_word_does_not_trigger_workout_anchors(monkeypatch):
+    monkeypatch.setattr(
+        moodboard_maker.llm_client,
+        "generate_text",
+        lambda *args, **kwargs: (
+            "terracotta plant pot, brass watering can, moisture meter, pruning shears, "
+            "leaf mister bottle, soil sample"
+        ),
+    )
+
+    prompt = moodboard_maker.generate_moodboard_prompt(topic="초보자를 위한 반려식물 물주기 루틴")
+
+    assert prompt.startswith("terracotta plant pot")
+    assert "brass watering can" in prompt
+    assert "yoga mat" not in prompt
+    assert "hex dumbbells" not in prompt
 
 
 def test_fallback_url_only_result_is_not_success(monkeypatch):

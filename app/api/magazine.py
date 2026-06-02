@@ -55,7 +55,43 @@ def handle_create_magazine(request: UnifiedMagazineRequest):
         print(f"❌ [Python] Exception in handle_create_magazine: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        topic = request.topic or "Magazine"
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": "CREATE_MAGAZINE_GENERATION_FAILED",
+            "title": topic,
+            "cover_image_url": None,
+            "tags": [],
+            "sections": [
+                {
+                    "heading": f"{topic} 관점 1",
+                    "thumbnail_url": None,
+                    "display_order": 0,
+                    "paragraphs": [
+                        {"subtitle": f"{topic}의 장면 {idx + 1}", "text": "", "image_url": None, "source_url": ""}
+                        for idx in range(3)
+                    ],
+                },
+                {
+                    "heading": f"{topic} 관점 2",
+                    "thumbnail_url": None,
+                    "display_order": 1,
+                    "paragraphs": [
+                        {"subtitle": f"{topic}의 장면 {idx + 4}", "text": "", "image_url": None, "source_url": ""}
+                        for idx in range(3)
+                    ],
+                },
+            ],
+            "moodboard": {
+                "image_url": None,
+                "description": "",
+                "success": False,
+                "status": "FAILED",
+                "error_type": "CREATE_MAGAZINE_GENERATION_FAILED",
+                "fallback_url": None,
+            },
+        }
 
 
 def handle_edit_magazine(request: UnifiedMagazineRequest):

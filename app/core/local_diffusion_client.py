@@ -2,6 +2,7 @@ import torch
 import sys
 import os
 import time
+import threading
 
 # Workaround for diffusers compatibility with PyTorch versions lacking torch.xpu
 # (Intel XPU support). This MUST be before importing diffusers!
@@ -79,6 +80,7 @@ class LocalDiffusionClient:
         self._load_attempted = False
         self._load_error = None
         self.last_timing = {}
+        self._generation_lock = threading.Lock()
         # Lazy loading: 모델은 처음 요청이 들어올 때 로드합니다. (서버 시작 시간 단축)
 
     def _load_model(self) -> bool:
@@ -148,6 +150,29 @@ class LocalDiffusionClient:
         Generate image using local Stable Diffusion XL.
         Returns: Data URI (Base64) on success, None on failure
         """
+        with self._generation_lock:
+            return self._generate_image_locked(
+                prompt=prompt,
+                width=width,
+                height=height,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=guidance_scale,
+                negative_prompt=negative_prompt,
+                output_format=output_format,
+                quality=quality,
+            )
+
+    def _generate_image_locked(
+        self,
+        prompt: str,
+        width: int = None,
+        height: int = None,
+        num_inference_steps: int = None,
+        guidance_scale: float = None,
+        negative_prompt: str = None,
+        output_format: str = None,
+        quality: int = None,
+    ) -> str:
         request_start = time.perf_counter()
         cold_start = not self._load_attempted or self.pipe is None
         load_start = time.perf_counter()

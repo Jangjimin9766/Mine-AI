@@ -230,13 +230,53 @@ def handle_create_magazine(data: dict) -> dict:
     if user_mood:
         logger.info(f"🎭 User mood: {user_mood}")
     
-    result = generate_magazine_content(
-        topic=topic,
-        user_interests=user_interests,
-        user_mood=user_mood,
-        request_id=request_id,
-        runpod_handler_start_time=time.perf_counter() - handler_start
-    )
+    try:
+        result = generate_magazine_content(
+            topic=topic,
+            user_interests=user_interests,
+            user_mood=user_mood,
+            request_id=request_id,
+            runpod_handler_start_time=time.perf_counter() - handler_start
+        )
+    except Exception as e:
+        logger.error(f"❌ create_magazine generation failed without RunPod crash: {e}")
+        logger.error(f"📋 Traceback:\n{traceback.format_exc()}")
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": "CREATE_MAGAZINE_GENERATION_FAILED",
+            "title": topic,
+            "cover_image_url": None,
+            "tags": [],
+            "sections": [
+                {
+                    "heading": f"{topic} 관점 1",
+                    "thumbnail_url": None,
+                    "display_order": 0,
+                    "paragraphs": [
+                        {"subtitle": f"{topic}의 장면 {idx + 1}", "text": "", "image_url": None, "source_url": ""}
+                        for idx in range(3)
+                    ],
+                },
+                {
+                    "heading": f"{topic} 관점 2",
+                    "thumbnail_url": None,
+                    "display_order": 1,
+                    "paragraphs": [
+                        {"subtitle": f"{topic}의 장면 {idx + 4}", "text": "", "image_url": None, "source_url": ""}
+                        for idx in range(3)
+                    ],
+                },
+            ],
+            "moodboard": {
+                "image_url": None,
+                "description": "",
+                "success": False,
+                "status": "FAILED",
+                "error_type": "CREATE_MAGAZINE_GENERATION_FAILED",
+                "fallback_url": None,
+            },
+        }
     
     if not result:
         return {"error": "Failed to generate magazine"}

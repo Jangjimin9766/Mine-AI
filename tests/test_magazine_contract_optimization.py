@@ -195,6 +195,102 @@ def test_user_mood_is_not_in_magazine_body_prompt(monkeypatch):
     assert "몽환적이고 우울한 톤" not in captured["user"]
 
 
+def test_create_magazine_returns_contract_when_moodboard_fails(monkeypatch):
+    monkeypatch.setattr(magazine_maker, "llm_client", MockLLM(_valid_magazine_json()))
+    monkeypatch.setattr(
+        magazine_maker,
+        "search_with_tavily",
+        lambda *args, **kwargs: (
+            [{"url": "https://example.com/a", "content": "a"}],
+            [],
+        ),
+    )
+    monkeypatch.setattr(
+        magazine_maker,
+        "scrape_labeled_sources",
+        lambda *args, **kwargs: ([("https://example.com/a", "a")], []),
+    )
+    monkeypatch.setattr(magazine_maker, "validate_image_url", lambda url: True)
+    monkeypatch.setattr(magazine_maker, "search_with_pexels_metadata", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        moodboard_maker,
+        "generate_moodboard",
+        lambda **kwargs: {
+            "image_url": None,
+            "description": "",
+            "success": False,
+            "status": "FAILED",
+            "error_type": "IMAGE_GENERATION_FAILED",
+            "fallback_url": None,
+        },
+    )
+
+    result = magazine_maker.generate_magazine_content("홈 오피스", request_id="test-moodboard-fail")
+
+    assert result["success"] is False
+    assert result["error_type"] == "IMAGE_GENERATION_FAILED"
+    assert result["moodboard"]["image_url"] is None
+    assert result["moodboard"]["description"] == ""
+    assert len(result["sections"]) == 2
+    for section in result["sections"]:
+        assert "heading" in section
+        assert "thumbnail_url" in section
+        assert len(section["paragraphs"]) == 3
+        for para in section["paragraphs"]:
+            assert set(["subtitle", "text", "image_url", "source_url"]).issubset(para)
+
+
+def test_create_magazine_records_image_future_errors_without_500(monkeypatch, capsys):
+    monkeypatch.setattr(magazine_maker, "llm_client", MockLLM(_valid_magazine_json()))
+    monkeypatch.setattr(
+        magazine_maker,
+        "search_with_tavily",
+        lambda *args, **kwargs: (
+            [{"url": "https://example.com/a", "content": "a"}],
+            [],
+        ),
+    )
+    monkeypatch.setattr(
+        magazine_maker,
+        "scrape_labeled_sources",
+        lambda *args, **kwargs: ([("https://example.com/a", "a")], []),
+    )
+    monkeypatch.setattr(magazine_maker, "validate_image_url", lambda url: True)
+
+    def fail_pexels(*args, **kwargs):
+        raise RuntimeError("pexels unavailable")
+
+    monkeypatch.setattr(magazine_maker, "search_with_pexels_metadata", fail_pexels)
+    monkeypatch.setattr(
+        moodboard_maker,
+        "generate_moodboard",
+        lambda **kwargs: {
+            "image_url": "https://example.com/moodboard.png",
+            "description": "premium editorial moodboard",
+            "success": True,
+        },
+    )
+
+    result = magazine_maker.generate_magazine_content("홈 오피스", request_id="test-image-future-error")
+    output = capsys.readouterr().out
+
+    assert result["moodboard"]["image_url"] == "https://example.com/moodboard.png"
+    assert len(result["sections"]) == 2
+    assert "Pexels search failed" in output
+
+
+def test_magazine_plan_defaults_fill_missing_fields():
+    plan = magazine_maker._normalize_magazine_plan({"tags": ["UNKNOWN"], "section_headings": []}, "친환경 텀블러")
+
+    assert plan["title"] == "친환경 텀블러 매거진"
+    assert plan["tags"]
+    assert all(tag in magazine_maker.ALLOWED_MAGAZINE_TAGS for tag in plan["tags"])
+    assert len(plan["section_headings"]) == 2
+    assert plan["visual_keywords"]
+    assert plan["moodboard_subjects"]
+    assert "fallback placeholder" in plan["forbidden_visuals"]
+
+
 def test_repair_reason_detection_and_local_fix():
     broken = {
         "sections": [
@@ -448,8 +544,11 @@ def test_same_pexels_path_with_different_query_string_is_duplicate():
 
 def test_low_resolution_url_is_excluded_by_policy():
     assert magazine_maker._is_low_resolution_url("https://images.pexels.com/photos/1/a.jpeg?w=150") is True
+    assert magazine_maker._is_low_resolution_url("https://images.pexels.com/photos/1/a.jpeg?w=940&h=500") is True
     assert magazine_maker._is_low_resolution_url("https://images.pexels.com/photos/1/tiny/a.jpeg") is True
     assert magazine_maker._is_low_resolution_url("https://images.pexels.com/photos/1/a.jpeg?w=1200") is False
+    assert magazine_maker._is_low_resolution_url("https://images.pexels.com/photos/1/a.jpeg?w=940&h=650") is False
+    assert magazine_maker._is_low_resolution_url("https://images.pexels.com/photos/1/a.jpeg?auto=compress&cs=tinysrgb&w=1260") is False
 
 
 def test_pexels_metadata_filters_low_resolution_and_prefers_large2x():
@@ -471,3 +570,46 @@ def test_pexels_metadata_filters_low_resolution_and_prefers_large2x():
     metadata = searcher._pexels_photo_to_metadata(high)
     assert metadata["url"] == "https://example.com/large2x.jpg"
     assert metadata["dedupe_key"] == "pexels:2"
+
+
+def test_dedupe_and_pad_paragraph_texts_removes_duplicate_short_text():
+    magazine = _valid_magazine_json()
+    duplicate = "짧은 문단입니다."
+    magazine["sections"][1]["paragraphs"][1]["text"] = duplicate
+    magazine["sections"][1]["paragraphs"][2]["text"] = duplicate
+
+    fixed = magazine_maker._dedupe_and_pad_paragraph_texts(magazine, "홈트 루틴")
+
+    first = fixed["sections"][1]["paragraphs"][1]["text"]
+    second = fixed["sections"][1]["paragraphs"][2]["text"]
+    assert first != second
+    assert magazine_maker._paragraph_length(first) >= magazine_maker.PARAGRAPH_MIN_CHARS
+    assert magazine_maker._paragraph_length(second) >= magazine_maker.PARAGRAPH_MIN_CHARS
+
+
+def test_ensure_minimum_unique_images_fills_content_slots_with_pexels(monkeypatch):
+    magazine = _valid_magazine_json()
+    candidates = [
+        {
+            "id": 100 + index,
+            "url": f"https://images.pexels.com/photos/{100 + index}/image.jpeg?auto=compress&cs=tinysrgb&w=1260",
+            "width": 1260,
+            "height": 840,
+            "dedupe_key": f"pexels:{100 + index}",
+        }
+        for index in range(8)
+    ]
+
+    monkeypatch.setattr(magazine_maker, "search_with_pexels_metadata", lambda *args, **kwargs: candidates)
+
+    used = set()
+    fixed = magazine_maker._ensure_minimum_unique_images(
+        magazine,
+        "홈 오피스",
+        used,
+        min_images=magazine_maker._count_content_image_slots(magazine),
+    )
+
+    assert magazine_maker._count_content_images(fixed) == magazine_maker._count_content_image_slots(fixed)
+    urls = [target[field] for target, field in magazine_maker._iter_image_slots(fixed)]
+    assert len(urls) == len(set(urls))

@@ -4,6 +4,7 @@ import os
 import re
 import time
 import uuid
+from urllib.parse import parse_qs, urlparse
 from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images, scrape_multiple_with_jina, scrape_labeled_sources, validate_image_url, search_with_pexels_metadata, pexels_dedupe_key
 from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V8
 from app.core.utils import is_mostly_english, translate_to_korean, force_translate_magazine_json
@@ -80,6 +81,19 @@ ENTITY_RECOMMENDATION_TERMS = [
     "추천", "recommend", "recommendation", "유튜버", "youtuber", "youtube",
     "채널", "creator", "크리에이터", "인플루언서", "맛집", "장소", "브랜드",
     "인물", "사람", "전문가", "계정", "account", "best", "top"
+]
+
+ALLOWED_MAGAZINE_TAGS = set(DEFAULT_IMAGE_KEYWORDS_BY_TAG.keys())
+DEFAULT_FORBIDDEN_VISUALS = [
+    "low quality",
+    "blurry",
+    "tiny image",
+    "thumbnail",
+    "watermark",
+    "logo",
+    "text overlay",
+    "duplicate image",
+    "fallback placeholder",
 ]
 
 
@@ -239,6 +253,73 @@ def _fallback_image_keyword(tags: list, topic: str, section_heading: str) -> str
         base = section_heading
     words = re.findall(r"[A-Za-z]+", base.lower())[:3]
     return " ".join(words) if len(words) >= 2 else "premium lifestyle editorial"
+
+
+def _topic_default_tags(topic: str) -> list:
+    text = (topic or "").lower()
+    rules = [
+        (("패션", "fashion", "옷", "코디"), "FASHION"),
+        (("인테리어", "interior", "홈", "집", "공간"), "INTERIOR"),
+        (("음식", "food", "맛집", "요리", "레시피"), "FOOD"),
+        (("여행", "travel", "제주", "부산"), "TRAVEL"),
+        (("운동", "fitness", "헬스", "러닝"), "FITNESS"),
+        (("기술", "tech", "ai", "it", "전자"), "TECH"),
+        (("환경", "친환경", "지속가능"), "ENVIRONMENT"),
+    ]
+    tags = [tag for keywords, tag in rules if any(keyword in text for keyword in keywords)]
+    if not tags:
+        tags = ["LIFESTYLE", "TREND"]
+    return tags[:2]
+
+
+def _topic_visual_keywords(topic: str, tags: list = None) -> list:
+    keyword = _fallback_image_keyword(tags or _topic_default_tags(topic), topic, "")
+    words = re.findall(r"[A-Za-z][A-Za-z0-9'-]*", keyword)
+    if len(words) >= 2:
+        return words[:6]
+    if is_mostly_english(topic or ""):
+        topic_words = re.findall(r"[A-Za-z][A-Za-z0-9'-]*", topic)
+        if topic_words:
+            return topic_words[:6]
+    return ["premium", "lifestyle", "editorial"]
+
+
+def _default_magazine_plan(topic: str, existing_result: dict = None) -> dict:
+    tags = _topic_default_tags(topic)
+    headings = []
+    if isinstance(existing_result, dict):
+        headings = [
+            section.get("heading")
+            for section in existing_result.get("sections", [])
+            if isinstance(section, dict) and section.get("heading")
+        ]
+    if not headings:
+        headings = [_editorial_heading_fallback(topic, 0), _editorial_heading_fallback(topic, 1)]
+    visual_keywords = _topic_visual_keywords(topic, tags)
+    return {
+        "title": f"{topic} 매거진" if topic else "M:ine 매거진",
+        "tags": tags,
+        "section_headings": headings[:2],
+        "visual_keywords": visual_keywords,
+        "moodboard_subjects": visual_keywords[:5],
+        "forbidden_visuals": DEFAULT_FORBIDDEN_VISUALS,
+    }
+
+
+def _normalize_magazine_plan(plan: dict, topic: str, existing_result: dict = None) -> dict:
+    defaults = _default_magazine_plan(topic, existing_result)
+    if not isinstance(plan, dict):
+        return defaults
+    normalized = {**defaults, **{key: value for key, value in plan.items() if value}}
+    tags = [str(tag).upper() for tag in normalized.get("tags", []) if str(tag).upper() in ALLOWED_MAGAZINE_TAGS]
+    normalized["tags"] = tags[:4] or defaults["tags"]
+    for key in ("section_headings", "visual_keywords", "moodboard_subjects", "forbidden_visuals"):
+        values = normalized.get(key)
+        normalized[key] = [str(value).strip() for value in values if str(value).strip()] if isinstance(values, list) else defaults[key]
+        if not normalized[key]:
+            normalized[key] = defaults[key]
+    normalized["title"] = str(normalized.get("title") or defaults["title"]).strip() or defaults["title"]
+    return normalized
 
 
 def _section_thumbnail_query(topic: str, section: dict) -> str:
@@ -524,6 +605,72 @@ def _fill_missing_final_images(result_json: dict, fallback_image_url: str) -> di
     return result_json
 
 
+def _ensure_create_magazine_contract(result_json: dict, topic: str, errors: list = None) -> dict:
+    """Ensure Spring-facing create_magazine fields are present even after partial failures."""
+    errors = errors if errors is not None else []
+    if not isinstance(result_json, dict):
+        result_json = {}
+    plan = _normalize_magazine_plan({}, topic, result_json)
+    result_json["title"] = result_json.get("title") or plan["title"]
+    result_json["cover_image_url"] = result_json.get("cover_image_url") if result_json.get("cover_image_url") else None
+    tags = result_json.get("tags")
+    if not isinstance(tags, list) or not tags:
+        result_json["tags"] = plan["tags"]
+    else:
+        normalized_tags = [str(tag).upper() for tag in tags if str(tag).upper() in ALLOWED_MAGAZINE_TAGS]
+        result_json["tags"] = normalized_tags[:4] or plan["tags"]
+
+    sections = result_json.get("sections")
+    if not isinstance(sections, list):
+        sections = []
+    for s_idx in range(2):
+        if s_idx >= len(sections) or not isinstance(sections[s_idx], dict):
+            sections.append({"heading": plan["section_headings"][min(s_idx, len(plan["section_headings"]) - 1)], "paragraphs": []})
+        section = sections[s_idx]
+        section["heading"] = section.get("heading") or plan["section_headings"][min(s_idx, len(plan["section_headings"]) - 1)]
+        section["thumbnail_url"] = section.get("thumbnail_url") if section.get("thumbnail_url") else None
+        section["display_order"] = section.get("display_order", s_idx)
+        paragraphs = section.get("paragraphs")
+        if not isinstance(paragraphs, list):
+            paragraphs = []
+        for p_idx in range(3):
+            if p_idx >= len(paragraphs) or not isinstance(paragraphs[p_idx], dict):
+                paragraphs.append({})
+            para = paragraphs[p_idx]
+            para["subtitle"] = para.get("subtitle") or f"{section['heading']}의 장면 {p_idx + 1}"
+            para["text"] = para.get("text") or "검증 가능한 생성 자료가 부족해 본문 생성을 완료하지 못했습니다."
+            para["image_url"] = para.get("image_url") if para.get("image_url") else None
+            para["source_url"] = para.get("source_url") or ""
+            para["image_search_keyword"] = para.get("image_search_keyword") or " ".join(plan["visual_keywords"][:4])
+        section["paragraphs"] = paragraphs[:3]
+    result_json["sections"] = sections[:2]
+
+    moodboard = result_json.get("moodboard")
+    if not isinstance(moodboard, dict):
+        error_type = "MOODBOARD_GENERATION_FAILED" if any("moodboard" in str(error).lower() for error in errors) else "MOODBOARD_MISSING"
+        moodboard = {
+            "image_url": None,
+            "description": "",
+            "success": False,
+            "status": "FAILED",
+            "error_type": error_type,
+            "fallback_url": None,
+        }
+    else:
+        moodboard["image_url"] = moodboard.get("image_url") if moodboard.get("image_url") else None
+        moodboard["description"] = moodboard.get("description") or ""
+        moodboard["fallback_url"] = moodboard.get("fallback_url") if moodboard.get("fallback_url") else None
+        if moodboard.get("image_url") is None:
+            moodboard["success"] = False
+            moodboard["status"] = moodboard.get("status") or "FAILED"
+            moodboard["error_type"] = moodboard.get("error_type") or "MOODBOARD_GENERATION_FAILED"
+    result_json["moodboard"] = moodboard
+    if moodboard.get("image_url") is None:
+        result_json["success"] = False
+        result_json["error_type"] = moodboard.get("error_type") or "MOODBOARD_GENERATION_FAILED"
+    return result_json
+
+
 def _image_dedupe_key(image) -> str:
     return pexels_dedupe_key(image)
 
@@ -536,9 +683,178 @@ def _image_url_from_candidate(image) -> str:
 
 def _is_low_resolution_url(url: str) -> bool:
     url_lower = (url or "").lower()
-    if any(token in url_lower for token in ("tiny", "small", "thumbnail", "thumb")):
+    parsed = urlparse(url_lower)
+    low_res_path_tokens = ("tiny", "small", "thumbnail", "thumb")
+    path_parts = [part for part in re.split(r"[/_.-]+", parsed.path) if part]
+    if any(part in low_res_path_tokens for part in path_parts):
         return True
-    return bool(re.search(r"([?&](w|width|h|height)=([1-8]\d{0,2})\b)|([/_-](?:1[0-9]{2}|[1-8][0-9])x(?:1[0-9]{2}|[1-8][0-9])\b)", url_lower))
+    params = parse_qs(parsed.query)
+    widths = params.get("w", []) + params.get("width", [])
+    heights = params.get("h", []) + params.get("height", [])
+    for width in widths:
+        if width.isdigit() and int(width) < 900:
+            return True
+    for height in heights:
+        if height.isdigit() and int(height) < 600:
+            return True
+    return bool(re.search(r"[/_-](?:1[0-9]{2}|[1-8][0-9])x(?:1[0-9]{2}|[1-5][0-9]{2}|[1-9][0-9])\b", url_lower))
+
+
+def _is_pexels_url(url: str) -> bool:
+    return "images.pexels.com" in (url or "").lower()
+
+
+def _iter_image_slots(result_json: dict):
+    for section in result_json.get("sections", []) if isinstance(result_json, dict) else []:
+        yield section, "thumbnail_url"
+        for para in section.get("paragraphs", []) if isinstance(section, dict) else []:
+            yield para, "image_url"
+
+
+def _count_final_images(result_json: dict) -> int:
+    count = 1 if result_json.get("cover_image_url") else 0
+    for target, field in _iter_image_slots(result_json):
+        if target.get(field):
+            count += 1
+    moodboard = result_json.get("moodboard")
+    if isinstance(moodboard, dict) and moodboard.get("image_url"):
+        count += 1
+    return count
+
+
+def _count_content_image_slots(result_json: dict) -> int:
+    return sum(1 for _target, _field in _iter_image_slots(result_json))
+
+
+def _count_content_images(result_json: dict) -> int:
+    return sum(1 for target, field in _iter_image_slots(result_json) if target.get(field))
+
+
+def _clear_invalid_final_images(result_json: dict, used_image_keys: set = None) -> dict:
+    used_image_keys = used_image_keys if used_image_keys is not None else set()
+
+    def clean(url):
+        if not url or not isinstance(url, str) or not url.startswith("http"):
+            return None
+        if _is_low_resolution_url(url):
+            return None
+        if not _is_pexels_url(url) and not validate_image_url(url):
+            return None
+        key = _image_dedupe_key(url)
+        if key in used_image_keys:
+            return None
+        used_image_keys.add(key)
+        return url
+
+    result_json["cover_image_url"] = clean(result_json.get("cover_image_url"))
+    for target, field in _iter_image_slots(result_json):
+        target[field] = clean(target.get(field))
+    return result_json
+
+
+def _ensure_minimum_unique_images(result_json: dict, topic: str, used_image_keys: set, min_images: int = 4) -> dict:
+    content_slot_count = _count_content_image_slots(result_json)
+    target_content_images = max(0, min(content_slot_count, min_images))
+    if _count_content_images(result_json) >= target_content_images:
+        return result_json
+    queries = []
+    topic_query = _topic_thumbnail_query(topic)
+    if topic_query:
+        queries.append(topic_query)
+    for section in result_json.get("sections", []):
+        if isinstance(section, dict):
+            queries.append(_section_thumbnail_query(topic, section))
+            for para in section.get("paragraphs", []):
+                if isinstance(para, dict):
+                    queries.append(para.get("image_search_keyword"))
+
+    seen_queries = set()
+    candidates = []
+    for query in queries:
+        query = str(query or "").strip()
+        normalized = query.lower()
+        if not query or normalized in seen_queries:
+            continue
+        seen_queries.add(normalized)
+        try:
+            candidates.extend(search_with_pexels_metadata(query, orientation="landscape", per_page=5))
+        except Exception as e:
+            print(f"Pexels supplement failed for '{query}': {type(e).__name__}: {e}")
+
+    candidate_index = 0
+
+    def next_url():
+        nonlocal candidate_index
+        while candidate_index < len(candidates):
+            candidate = candidates[candidate_index]
+            candidate_index += 1
+            url = _image_url_from_candidate(candidate)
+            key = _image_dedupe_key(candidate)
+            if (
+                url
+                and url.startswith("http")
+                and not _is_low_resolution_url(url)
+                and key not in used_image_keys
+                and (_is_pexels_url(url) or validate_image_url(url))
+            ):
+                used_image_keys.add(key)
+                return url
+        return None
+
+    for target, field in _iter_image_slots(result_json):
+        if _count_content_images(result_json) >= target_content_images:
+            break
+        if not target.get(field):
+            target[field] = next_url()
+    if not result_json.get("cover_image_url"):
+        result_json["cover_image_url"] = next_url()
+    return result_json
+
+
+def _dedupe_and_pad_paragraph_texts(result_json: dict, topic: str) -> dict:
+    seen = set()
+    for s_idx, section in enumerate(result_json.get("sections", [])):
+        heading = section.get("heading", topic)
+        for p_idx, para in enumerate(section.get("paragraphs", [])):
+            text = str(para.get("text") or "").strip()
+            normalized = re.sub(r"\s+", " ", text)
+            if normalized in seen:
+                para["subtitle"] = f"{heading}의 다른 관점 {p_idx + 1}"
+                text = (
+                    f"{heading}을 다른 각도에서 보면, 같은 실천도 공간과 시간의 조건에 따라 달라진다. "
+                    f"{topic}라는 주제는 작은 선택을 반복 가능한 루틴으로 만드는 데 의미가 있다. "
+                    "독자는 이미 알고 있는 정보를 다시 확인하는 데서 그치지 않고, 자신의 생활 동선에 맞춰 적용할 기준을 얻을 수 있다. "
+                    "따라서 이 문단은 앞선 내용과 겹치지 않도록 실천의 맥락, 감각적 장면, 지속 가능한 선택 기준을 함께 제안한다."
+                )
+            if _paragraph_length(text) < PARAGRAPH_MIN_CHARS:
+                text = (
+                    text
+                    + " "
+                    + f"이 관점은 {topic}를 일상의 구체적인 장면으로 옮길 때 더 분명해진다. "
+                    + f"{heading} 안에서 {p_idx + 1}번째 장면은 작은 변화라도 반복 가능해야 의미가 있고, "
+                    + "독자는 자신의 공간과 시간에 맞춰 부담 없이 적용할 수 있다."
+                )
+            while _paragraph_length(text) < PARAGRAPH_MIN_CHARS:
+                text += (
+                    " 또한 준비와 실행, 마무리의 흐름을 분리해두면 부담이 줄고, "
+                    "같은 선택을 다음 날에도 이어갈 수 있는 현실적인 기준이 생긴다."
+                )
+            padded_normalized = re.sub(r"\s+", " ", text).strip()
+            if padded_normalized in seen:
+                text = (
+                    f"{heading}을 또 다른 순서로 바라보면, {topic}의 실천은 결과보다 시작 조건을 정리하는 일에 가깝다. "
+                    "동일한 정보가 반복될 때 독자는 금방 피로해지므로, 이 문단은 앞선 내용과 달리 준비물, 시간 배분, 유지 기준을 중심으로 설명한다. "
+                    "작은 도구를 미리 보이는 곳에 두고, 시작 지점을 한 문장으로 정해두면 행동의 마찰이 줄어든다. "
+                    "이런 방식은 매일 완벽하게 해내는 목표보다 다시 돌아올 수 있는 생활 구조를 만드는 데 도움이 된다."
+                )
+                while _paragraph_length(text) < PARAGRAPH_MIN_CHARS:
+                    text += (
+                        " 특히 독자는 자신의 생활 리듬 안에서 실행 가능한 최소 단위를 고를 수 있어야 하며, "
+                        "그 기준이 있어야 실천이 일회성 결심으로 끝나지 않는다."
+                    )
+            para["text"] = _trim_to_sentence_limit(text)
+            seen.add(re.sub(r"\s+", " ", para["text"]).strip())
+    return result_json
 
 
 def _repair_magazine_contract(result_json: dict, topic: str, labeled_material: str) -> dict:
@@ -993,7 +1309,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                 pexels_imgs = search_with_pexels_metadata(query, orientation='landscape', per_page=5)
                 with lock:
                     for img in pexels_imgs:
-                        if assign_candidate(target, img, validate=True):
+                        if assign_candidate(target, img, validate=False):
                             assigned = True
                             return True
             except Exception as e:
@@ -1027,17 +1343,21 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                     pq = para.get('image_search_keyword', f"{topic} {section.get('heading', '')}")
                     futures.append(executor.submit(assign_image_to_target, para, pq))
         for f in futures:
-            f.result()
+            try:
+                f.result()
+            except Exception as e:
+                errors.append(f"image_future_exception:{type(e).__name__}:{e}")
+                print(f"Image assignment future failed: {type(e).__name__}: {e}")
         result_json = _sync_section_thumbnails_from_paragraphs(result_json)
         timings["paragraph_image_search_time"] = round(time.perf_counter() - image_search_start, 3)
+        moodboard_wait_start = time.perf_counter()
         try:
             # Do not use a timeout here. If this times out inside the
             # ThreadPoolExecutor context, Python still waits for the running
             # future during executor shutdown, but the moodboard result is
             # discarded. Spring expects create_magazine to include moodboard
             # when generation eventually succeeds.
-            moodboard_wait_start = time.perf_counter()
-            moodboard_data = moodboard_future.result()
+            moodboard_data = moodboard_future.result() if moodboard_future else None
             timings["moodboard_wait_after_content_time"] = round(time.perf_counter() - moodboard_wait_start, 3)
             if moodboard_data and moodboard_data.get('image_url'):
                 result_json['moodboard'] = moodboard_data
@@ -1045,6 +1365,8 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                     timings.update(moodboard_data["timing"])
                 print(f"Parallel Moodboard attached: {moodboard_data.get('image_url', '')[:40]}")
             else:
+                if isinstance(moodboard_data, dict):
+                    result_json['moodboard'] = moodboard_data
                 errors.append(f"moodboard_no_usable_image:{moodboard_data}")
                 print(f"Moodboard generation returned no usable image: {moodboard_data}")
         except Exception as e:
@@ -1059,7 +1381,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         with lock:
             for candidate in [*scraped_images, *real_tavily_images, *images]:
                 url = _image_url_from_candidate(candidate)
-                if url and url.startswith('http') and not _is_low_resolution_url(url):
+                if url and url.startswith('http') and not _is_low_resolution_url(url) and validate_image_url(url):
                     result_json['cover_image_url'] = url
                     used_image_keys.add(_image_dedupe_key(candidate))
                     break
@@ -1069,6 +1391,17 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     if not paragraph_fallback_image and result_json.get("moodboard"):
         paragraph_fallback_image = result_json["moodboard"].get("image_url")
     result_json = _fill_missing_final_images(result_json, paragraph_fallback_image)
+    result_json = _ensure_create_magazine_contract(result_json, topic, errors)
+    used_image_keys = set()
+    result_json = _clear_invalid_final_images(result_json, used_image_keys)
+    result_json = _ensure_minimum_unique_images(
+        result_json,
+        topic,
+        used_image_keys,
+        min_images=_count_content_image_slots(result_json),
+    )
+    result_json = _dedupe_and_pad_paragraph_texts(result_json, topic)
+    result_json = _ensure_create_magazine_contract(result_json, topic, errors)
     timings["final_json_assembly_time"] = round(time.perf_counter() - assembly_start, 3)
     timings["total_time"] = round(time.perf_counter() - total_start, 3)
     timings["total_generation_time"] = timings["total_time"]
@@ -1077,10 +1410,6 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     timings["final_paragraph_counts"] = [
         len(section.get('paragraphs', [])) for section in result_json.get('sections', [])
     ]
-
-    if not result_json.get("moodboard") or not result_json["moodboard"].get("image_url"):
-        _log_create_timing(request_id, timings, result_json, errors, skipped_steps)
-        raise RuntimeError("Moodboard generation is required for create_magazine but no moodboard.image_url was produced")
 
     print(f"V8 Magazine created: 2 sections with parallel research and paragraph-level source tracking")
     _log_create_timing(request_id, timings, result_json, errors, skipped_steps)
