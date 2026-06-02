@@ -322,8 +322,7 @@ def handle_create_moodboard(data: dict) -> dict:
     Returns structured response with success indicator.
     
     On success: {"image_url": "...", "description": "...", "success": True}
-    On fallback: {"image_url": "fallback_url", ..., "success": False, "error_type": "..."}
-    On error: {"error": "...", "success": False}
+    On failure: {"image_url": None, "fallback_url": None, "success": False, "error_type": "..."}
     """
     logger.info("🎨 [1/4] Moodboard handler started")
     logger.info(f"🎨 [1/4] Data received: {data}")
@@ -339,7 +338,9 @@ def handle_create_moodboard(data: dict) -> dict:
             user_mood=data.get("user_mood"),
             user_interests=data.get("user_interests"),
             magazine_tags=data.get("magazine_tags"),
-            magazine_titles=data.get("magazine_titles")
+            magazine_titles=data.get("magazine_titles"),
+            section_headings=data.get("section_headings"),
+            content_keywords=data.get("content_keywords"),
         )
         
         # 결과 검증 (None 체크 + image_url 존재 여부)
@@ -354,8 +355,7 @@ def handle_create_moodboard(data: dict) -> dict:
         
         # success 필드 확인 (새로운 응답 형식)
         if result.get("success") is False:
-            logger.warning(f"🎨 [4/4] Moodboard used fallback: {result.get('error_type')}")
-            # 여전히 image_url은 있으므로 클라이언트에서 사용 가능
+            logger.warning(f"🎨 [4/4] Moodboard failed without usable fallback: {result.get('error_type')}")
         else:
             logger.info("🎨 [4/4] Success! Generated with SDXL")
         

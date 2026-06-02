@@ -133,6 +133,52 @@ def test_visual_elements_keep_topic_keywords_without_weak_terms():
     assert "translate if needed" in visual_elements["elements"]
 
 
+def test_prompt_uses_section_headings_and_content_keywords(monkeypatch):
+    captured = {}
+
+    def fake_generate_text(system_prompt, user_prompt, *args, **kwargs):
+        captured["system"] = system_prompt
+        captured["user"] = user_prompt
+        return "editorial board with ceramic tumbler, refill station, steel texture"
+
+    monkeypatch.setattr(moodboard_maker.llm_client, "generate_text", fake_generate_text)
+
+    prompt = moodboard_maker.generate_moodboard_prompt(
+        topic="친환경 텀블러",
+        user_mood="calm",
+        magazine_tags=["LIFESTYLE"],
+        section_headings=["버려지지 않는 컵의 조건"],
+        content_keywords=["스테인리스 텀블러", "리필 스테이션", "세척 루틴"],
+    )
+
+    assert "버려지지 않는 컵의 조건" in captured["user"]
+    assert "스테인리스 텀블러" in captured["user"]
+    assert "리필 스테이션" in captured["system"]
+    assert "Magazine section headings and article content keywords are stronger" in captured["system"]
+    assert "스테인리스 텀블러" in prompt
+    assert "리필 스테이션" in prompt
+
+
+def test_fallback_url_only_result_is_not_success(monkeypatch):
+    monkeypatch.setattr(
+        moodboard_maker,
+        "generate_moodboard_prompt",
+        lambda *args, **kwargs: "object moodboard, no people",
+    )
+    monkeypatch.setattr(
+        moodboard_maker.local_diffusion_client,
+        "generate_image",
+        lambda *args, **kwargs: None,
+    )
+
+    result = moodboard_maker.generate_moodboard(topic="홈 오피스")
+
+    assert result["success"] is False
+    assert result["image_url"] is None
+    assert result["fallback_url"] is None
+    assert result["status"] == "FAILED"
+
+
 def test_moodboard_generation_defaults(monkeypatch, capsys):
     monkeypatch.delenv("MOODBOARD_WIDTH", raising=False)
     monkeypatch.delenv("MOODBOARD_HEIGHT", raising=False)

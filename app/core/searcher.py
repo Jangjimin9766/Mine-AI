@@ -181,6 +181,7 @@ def scrape_with_jina(url: str, request_state: dict = None):
 
 
 import re
+from urllib.parse import urlparse
 
 def extract_images_from_content(content: str) -> list:
     """
@@ -406,7 +407,50 @@ def validate_image_url(url: str) -> bool:
         _validation_cache[url] = False
         return False
 
-def search_with_pexels(query: str, orientation: str = 'landscape', per_page: int = 5) -> list:
+PEXELS_MIN_WIDTH = 900
+PEXELS_MIN_HEIGHT = 600
+
+
+def pexels_dedupe_key(photo_or_url) -> str:
+    """Return a stable image identity across Pexels sizes/query params."""
+    if isinstance(photo_or_url, dict):
+        photo_id = photo_or_url.get("id")
+        if photo_id:
+            return f"pexels:{photo_id}"
+        url = photo_or_url.get("url") or ""
+    else:
+        url = str(photo_or_url or "")
+    parsed = urlparse(url)
+    if parsed.netloc and parsed.path:
+        return f"{parsed.netloc.lower()}{parsed.path}"
+    return url
+
+
+def _best_pexels_src(src: dict) -> str:
+    if not isinstance(src, dict):
+        return ""
+    return src.get("large2x") or src.get("original") or src.get("large") or ""
+
+
+def _pexels_photo_to_metadata(photo: dict, min_width: int = PEXELS_MIN_WIDTH, min_height: int = PEXELS_MIN_HEIGHT) -> dict:
+    width = int(photo.get("width") or 0)
+    height = int(photo.get("height") or 0)
+    url = _best_pexels_src(photo.get("src", {}))
+    if not url or width < min_width or height < min_height:
+        return {}
+    metadata = {
+        "id": photo.get("id"),
+        "url": url,
+        "width": width,
+        "height": height,
+        "alt": photo.get("alt") or "",
+        "photographer": photo.get("photographer") or "",
+    }
+    metadata["dedupe_key"] = pexels_dedupe_key(metadata)
+    return metadata
+
+
+def search_with_pexels_metadata(query: str, orientation: str = 'landscape', per_page: int = 5) -> list:
     """
     Pexels API를 사용하여 고품질 무료 스톡 이미지를 검색합니다.
     
@@ -416,7 +460,7 @@ def search_with_pexels(query: str, orientation: str = 'landscape', per_page: int
         per_page: 가져올 이미지 수
     
     Returns:
-        이미지 URL 리스트 (large 사이즈)
+        Pexels 이미지 메타데이터 리스트
     """
     api_key = getattr(settings, 'PEXELS_API_KEY', None)
     if not api_key:
@@ -442,15 +486,25 @@ def search_with_pexels(query: str, orientation: str = 'landscape', per_page: int
         
         images = []
         for photo in data.get('photos', []):
-            img_url = photo.get('src', {}).get('large')
-            if img_url:
-                images.append(img_url)
+            metadata = _pexels_photo_to_metadata(photo)
+            if metadata:
+                images.append(metadata)
                 
         print(f"✅ Pexels Found {len(images)} images")
         return images
     except Exception as e:
         print(f"❌ Pexels Error: {e}")
         return []
+
+
+def search_with_pexels(query: str, orientation: str = 'landscape', per_page: int = 5) -> list:
+    """
+    Backward-compatible Pexels search wrapper.
+
+    Returns:
+        이미지 URL 리스트. New code should prefer search_with_pexels_metadata().
+    """
+    return [item["url"] for item in search_with_pexels_metadata(query, orientation, per_page)]
 
 import concurrent.futures
 

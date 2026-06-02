@@ -4,7 +4,7 @@ import os
 import re
 import time
 import uuid
-from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images, scrape_multiple_with_jina, scrape_labeled_sources, validate_image_url, search_with_pexels
+from app.core.searcher import search_with_tavily, scrape_with_jina, extract_images_from_content, get_topic_fallback_images, scrape_multiple_with_jina, scrape_labeled_sources, validate_image_url, search_with_pexels_metadata, pexels_dedupe_key
 from app.core.prompts import MAGAZINE_SYSTEM_PROMPT_V8
 from app.core.utils import is_mostly_english, translate_to_korean, force_translate_magazine_json
 from concurrent.futures import ThreadPoolExecutor
@@ -512,22 +512,33 @@ def _apply_local_contract_fixes(result_json: dict, topic: str, labeled_sources: 
 
 
 def _fill_missing_final_images(result_json: dict, fallback_image_url: str) -> dict:
-    if not fallback_image_url:
+    """Keep missing final images as null instead of copying fallback images."""
+    if not isinstance(result_json, dict):
         return result_json
-    if not result_json.get('cover_image_url'):
-        result_json['cover_image_url'] = fallback_image_url
     for section in result_json.get('sections', []):
         for para in section.get('paragraphs', []):
             if not para.get('image_url'):
-                para['image_url'] = fallback_image_url
+                para['image_url'] = None
         if not section.get('thumbnail_url'):
-            for para in section.get('paragraphs', []):
-                if para.get('image_url'):
-                    section['thumbnail_url'] = para.get('image_url')
-                    break
-        if not section.get('thumbnail_url'):
-            section['thumbnail_url'] = result_json.get('cover_image_url') or fallback_image_url
+            section['thumbnail_url'] = None
     return result_json
+
+
+def _image_dedupe_key(image) -> str:
+    return pexels_dedupe_key(image)
+
+
+def _image_url_from_candidate(image) -> str:
+    if isinstance(image, dict):
+        return image.get("url") or ""
+    return str(image or "")
+
+
+def _is_low_resolution_url(url: str) -> bool:
+    url_lower = (url or "").lower()
+    if any(token in url_lower for token in ("tiny", "small", "thumbnail", "thumb")):
+        return True
+    return bool(re.search(r"([?&](w|width|h|height)=([1-8]\d{0,2})\b)|([/_-](?:1[0-9]{2}|[1-8][0-9])x(?:1[0-9]{2}|[1-8][0-9])\b)", url_lower))
 
 
 def _repair_magazine_contract(result_json: dict, topic: str, labeled_material: str) -> dict:
@@ -954,28 +965,39 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     # hard-coded category palette.
     print(f"Parallelizing image searching and keyword-grounded moodboard generation...")
     
-    used_image_urls = set()
+    used_image_keys = set()
     if result_json.get('cover_image_url') and result_json['cover_image_url'].startswith('http'):
-        used_image_urls.add(result_json['cover_image_url'])
+        used_image_keys.add(_image_dedupe_key(result_json['cover_image_url']))
 
     lock = threading.Lock()
     real_tavily_images = [img for img in images]
     indices = {"scraped": 0, "tavily": 0}
 
+    def assign_candidate(target, candidate, validate: bool = True):
+        url = _image_url_from_candidate(candidate)
+        if not url or not url.startswith('http') or _is_low_resolution_url(url):
+            return False
+        key = _image_dedupe_key(candidate)
+        if key in used_image_keys:
+            return False
+        if validate and not validate_image_url(url):
+            return False
+        target['thumbnail_url' if 'thumbnail_url' in target else 'image_url'] = url
+        used_image_keys.add(key)
+        return True
+
     def assign_image_to_target(target, query, allow_fallback=True):
         assigned = False
         if query:
             try:
-                pexels_imgs = search_with_pexels(query, orientation='landscape', per_page=3)
+                pexels_imgs = search_with_pexels_metadata(query, orientation='landscape', per_page=5)
                 with lock:
                     for img in pexels_imgs:
-                        if img not in used_image_urls and validate_image_url(img):
-                            target['thumbnail_url' if 'thumbnail_url' in target else 'image_url'] = img
-                            used_image_urls.add(img)
+                        if assign_candidate(target, img, validate=True):
                             assigned = True
                             return True
             except Exception as e:
-                print(f"Pexels failed: {e}")
+                print(f"Pexels search failed for '{query}': {type(e).__name__}: {e}")
         if not allow_fallback:
             return False
         with lock:
@@ -983,21 +1005,12 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                 while indices["scraped"] < len(scraped_images):
                     img = scraped_images[indices["scraped"]]
                     indices["scraped"] += 1
-                    if img not in used_image_urls:
-                        target['thumbnail_url' if 'thumbnail_url' in target else 'image_url'] = img
-                        used_image_urls.add(img)
+                    if assign_candidate(target, img, validate=False):
                         return True
                 while indices["tavily"] < len(real_tavily_images):
                     img = real_tavily_images[indices["tavily"]]
                     indices["tavily"] += 1
-                    if img not in used_image_urls and validate_image_url(img):
-                        target['thumbnail_url' if 'thumbnail_url' in target else 'image_url'] = img
-                        used_image_urls.add(img)
-                        return True
-                fallback_pool = scraped_images + real_tavily_images
-                for img in fallback_pool:
-                    if img and isinstance(img, str) and img.startswith('http'):
-                        target['thumbnail_url' if 'thumbnail_url' in target else 'image_url'] = img
+                    if assign_candidate(target, img, validate=True):
                         return True
         return False
 
@@ -1044,14 +1057,18 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     assembly_start = time.perf_counter()
     if not result_json.get('cover_image_url') or not result_json['cover_image_url'].startswith('http'):
         with lock:
-            if scraped_images: result_json['cover_image_url'] = scraped_images[0]
-            elif real_tavily_images: result_json['cover_image_url'] = real_tavily_images[0]
-            else: result_json['cover_image_url'] = images[0] if images else ""
+            for candidate in [*scraped_images, *real_tavily_images, *images]:
+                url = _image_url_from_candidate(candidate)
+                if url and url.startswith('http') and not _is_low_resolution_url(url):
+                    result_json['cover_image_url'] = url
+                    used_image_keys.add(_image_dedupe_key(candidate))
+                    break
+            else:
+                result_json['cover_image_url'] = None
     paragraph_fallback_image = result_json.get('cover_image_url')
     if not paragraph_fallback_image and result_json.get("moodboard"):
         paragraph_fallback_image = result_json["moodboard"].get("image_url")
-    if paragraph_fallback_image:
-        result_json = _fill_missing_final_images(result_json, paragraph_fallback_image)
+    result_json = _fill_missing_final_images(result_json, paragraph_fallback_image)
     timings["final_json_assembly_time"] = round(time.perf_counter() - assembly_start, 3)
     timings["total_time"] = round(time.perf_counter() - total_start, 3)
     timings["total_generation_time"] = timings["total_time"]

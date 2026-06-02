@@ -7,7 +7,7 @@ from app.config import settings
 client = TestClient(app)
 
 @patch("app.core.llm_client.llm_client.generate_text")
-@patch("app.core.local_diffusion_client.LocalDiffusionClient.generate_image")
+@patch("app.core.moodboard_maker.local_diffusion_client.generate_image")
 def test_create_moodboard(mock_generate_image, mock_generate_text):
     # Mock LLM responses
     mock_generate_text.return_value = "winter, jazz, cozy, warm lighting, 8k"

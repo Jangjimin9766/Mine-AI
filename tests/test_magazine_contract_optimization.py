@@ -1,5 +1,6 @@
 from app.core import magazine_maker
 from app.core import moodboard_maker
+from app.core import searcher
 
 
 def _valid_magazine_json():
@@ -103,7 +104,19 @@ def test_create_magazine_does_not_repair_valid_contract(monkeypatch, capsys):
         ),
     )
     monkeypatch.setattr(magazine_maker, "validate_image_url", lambda url: True)
-    monkeypatch.setattr(magazine_maker, "search_with_pexels", lambda *args, **kwargs: ["https://example.com/pexels.jpg"])
+    monkeypatch.setattr(
+        magazine_maker,
+        "search_with_pexels_metadata",
+        lambda *args, **kwargs: [
+            {
+                "id": 1,
+                "url": "https://images.pexels.com/photos/1/pexels-photo-1.jpeg?w=1200",
+                "width": 1200,
+                "height": 800,
+                "dedupe_key": "pexels:1",
+            }
+        ],
+    )
     monkeypatch.setattr(magazine_maker, "_expand_short_paragraphs", lambda result_json, topic, labeled_material: result_json)
 
     def fail_repair(*args, **kwargs):
@@ -134,6 +147,52 @@ def test_create_magazine_does_not_repair_valid_contract(monkeypatch, capsys):
     assert '"targeted_expansion_count": 0' in output
     assert '"initial_paragraph_lengths":' in output
     assert '"openai_call_count": 1' in output
+
+
+def test_user_mood_is_not_in_magazine_body_prompt(monkeypatch):
+    captured = {}
+
+    class CapturingLLM(MockLLM):
+        def generate_json(self, system_prompt, user_prompt, **kwargs):
+            captured["system"] = system_prompt
+            captured["user"] = user_prompt
+            return super().generate_json(system_prompt, user_prompt, **kwargs)
+
+    monkeypatch.setattr(magazine_maker, "llm_client", CapturingLLM(_valid_magazine_json()))
+    monkeypatch.setattr(
+        magazine_maker,
+        "search_with_tavily",
+        lambda *args, **kwargs: (
+            [{"url": "https://example.com/a", "content": "a"}],
+            ["https://example.com/cover.jpg"],
+        ),
+    )
+    monkeypatch.setattr(
+        magazine_maker,
+        "scrape_labeled_sources",
+        lambda *args, **kwargs: ([("https://example.com/a", "a")], []),
+    )
+    monkeypatch.setattr(magazine_maker, "validate_image_url", lambda url: True)
+    monkeypatch.setattr(magazine_maker, "search_with_pexels_metadata", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        moodboard_maker,
+        "generate_moodboard",
+        lambda **kwargs: {
+            "image_url": "https://example.com/moodboard.png",
+            "description": "premium editorial moodboard",
+            "success": True,
+        },
+    )
+
+    magazine_maker.generate_magazine_content(
+        "홈 오피스",
+        user_interests=["인테리어"],
+        user_mood="몽환적이고 우울한 톤",
+        request_id="test-user-mood-split",
+    )
+
+    assert "몽환적이고 우울한 톤" not in captured["system"]
+    assert "몽환적이고 우울한 톤" not in captured["user"]
 
 
 def test_repair_reason_detection_and_local_fix():
@@ -298,7 +357,7 @@ def test_educational_section_headings_are_sanitized():
     assert all(not magazine_maker._looks_educational_title(heading) for heading in headings)
 
 
-def test_fill_missing_final_images_uses_cover_for_all_empty_paragraphs():
+def test_fill_missing_final_images_keeps_empty_paragraphs_null():
     magazine = _valid_magazine_json()
     magazine["cover_image_url"] = "https://example.com/cover.jpg"
     magazine["sections"][0]["paragraphs"][0]["image_url"] = None
@@ -306,8 +365,8 @@ def test_fill_missing_final_images_uses_cover_for_all_empty_paragraphs():
 
     filled = magazine_maker._fill_missing_final_images(magazine, magazine["cover_image_url"])
 
-    assert filled["sections"][0]["paragraphs"][0]["image_url"] == "https://example.com/cover.jpg"
-    assert filled["sections"][1]["paragraphs"][0]["image_url"] == "https://example.com/cover.jpg"
+    assert filled["sections"][0]["paragraphs"][0]["image_url"] is None
+    assert filled["sections"][1]["paragraphs"][0]["image_url"] is None
 
 
 def test_section_thumbnail_query_uses_paragraph_image_keyword_before_heading():
@@ -370,3 +429,45 @@ def test_section_thumbnail_sync_keeps_exact_topic_thumbnail_unless_missing():
     synced = magazine_maker._sync_section_thumbnails_from_paragraphs(magazine)
 
     assert synced["sections"][0]["thumbnail_url"] == "https://example.com/exact-kimchi-stew.jpg"
+
+
+def test_pexels_same_photo_id_has_one_dedupe_key():
+    first = {"id": 123, "url": "https://images.pexels.com/photos/123/a.jpeg?w=150"}
+    second = {"id": 123, "url": "https://images.pexels.com/photos/123/a.jpeg?w=1200"}
+
+    assert magazine_maker._image_dedupe_key(first) == "pexels:123"
+    assert magazine_maker._image_dedupe_key(first) == magazine_maker._image_dedupe_key(second)
+
+
+def test_same_pexels_path_with_different_query_string_is_duplicate():
+    first = "https://images.pexels.com/photos/123/a.jpeg?w=150&auto=compress"
+    second = "https://images.pexels.com/photos/123/a.jpeg?w=1200"
+
+    assert magazine_maker._image_dedupe_key(first) == magazine_maker._image_dedupe_key(second)
+
+
+def test_low_resolution_url_is_excluded_by_policy():
+    assert magazine_maker._is_low_resolution_url("https://images.pexels.com/photos/1/a.jpeg?w=150") is True
+    assert magazine_maker._is_low_resolution_url("https://images.pexels.com/photos/1/tiny/a.jpeg") is True
+    assert magazine_maker._is_low_resolution_url("https://images.pexels.com/photos/1/a.jpeg?w=1200") is False
+
+
+def test_pexels_metadata_filters_low_resolution_and_prefers_large2x():
+    low = {"id": 1, "width": 800, "height": 600, "src": {"large2x": "https://example.com/low.jpg"}}
+    high = {
+        "id": 2,
+        "width": 1200,
+        "height": 800,
+        "alt": "desk",
+        "photographer": "A",
+        "src": {
+            "large": "https://example.com/large.jpg",
+            "large2x": "https://example.com/large2x.jpg",
+            "original": "https://example.com/original.jpg",
+        },
+    }
+
+    assert searcher._pexels_photo_to_metadata(low) == {}
+    metadata = searcher._pexels_photo_to_metadata(high)
+    assert metadata["url"] == "https://example.com/large2x.jpg"
+    assert metadata["dedupe_key"] == "pexels:2"

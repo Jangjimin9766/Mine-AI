@@ -97,11 +97,13 @@ def select_visual_elements(
     user_interests: list = None,
     magazine_tags: list = None,
     magazine_titles: list = None,
+    section_headings: list = None,
+    content_keywords: list = None,
 ) -> dict:
     if topic:
-        source_values = [topic or "", *(magazine_tags or []), *(magazine_titles or [])]
+        source_values = [topic or "", *(section_headings or []), *(content_keywords or []), *(magazine_tags or []), *(magazine_titles or [])]
     else:
-        source_values = [*(user_interests or []), *(magazine_tags or []), *(magazine_titles or [])]
+        source_values = [*(section_headings or []), *(content_keywords or []), *(user_interests or []), *(magazine_tags or []), *(magazine_titles or [])]
     keyword_phrases = _source_keyword_phrases(source_values)
     if keyword_phrases:
         elements = (
@@ -141,7 +143,7 @@ def enforce_no_human_moodboard_prompt(prompt: str, visual_elements: dict) -> str
     )
 
 
-def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None, request_id: str = None) -> str:
+def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None, section_headings: list = None, content_keywords: list = None, request_id: str = None) -> str:
     """
     Generate a detailed prompt for Stable Diffusion (SDXL) based on the user's magazine context.
     Focus on creating an atmospheric BACKGROUND/WALLPAPER.
@@ -159,6 +161,12 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
         
     if magazine_titles:
         context_parts.append(f"Recent Themes: {', '.join(magazine_titles)}")
+
+    if section_headings:
+        context_parts.append(f"Magazine Section Headings: {', '.join(section_headings)}")
+
+    if content_keywords:
+        context_parts.append(f"Article Content Keywords: {', '.join(content_keywords)}")
         
     if user_mood:
         context_parts.append(f"Desired Vibe: {user_mood}")
@@ -183,9 +191,13 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
         topic_keywords.append(topic)
     if magazine_tags:
         topic_keywords.extend(magazine_tags)
+    if section_headings:
+        topic_keywords.extend(section_headings)
+    if content_keywords:
+        topic_keywords.extend(content_keywords)
     
     topic_emphasis = ", ".join(topic_keywords) if topic_keywords else "general lifestyle"
-    visual_elements = select_visual_elements(topic, user_interests, magazine_tags, magazine_titles)
+    visual_elements = select_visual_elements(topic, user_interests, magazine_tags, magazine_titles, section_headings, content_keywords)
 
     system_prompt = f"""
     You are an award-winning Art Director and Senior Photographer.
@@ -201,6 +213,7 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     The image MUST clearly feature elements of: {topic_emphasis}
     It MUST show object, product, material, and color elements instead of humans.
     Source keywords and constraints: {visual_elements['elements']}
+    Magazine section headings and article content keywords are stronger than generic title, tag, or user mood signals.
     The result must feel like an editorial moodboard or magazine brand board, not a single product photo or advertisement.
     It must show 5 to 8 related objects, material samples, or color elements with balanced spacing.
     Use a wide, zoomed-out editorial board composition with clean negative space so it works as a cover background.
@@ -257,18 +270,18 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
 FALLBACK_MOODBOARD_IMAGES = []
 
 
-def generate_moodboard(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None, request_id: str = None) -> dict:
+def generate_moodboard(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None, section_headings: list = None, content_keywords: list = None, request_id: str = None) -> dict:
     """
     Orchestrates the moodboard generation process using Stable Diffusion.
-    Returns structured response with success indicator and fallback on failure.
+    Returns structured response with success indicator. Failures do not expose a usable fallback image.
     
     Returns:
         On success: {"image_url": "...", "description": "...", "success": True}
-        On failure: {"error": "...", "error_type": "...", "success": False, "fallback_url": "..."}
+        On failure: {"error": "...", "error_type": "...", "success": False, "fallback_url": None, "image_url": None}
     """
     # 토픽이 없으면 태그나 타이틀로 대체 토픽 설정 (로깅용)
     display_topic = topic or (magazine_titles[0] if magazine_titles else "User Profile")
-    visual_elements = select_visual_elements(topic or display_topic, user_interests, magazine_tags, magazine_titles)
+    visual_elements = select_visual_elements(topic or display_topic, user_interests, magazine_tags, magazine_titles, section_headings, content_keywords)
     generation_config = get_moodboard_generation_config()
     negative_prompt = build_no_human_negative_prompt()
     
@@ -297,7 +310,7 @@ def generate_moodboard(topic: str = None, user_mood: str = None, user_interests:
     # 1. Generate Prompt
     try:
         prompt_start = time.perf_counter()
-        sd_prompt = generate_moodboard_prompt(topic, user_mood, user_interests, magazine_tags, magazine_titles, request_id=request_id)
+        sd_prompt = generate_moodboard_prompt(topic, user_mood, user_interests, magazine_tags, magazine_titles, section_headings, content_keywords, request_id=request_id)
         timings["moodboard_prompt_generation_time"] = round(time.perf_counter() - prompt_start, 3)
         print(f"{log_prefix} ✨ SDXL Prompt: {sd_prompt}")
     except Exception as e:

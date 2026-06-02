@@ -185,7 +185,9 @@ def handle_generate_moodboard(request: UnifiedMagazineRequest):
         user_mood=request.user_mood,
         user_interests=request.user_interests,
         magazine_tags=request.magazine_tags,
-        magazine_titles=request.magazine_titles
+        magazine_titles=request.magazine_titles,
+        section_headings=request.section_headings,
+        content_keywords=request.content_keywords,
     )
 
     if not result:
@@ -207,7 +209,9 @@ def create_moodboard(request: MoodboardRequest):
         user_mood=request.user_mood,
         user_interests=request.user_interests,
         magazine_tags=request.magazine_tags,
-        magazine_titles=request.magazine_titles
+        magazine_titles=request.magazine_titles,
+        section_headings=request.section_headings,
+        content_keywords=request.content_keywords,
     )
 
     if not result:

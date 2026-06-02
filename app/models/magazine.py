@@ -53,6 +53,8 @@ class MoodboardRequest(BaseModel):
     user_interests: Optional[List[str]] = None
     magazine_tags: Optional[List[str]] = None
     magazine_titles: Optional[List[str]] = None
+    section_headings: Optional[List[str]] = None
+    content_keywords: Optional[List[str]] = None
 
 # ==========================================
 # 통합 요청 모델 (Action 기반)
@@ -72,6 +74,8 @@ class UnifiedMagazineRequest(BaseModel):
     user_interests: Optional[List[str]] = None
     magazine_tags: Optional[List[str]] = None
     magazine_titles: Optional[List[str]] = None
+    section_headings: Optional[List[str]] = None
+    content_keywords: Optional[List[str]] = None
     
     # edit_magazine용
     magazine_id: Optional[int] = None
