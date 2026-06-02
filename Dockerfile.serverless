@@ -1,5 +1,5 @@
 # RunPod Serverless Dockerfile for M:ine AI
-# Model weights download at runtime; Docker layers should stay cache-friendly.
+# Model weights are cached on the RunPod network volume when it is mounted.
 
 FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
 
@@ -28,6 +28,10 @@ COPY . .
 ENV PYTHONUNBUFFERED=1
 ENV GIT_COMMIT=$GIT_COMMIT
 ENV BUILD_DATE=$BUILD_DATE
+ENV HF_HOME=/runpod-volume/huggingface
+ENV HF_HUB_CACHE=/runpod-volume/huggingface/hub
+ENV TRANSFORMERS_CACHE=/runpod-volume/huggingface/transformers
+ENV DIFFUSERS_CACHE=/runpod-volume/huggingface/diffusers
 
 # Run the handler
 CMD ["python", "-u", "handler.py"]

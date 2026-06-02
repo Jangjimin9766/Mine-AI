@@ -249,6 +249,19 @@ docker push jiminjang/mine-ai-serverless:latest
 git push origin main
 ```
 
+#### RunPod Network Volume 캐시 설정
+
+SDXL 모델 파일을 매 요청마다 다시 받지 않으려면 RunPod Serverless endpoint에 Network Volume을 연결하고 mount path를 `/runpod-volume`로 설정합니다. `Dockerfile.serverless`는 아래 캐시 경로를 기본값으로 사용합니다.
+
+```bash
+HF_HOME=/runpod-volume/huggingface
+HF_HUB_CACHE=/runpod-volume/huggingface/hub
+TRANSFORMERS_CACHE=/runpod-volume/huggingface/transformers
+DIFFUSERS_CACHE=/runpod-volume/huggingface/diffusers
+```
+
+배포 후 RunPod 로그에서 `cache_dir=/runpod-volume/huggingface/hub`가 찍히고, 두 번째 생성부터 `Fetching 19 files` 시간이 사라지거나 크게 줄어드는지 확인합니다.
+
 ---
 
 ## 📖 API 사용법

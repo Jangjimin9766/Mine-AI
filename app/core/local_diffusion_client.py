@@ -72,6 +72,16 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _resolve_hf_cache_dir() -> str:
+    """Return the Hugging Face cache dir, preferring the RunPod network volume."""
+    return (
+        os.getenv("HF_HUB_CACHE")
+        or os.getenv("DIFFUSERS_CACHE")
+        or os.getenv("HF_HOME")
+        or os.path.expanduser("~/.cache/huggingface")
+    )
+
+
 class LocalDiffusionClient:
     def __init__(self):
         self.pipe = None
@@ -81,6 +91,7 @@ class LocalDiffusionClient:
         self._load_error = None
         self.last_timing = {}
         self._generation_lock = threading.Lock()
+        self.cache_dir = _resolve_hf_cache_dir()
         # Lazy loading: 모델은 처음 요청이 들어올 때 로드합니다. (서버 시작 시간 단축)
 
     def _load_model(self) -> bool:
@@ -98,13 +109,17 @@ class LocalDiffusionClient:
         elif torch.backends.mps.is_available():
             self.device = "mps"
         
-        print(f"⏳ Loading Stable Diffusion XL model to {self.device.upper()} (This may take a while on first run)...")
+        print(
+            f"⏳ Loading Stable Diffusion XL model to {self.device.upper()} "
+            f"(cache_dir={self.cache_dir})..."
+        )
         try:
             self.pipe = DiffusionPipeline.from_pretrained(
                 self.model_id,
                 torch_dtype=torch.float16,
                 use_safetensors=True,
-                variant="fp16"
+                variant="fp16",
+                cache_dir=self.cache_dir,
             )
             
             self.pipe.to(self.device)
@@ -132,6 +147,7 @@ class LocalDiffusionClient:
             "loaded": self.pipe is not None,
             "load_attempted": self._load_attempted,
             "device": self.device,
+            "cache_dir": self.cache_dir,
             "error": self._load_error
         }
 
@@ -188,6 +204,7 @@ class LocalDiffusionClient:
                 "guidance_scale": guidance_scale,
                 "negative_prompt_applied": bool(negative_prompt),
                 "device": self.device,
+                "cache_dir": self.cache_dir,
                 "error": self._load_error,
             }
             print(f"⚠️ SDXL model not available. Status: {self.get_status()}")
@@ -241,6 +258,7 @@ class LocalDiffusionClient:
                 "output_format": output_format,
                 "image_quality": quality,
                 "device": self.device,
+                "cache_dir": self.cache_dir,
                 "error": None,
             }
             
@@ -259,6 +277,7 @@ class LocalDiffusionClient:
                 "guidance_scale": guidance_scale,
                 "negative_prompt_applied": bool(negative_prompt),
                 "device": self.device,
+                "cache_dir": self.cache_dir,
                 "error": str(e),
             }
             print(f"❌ Local Generation Error: {e}")
