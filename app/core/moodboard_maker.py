@@ -92,6 +92,131 @@ def _source_keyword_phrases(values: list, max_items: int = 6) -> list:
     return phrases
 
 
+TOPIC_OBJECT_ANCHORS = [
+    (
+        ("텀블러", "tumbler", "reusable cup", "reusable bottle"),
+        [
+            "stainless steel reusable tumbler",
+            "bamboo bottle cleaning brush",
+            "silicone straw case",
+            "microfiber drying cloth",
+            "cork coaster",
+            "clear refill bottle",
+        ],
+    ),
+    (
+        ("홈트", "workout", "exercise", "fitness"),
+        [
+            "yoga mat",
+            "hex dumbbells",
+            "resistance bands",
+            "foam roller",
+            "water bottle",
+            "workout timer",
+        ],
+    ),
+    (
+        ("인테리어", "interior", "작은 집", "small home", "space saving"),
+        [
+            "modular storage cubes",
+            "round wall mirror",
+            "floating oak shelf",
+            "linen fabric swatches",
+            "light oak flooring sample",
+            "neutral color cards",
+        ],
+    ),
+    (
+        ("요리", "레시피", "food", "recipe", "cooking"),
+        [
+            "ceramic serving bowl",
+            "wooden spoon",
+            "ingredient bowls",
+            "linen napkin",
+            "stone countertop sample",
+            "warm color cards",
+        ],
+    ),
+]
+
+
+def _topic_object_anchors(values: list, max_items: int = 6) -> list:
+    haystack = " ".join(str(value or "").lower() for value in values or [])
+    anchors = []
+    seen = set()
+    for triggers, objects in TOPIC_OBJECT_ANCHORS:
+        if any(trigger.lower() in haystack for trigger in triggers):
+            for obj in objects:
+                if obj not in seen:
+                    seen.add(obj)
+                    anchors.append(obj)
+                if len(anchors) >= max_items:
+                    return anchors
+    return anchors
+
+
+def _clean_prompt_phrase(value: str) -> str:
+    text = str(value or "").strip()
+    text = re.sub(r"\[[^\]]+\]", " ", text)
+    text = re.sub(r"[^A-Za-z0-9&' -]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip(" ,.-")
+    return text
+
+
+def _prompt_object_phrases(prompt: str, max_items: int = 5) -> list:
+    phrases = []
+    seen = set()
+    for raw_part in re.split(r"[,;]", str(prompt or "")):
+        phrase = _clean_prompt_phrase(raw_part)
+        normalized = phrase.lower()
+        if (
+            not phrase
+            or len(phrase) < 3
+            or len(phrase) > 48
+            or normalized in seen
+            or any(term in normalized for term in (
+                "premium", "editorial", "moodboard", "photorealistic", "cinematic",
+                "camera", "quality", "negative space", "composition",
+                "no people", "no human", "no text", "no logo",
+            ))
+        ):
+            continue
+        seen.add(normalized)
+        phrases.append(phrase)
+        if len(phrases) >= max_items:
+            break
+    return phrases
+
+
+def _compact_sdxl_prompt(prompt: str, visual_elements: dict) -> str:
+    anchors = visual_elements.get("object_anchors") or []
+    llm_objects = _prompt_object_phrases(prompt)
+    objects = []
+    seen = set()
+    for item in [*anchors, *llm_objects]:
+        phrase = _clean_prompt_phrase(item)
+        normalized = phrase.lower()
+        if phrase and normalized not in seen:
+            seen.add(normalized)
+            objects.append(phrase)
+        if len(objects) >= 5:
+            break
+
+    object_text = ", ".join(objects) if objects else _clean_prompt_phrase(prompt)[:220]
+    source_keyword_items = []
+    for keyword in visual_elements.get("keywords", [])[:4]:
+        cleaned = _clean_prompt_phrase(keyword)
+        if cleaned and re.search(r"[A-Za-z]{3,}", cleaned):
+            source_keyword_items.append(cleaned)
+    source_keywords = ", ".join(source_keyword_items)
+    source_rule = f"source constraint: {source_keywords}" if source_keywords else "source constraint: use only topic-derived objects"
+    return (
+        f"{object_text}, premium editorial object moodboard, curated flatlay, multiple curated objects, balanced spacing, "
+        "material swatches, color cards, clean background, soft natural light, photorealistic, "
+        f"no people, no humans, no hands, no model, no text, no logos, no single product shot, not a single product shot, {source_rule}"
+    )
+
+
 def select_visual_elements(
     topic: str = None,
     user_interests: list = None,
@@ -105,6 +230,7 @@ def select_visual_elements(
     else:
         source_values = [*(section_headings or []), *(content_keywords or []), *(user_interests or []), *(magazine_tags or []), *(magazine_titles or [])]
     keyword_phrases = _source_keyword_phrases(source_values)
+    object_anchors = _topic_object_anchors(source_values)
     if keyword_phrases:
         elements = (
             "translate if needed and use only visual subjects derived from these supplied magazine keywords: "
@@ -115,32 +241,16 @@ def select_visual_elements(
             "use only concrete objects, materials, colors, locations, and visual details "
             "explicitly implied by the translated topic and supplied magazine context"
         )
-    return {"category": "keyword_driven", "elements": elements, "keywords": keyword_phrases}
+    return {
+        "category": "keyword_driven",
+        "elements": elements,
+        "keywords": keyword_phrases,
+        "object_anchors": object_anchors,
+    }
 
 
 def enforce_no_human_moodboard_prompt(prompt: str, visual_elements: dict) -> str:
-    style = (
-        "premium editorial moodboard, aesthetic product collage, clean wallpaper composition, "
-        "curated object flatlay, cohesive color palette, tasteful lighting, design magazine style, "
-        "balanced layout, multiple curated objects, material swatches, color palette cards, "
-        "magazine brand board, not a single product shot"
-    )
-    layout_rule = (
-        "5 to 8 related objects and material or color elements arranged with balanced spacing, "
-        "wide editorial board crop with clean negative space, no macro close-up, "
-        "no single item dominates the frame, no unrelated props, no category-default objects, "
-        "no objects that are absent from the supplied topic or magazine keywords"
-    )
-    no_human_rule = (
-        "strictly no people, no humans, no person, no face, no portrait, no hands, no arms, "
-        "no legs, no feet, no body, no mannequin, no model, no silhouette"
-    )
-    no_text_rule = "no logos, no text, no labels, no brand marks, no typography"
-    return (
-        f"{prompt}, {style}, source constraint: {visual_elements['elements']}, "
-        f"{layout_rule}, object and material focused, brand board composition, "
-        f"{no_human_rule}, {no_text_rule}"
-    )
+    return _compact_sdxl_prompt(prompt, visual_elements)
 
 
 def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_interests: list = None, magazine_tags: list = None, magazine_titles: list = None, section_headings: list = None, content_keywords: list = None, request_id: str = None) -> str:
@@ -198,6 +308,8 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     
     topic_emphasis = ", ".join(topic_keywords) if topic_keywords else "general lifestyle"
     visual_elements = select_visual_elements(topic, user_interests, magazine_tags, magazine_titles, section_headings, content_keywords)
+    object_anchors = visual_elements.get("object_anchors") or []
+    object_anchor_text = ", ".join(object_anchors) if object_anchors else "objects explicitly named or directly implied by the supplied magazine keywords"
 
     system_prompt = f"""
     You are an award-winning Art Director and Senior Photographer.
@@ -211,6 +323,7 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
 
     [SUBJECT-SPECIFIC FOCUS — MANDATORY]
     The image MUST clearly feature elements of: {topic_emphasis}
+    It MUST visibly include these primary anchor objects when applicable: {object_anchor_text}
     It MUST show object, product, material, and color elements instead of humans.
     Source keywords and constraints: {visual_elements['elements']}
     Magazine section headings and article content keywords are stronger than generic title, tag, or user mood signals.
@@ -222,6 +335,7 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
 
     [CONCRETE OBJECTS REQUIRED]
     You MUST include 5-8 specific physical objects, materials, or color swatches in the prompt that are directly related to the supplied topic and magazine keywords.
+    Use the primary anchor objects as the first objects in the prompt; do not replace them with generic category props.
     - BAD: "premium concept, lifestyle, motivation" (too abstract)
     - BAD: "model wearing clothes, athlete portrait, person using product" (humans are forbidden)
     - BAD: "single centered product photo, advertisement, logo close-up" (too much like a product ad)
