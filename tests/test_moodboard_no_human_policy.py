@@ -48,7 +48,7 @@ def test_prompt_uses_supplied_magazine_keywords_without_category_palette(monkeyp
     assert "folded polo fabric" in prompt
     assert "club head detail" not in prompt
     assert "golf balls" not in prompt
-    assert "multiple curated objects" in prompt
+    assert "one clear hero object" in prompt
     assert "not a single product shot" in prompt
     assert "no logos" in prompt
     assert "no text" in prompt
@@ -66,7 +66,7 @@ def test_general_prompt_uses_keyword_driven_constraints(monkeypatch):
     prompt = moodboard_maker.generate_moodboard_prompt(topic="봄 패션", magazine_tags=["FASHION"])
 
     assert "source constraint" in prompt
-    assert "premium editorial object moodboard" in prompt
+    assert "premium editorial cover background" in prompt
 
 
 def test_moodboard_prompt_does_not_use_object_specific_rejection(monkeypatch):
@@ -93,7 +93,7 @@ def test_home_office_prompt_uses_interior_object_palette(monkeypatch):
     prompt = moodboard_maker.generate_moodboard_prompt(topic="홈 오피스 생산성 셋업")
 
     assert "source constraint" in prompt
-    assert "premium editorial object moodboard" in prompt
+    assert "premium editorial cover background" in prompt
     assert "no humans" in prompt
 
 
@@ -175,7 +175,7 @@ def test_moodboard_prompt_adds_topic_specific_anchor_objects(monkeypatch):
     assert "yoga mat" in prompt
     assert "resistance bands" in prompt
     assert "foam roller" in prompt
-    assert prompt.index("yoga mat") < prompt.index("premium editorial object moodboard")
+    assert prompt.index("yoga mat") < prompt.index("premium editorial cover background")
 
 
 def test_moodboard_prompt_is_compact_and_topic_first(monkeypatch):
@@ -195,7 +195,7 @@ def test_moodboard_prompt_is_compact_and_topic_first(monkeypatch):
 
     assert prompt.startswith("portable espresso grinder")
     assert "ceramic demitasse cup" in prompt
-    assert "premium editorial object moodboard" in prompt
+    assert "premium editorial cover background" in prompt
     assert len(prompt.split()) < 95
 
 
@@ -284,7 +284,7 @@ def test_moodboard_generation_defaults(monkeypatch, capsys):
     assert "inference_steps=12" in output
 
 
-def test_compact_prompt_adds_depth_and_layering(monkeypatch):
+def test_compact_prompt_adds_cover_depth_and_layering(monkeypatch):
     monkeypatch.setattr(
         moodboard_maker.llm_client,
         "generate_text",
@@ -293,8 +293,11 @@ def test_compact_prompt_adds_depth_and_layering(monkeypatch):
 
     prompt = moodboard_maker.generate_moodboard_prompt(topic="환경친화 텀블러 추천")
 
-    assert "layered curated flatlay" in prompt
-    assert "overlapping material swatches" in prompt
+    assert "premium editorial cover background" in prompt
+    assert "layered still-life composition" in prompt
+    assert "one clear hero object" in prompt
+    assert "refined negative space for app title overlay" in prompt
     assert "subtle shadows" in prompt
-    assert "cohesive accent color" in prompt
+    assert "cohesive color story" in prompt
     assert "high-end design magazine styling" in prompt
+    assert "no paper flatlay grid" in prompt

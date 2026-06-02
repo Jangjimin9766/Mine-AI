@@ -22,7 +22,8 @@ BASE_MOODBOARD_NEGATIVE_PROMPT = (
     "disturbing, offensive, inappropriate, pornographic, erotic, suggestive, low quality, blurry, "
     "messy composition, random snapshot, distorted objects, extra limbs, single product shot, "
     "single product photo, product advertisement, catalog photo, isolated object, oversized clothing item, "
-    "flat boring layout, empty composition, dull lighting, washed out colors, generic stock photo"
+    "flat boring layout, paper grid layout, scrapbook layout, empty composition, dull lighting, "
+    "washed out colors, generic stock photo"
 )
 
 
@@ -210,13 +211,15 @@ def _compact_sdxl_prompt(prompt: str, visual_elements: dict) -> str:
         if cleaned and re.search(r"[A-Za-z]{3,}", cleaned):
             source_keyword_items.append(cleaned)
     source_keywords = ", ".join(source_keyword_items)
-    source_rule = f"source constraint: {source_keywords}" if source_keywords else "source constraint: use only topic-derived objects"
+    source_rule = f"source constraint: {source_keywords}" if source_keywords else "source constraint: topic objects"
     return (
-        f"{object_text}, premium editorial object moodboard, layered curated flatlay, magazine brand board, "
-        "multiple curated objects, balanced asymmetrical spacing, overlapping material swatches, "
-        "color palette cards, tactile surface details, subtle shadows, depth, refined negative space, "
-        "warm natural window light with soft highlights, cohesive accent color, crisp focus, high-end design magazine styling, photorealistic, "
-        f"no people, no humans, no hands, no model, no text, no logos, no single product shot, not a single product shot, {source_rule}"
+        f"{object_text}, premium editorial cover background, layered still-life composition, magazine brand board, "
+        "one clear hero object with supporting material layers, color palette cards, tactile details, "
+        "balanced asymmetrical composition, refined negative space for app title overlay, subtle shadows, "
+        "cinematic depth cues, soft directional daylight, cohesive color story, crisp texture, "
+        "high-end design magazine styling, photorealistic, "
+        f"no people, no humans, no hands, no model, no text, no logos, no single product shot, "
+        f"not a single product shot, no paper flatlay grid, {source_rule}"
     )
 
 
@@ -316,8 +319,8 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
 
     system_prompt = f"""
     You are an award-winning Art Director and Senior Photographer.
-    Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's moodboard.
-    The image must be a people-free object moodboard, not a portrait, not a model shot, not a lifestyle photo with humans.
+    Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's cover moodboard.
+    The image must be a people-free editorial cover background, not a portrait, not a model shot, not a lifestyle photo with humans.
 
     [LANGUAGE RULE — ABSOLUTE]
     Your output MUST be in ENGLISH ONLY. No Korean, Chinese, Japanese, or any non-Latin characters.
@@ -330,30 +333,30 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     It MUST show object, product, material, and color elements instead of humans.
     Source keywords and constraints: {visual_elements['elements']}
     Magazine section headings and article content keywords are stronger than generic title, tag, or user mood signals.
-    The result must feel like an editorial moodboard or magazine brand board, not a single product photo or advertisement.
-    It must show 5 to 8 related objects, material samples, or color elements with balanced spacing.
-    Use a wide, zoomed-out editorial board composition with clean negative space so it works as a cover background.
-    Do not use a macro close-up, cropped close-up, or one oversized object filling the frame.
+    The result must feel like a premium editorial cover background or magazine brand board, not a single product photo or advertisement.
+    Use a hero object plus supporting layers: 1 clear focal object, 1-2 secondary objects, 2-3 material or texture layers, and 2 color palette accents.
+    Use a wide editorial still-life composition with clean negative space so it works as an app cover background.
+    Do not use a paper grid, scrapbook layout, macro close-up, cropped close-up, or one oversized object filling the frame.
     Do not use a fixed category palette. Derive every object from the supplied topic, titles, tags, and source keywords.
 
     [CONCRETE OBJECTS REQUIRED]
-    You MUST include 5-8 specific physical objects, materials, or color swatches in the prompt that are directly related to the supplied topic and magazine keywords.
-    Use the primary anchor objects as the first objects in the prompt; do not replace them with generic category props.
+    You MUST include a specific hero object and supporting physical objects, materials, textures, or color accents directly related to the supplied topic and magazine keywords.
+    Use the primary anchor objects as the first visual subjects in the prompt; do not replace them with generic category props.
     - BAD: "premium concept, lifestyle, motivation" (too abstract)
     - BAD: "model wearing clothes, athlete portrait, person using product" (humans are forbidden)
     - BAD: "single centered product photo, advertisement, logo close-up" (too much like a product ad)
-    - GOOD: concrete objects, material swatches, color palette cards, tools, surfaces, and props directly implied by the supplied magazine keywords.
+    - GOOD: a clear hero object, secondary objects, material textures, color palette accents, surfaces, and props directly implied by the supplied magazine keywords.
 
     [PHOTOGRAPHY PARAMETERS]
     1. Subject: specific, high-definition product/object/material subjects related to the Topic ({topic_emphasis}) and source keywords.
-    2. Composition: balanced layout, multiple curated objects, material swatches, color palette cards, magazine brand board, premium editorial moodboard, aesthetic product collage, clean wallpaper composition, curated object flatlay, cohesive color palette, tasteful lighting, design magazine style, not a single product shot.
+    2. Composition: premium editorial cover background, layered still-life composition, one clear hero object with supporting material layers, color palette accents, magazine brand board, clean wallpaper composition, cohesive color story, refined negative space for app title overlay, tasteful lighting, design magazine style, not a single product shot, not a paper flatlay grid.
     3. Lighting: cinematic volumetric light, soft natural dawn light, dramatic Rembrandt shadows.
     4. Camera/Film: 85mm lens for products, f/5.6, ISO 100, crisp focus, minimal grain.
     5. Style: premium magazine editorial style, Kinfolk, Magazine B, Vogue quality, photorealistic.
     6. Variation: {random_variation}
 
     [PROMPT STRUCTURE]
-    [Subject Detail with concrete objects], [Environment/Atmosphere], [Composition Style], [Specific Lighting], [Camera Settings], [Quality Tags: photorealistic, premium editorial]
+    [Hero object and supporting concrete subjects], [Material/Color Story], [Editorial Cover Composition], [Specific Lighting], [Camera Settings], [Quality Tags: photorealistic, premium editorial]
 
     [CRITICAL CONSTRAINTS]
     - NSFW POLICY: NEVER generate prompts for pornography, explicit sexual acts, extreme violence, or illegal content.
@@ -371,8 +374,8 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     [User Context]
     {full_context}
     
-    Create a comma-separated ENGLISH prompt for a sophisticated people-free editorial moodboard/wallpaper image.
-    Remember: ENGLISH ONLY, include 5-8 balanced curated objects, materials, or color elements related to the topic.
+    Create a comma-separated ENGLISH prompt for a sophisticated people-free editorial cover moodboard image.
+    Remember: ENGLISH ONLY, use a hero object plus supporting material layers, texture details, and color accents related to the topic.
     Do not include people, body parts, logos, text, labels, brand marks, or typography.
     """
 
