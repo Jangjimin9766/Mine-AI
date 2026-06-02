@@ -21,7 +21,8 @@ BASE_MOODBOARD_NEGATIVE_PROMPT = (
     "nsfw, nude, naked, violence, blood, gore, sexually explicit, weapons, drugs, horror, "
     "disturbing, offensive, inappropriate, pornographic, erotic, suggestive, low quality, blurry, "
     "messy composition, random snapshot, distorted objects, extra limbs, single product shot, "
-    "single product photo, product advertisement, catalog photo, isolated object, oversized clothing item"
+    "single product photo, product advertisement, catalog photo, isolated object, oversized clothing item, "
+    "flat boring layout, empty composition, dull lighting, washed out colors, generic stock photo"
 )
 
 
@@ -46,7 +47,7 @@ def get_moodboard_generation_config() -> dict:
         "steps": _env_int("MOODBOARD_STEPS", 12),
         "guidance_scale": _env_float("MOODBOARD_GUIDANCE_SCALE", 6.0),
         "output_format": os.getenv("MOODBOARD_IMAGE_FORMAT", "JPEG"),
-        "quality": _env_int("MOODBOARD_IMAGE_QUALITY", 82),
+        "quality": _env_int("MOODBOARD_IMAGE_QUALITY", 88),
     }
 
 
@@ -211,8 +212,10 @@ def _compact_sdxl_prompt(prompt: str, visual_elements: dict) -> str:
     source_keywords = ", ".join(source_keyword_items)
     source_rule = f"source constraint: {source_keywords}" if source_keywords else "source constraint: use only topic-derived objects"
     return (
-        f"{object_text}, premium editorial object moodboard, curated flatlay, multiple curated objects, balanced spacing, "
-        "material swatches, color cards, clean background, soft natural light, photorealistic, "
+        f"{object_text}, premium editorial object moodboard, layered curated flatlay, magazine brand board, "
+        "multiple curated objects, balanced asymmetrical spacing, overlapping material swatches, "
+        "color palette cards, tactile surface details, subtle shadows, depth, refined negative space, "
+        "warm natural window light with soft highlights, cohesive accent color, crisp focus, high-end design magazine styling, photorealistic, "
         f"no people, no humans, no hands, no model, no text, no logos, no single product shot, not a single product shot, {source_rule}"
     )
 

@@ -278,6 +278,23 @@ def test_moodboard_generation_defaults(monkeypatch, capsys):
     assert calls["height"] == 768
     assert calls["num_inference_steps"] == 12
     assert calls["guidance_scale"] == 6.0
+    assert calls["quality"] == 88
     assert "no people" in calls["negative_prompt"]
     assert "no_human=true" in output
     assert "inference_steps=12" in output
+
+
+def test_compact_prompt_adds_depth_and_layering(monkeypatch):
+    monkeypatch.setattr(
+        moodboard_maker.llm_client,
+        "generate_text",
+        lambda *args, **kwargs: "stainless steel reusable tumbler, cork coaster, refill bottle",
+    )
+
+    prompt = moodboard_maker.generate_moodboard_prompt(topic="환경친화 텀블러 추천")
+
+    assert "layered curated flatlay" in prompt
+    assert "overlapping material swatches" in prompt
+    assert "subtle shadows" in prompt
+    assert "cohesive accent color" in prompt
+    assert "high-end design magazine styling" in prompt
