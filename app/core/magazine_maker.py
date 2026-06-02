@@ -1006,6 +1006,16 @@ def _log_create_timing(request_id: str, timings: dict, result_json: dict, errors
     print(f"[create_magazine][request_id={request_id}] timing: {json.dumps(summary, ensure_ascii=False)}")
 
 
+def _log_create_step(request_id: str, step: str, elapsed: float, total_start: float, **extra):
+    payload = {
+        "step": step,
+        "elapsed": round(elapsed, 3),
+        "total_elapsed": round(time.perf_counter() - total_start, 3),
+        **extra,
+    }
+    print(f"[create_magazine][request_id={request_id}] step_timing: {json.dumps(payload, ensure_ascii=False)}")
+
+
 def generate_magazine_content(topic: str, user_interests: list = None, user_mood: str = None, request_id: str = None, runpod_handler_start_time: float = 0):
     request_id = request_id or str(uuid.uuid4())[:8]
     total_start = time.perf_counter()
@@ -1033,6 +1043,11 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         "jina_urls_failed": 0,
         "scraping_total_time": 0,
         "jina_total_time": 0,
+        "search_total_time": 0,
+        "llm_total_time": 0,
+        "image_fetch_time": 0,
+        "moodboard_total_time": 0,
+        "callback_response_time": 0,
         "contract_repair_needed": False,
         "contract_repair_reason": [],
         "contract_repair_time": 0,
@@ -1088,6 +1103,14 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     web_search_start = time.perf_counter()
     search_results, images = search_with_tavily(search_query, topic=topic)
     timings["web_search_time"] = round(time.perf_counter() - web_search_start, 3)
+    _log_create_step(
+        request_id,
+        "search.tavily",
+        timings["web_search_time"],
+        total_start,
+        results_count=len(search_results or []),
+        images_count=len(images or []),
+    )
     
     # 2. [Parallel Scraping V2] Labeled source scraping
     # Initial magazines use 2 sections x 3 paragraphs. We try 4 Jina sources
@@ -1125,12 +1148,27 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         scraped_images = [img for img in scraped_images if validate_image_url(img)]
         timings["scraped_image_validation_time"] = round(time.perf_counter() - validation_start, 3)
         timings["scraping_total_time"] = round(timings["jina_scrape_time"] + timings["scraped_image_validation_time"], 3)
+        _log_create_step(
+            request_id,
+            "search.scraping",
+            timings["scraping_total_time"],
+            total_start,
+            jina_total_time=timings["jina_total_time"],
+            image_validation_time=timings["scraped_image_validation_time"],
+            sources_count=len(labeled_sources),
+            scraped_images_count=len(scraped_images),
+            jina_urls_attempted=timings["jina_urls_attempted"],
+            jina_urls_succeeded=timings["jina_urls_succeeded"],
+            jina_timeout_count=timings["jina_timeout_count"],
+        )
     else:
         timings["jina_scrape_time"] = 0
         timings["jina_total_time"] = 0
         timings["scraped_image_validation_time"] = 0
         timings["scraping_total_time"] = 0
         skipped_steps.append("no_search_results_for_jina")
+        _log_create_step(request_id, "search.scraping", 0, total_start, skipped=True, reason="no_search_results")
+    timings["search_total_time"] = round(timings["web_search_time"] + timings["scraping_total_time"], 3)
 
     # 3. Build labeled research material
     labeled_material = ""
@@ -1162,6 +1200,13 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         request_id=request_id,
     )
     timings["moodboard_submit_time"] = round(time.perf_counter() - moodboard_submit_start, 3)
+    _log_create_step(
+        request_id,
+        "moodboard.submit",
+        timings["moodboard_submit_time"],
+        total_start,
+        seed_tags=moodboard_seed_tags[:5],
+    )
 
     system_prompt = MAGAZINE_SYSTEM_PROMPT_V8
     user_prompt = f"""
@@ -1190,6 +1235,14 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     )
     timings["content_generation_time"] = round(time.perf_counter() - content_start, 3)
     timings["initial_generation_time"] = timings["content_generation_time"]
+    timings["llm_total_time"] = timings["content_generation_time"]
+    _log_create_step(
+        request_id,
+        "llm.initial_generation",
+        timings["content_generation_time"],
+        total_start,
+        openai_call_count_delta=getattr(llm_client, "call_count", 0) - llm_call_count_start,
+    )
     
     # Handle Safety/NSFW Errors
     if "error" in result_json:
@@ -1235,6 +1288,14 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         repair_start = time.perf_counter()
         result_json = _repair_magazine_contract(result_json, topic, labeled_material)
         timings["contract_repair_time"] = round(time.perf_counter() - repair_start, 3)
+        timings["llm_total_time"] = round(timings["llm_total_time"] + timings["contract_repair_time"], 3)
+        _log_create_step(
+            request_id,
+            "llm.contract_repair",
+            timings["contract_repair_time"],
+            total_start,
+            repair_reasons=repair_reasons,
+        )
         result_json = force_translate_magazine_json(result_json)
         result_json = _normalize_magazine_contract(result_json, topic)
         result_json = _apply_local_contract_fixes(result_json, topic, labeled_sources, search_results)
@@ -1269,7 +1330,15 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
         result_json = _expand_short_paragraphs(result_json, topic, labeled_material, short_items=expansion_targets)
     timings["paragraph_expansion_time"] = round(time.perf_counter() - expand_start, 3)
     timings["targeted_expansion_time"] = timings["paragraph_expansion_time"]
+    timings["llm_total_time"] = round(timings["llm_total_time"] + timings["paragraph_expansion_time"], 3)
     timings["targeted_expansion_count"] = len(expansion_targets)
+    _log_create_step(
+        request_id,
+        "llm.targeted_expansion",
+        timings["paragraph_expansion_time"],
+        total_start,
+        targeted_expansion_count=len(expansion_targets),
+    )
     result_json = _normalize_magazine_contract(result_json, topic)
     timings["short_paragraphs_after_expansion"] = _short_paragraphs(result_json)
     timings["remaining_short_paragraphs"] = timings["short_paragraphs_after_expansion"]
@@ -1350,6 +1419,15 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                 print(f"Image assignment future failed: {type(e).__name__}: {e}")
         result_json = _sync_section_thumbnails_from_paragraphs(result_json)
         timings["paragraph_image_search_time"] = round(time.perf_counter() - image_search_start, 3)
+        timings["image_fetch_time"] = timings["paragraph_image_search_time"]
+        _log_create_step(
+            request_id,
+            "image_fetch.paragraph_images",
+            timings["paragraph_image_search_time"],
+            total_start,
+            sections_count=len(result_json.get('sections', [])),
+            paragraph_counts=[len(section.get('paragraphs', [])) for section in result_json.get('sections', [])],
+        )
         moodboard_wait_start = time.perf_counter()
         try:
             # Do not use a timeout here. If this times out inside the
@@ -1375,6 +1453,20 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
             print(f"Moodboard parallel generation failed: {type(e).__name__}: {e}")
         finally:
             moodboard_executor.shutdown(wait=True)
+        timings["moodboard_total_time"] = round(
+            timings.get("moodboard_prompt_generation_time", 0)
+            + timings.get("moodboard_image_generation_time", 0)
+            + timings.get("moodboard_wait_after_content_time", 0),
+            3,
+        )
+        _log_create_step(
+            request_id,
+            "moodboard.complete",
+            timings["moodboard_total_time"],
+            total_start,
+            wait_after_content_time=timings.get("moodboard_wait_after_content_time", 0),
+            has_moodboard=bool(result_json.get("moodboard") and result_json["moodboard"].get("image_url")),
+        )
 
     assembly_start = time.perf_counter()
     if not result_json.get('cover_image_url') or not result_json['cover_image_url'].startswith('http'):
@@ -1403,6 +1495,15 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     result_json = _dedupe_and_pad_paragraph_texts(result_json, topic)
     result_json = _ensure_create_magazine_contract(result_json, topic, errors)
     timings["final_json_assembly_time"] = round(time.perf_counter() - assembly_start, 3)
+    timings["callback_response_time"] = timings["final_json_assembly_time"]
+    _log_create_step(
+        request_id,
+        "response.assembly",
+        timings["final_json_assembly_time"],
+        total_start,
+        spring_callback_enabled=timings["spring_callback_enabled"],
+        spring_callback_attempted=timings["spring_callback_attempted"],
+    )
     timings["total_time"] = round(time.perf_counter() - total_start, 3)
     timings["total_generation_time"] = timings["total_time"]
     timings["openai_call_count"] = getattr(llm_client, "call_count", 0) - llm_call_count_start
