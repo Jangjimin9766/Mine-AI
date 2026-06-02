@@ -61,7 +61,8 @@ WEAK_MOODBOARD_KEYWORDS = {
     "in", "is", "it", "its", "my", "of", "on", "or", "the", "this", "to",
     "what", "with", "posted", "posted oct", "posted nov", "login", "naver",
     "blog", "로그인", "네이버", "블로그", "본문", "댓글", "공유", "검색",
-    "지면보기", "구독", "회원가입",
+    "지면보기", "구독", "회원가입", "best", "best 9", "top", "top 10",
+    "추천 best", "국내 여행 추천 best",
 }
 
 
@@ -95,6 +96,28 @@ def _source_keyword_phrases(values: list, max_items: int = 6) -> list:
 
 
 TOPIC_OBJECT_ANCHORS = [
+    (
+        ("벚꽃", "cherry blossom", "sakura", "꽃놀이", "봄꽃"),
+        [
+            "cherry blossom branches",
+            "soft pink petals",
+            "stone park path texture",
+            "spring picnic mat detail",
+            "pale sky color card",
+            "warm cream paper map",
+        ],
+    ),
+    (
+        ("여행", "travel", "명소", "place", "destination"),
+        [
+            "folded local map",
+            "small travel notebook",
+            "landscape color cards",
+            "ticket paper texture",
+            "natural stone surface",
+            "seasonal botanical detail",
+        ],
+    ),
     (
         ("텀블러", "tumbler", "reusable cup", "reusable bottle"),
         [
@@ -208,7 +231,13 @@ def _compact_sdxl_prompt(prompt: str, visual_elements: dict) -> str:
     source_keyword_items = []
     for keyword in visual_elements.get("keywords", [])[:4]:
         cleaned = _clean_prompt_phrase(keyword)
-        if cleaned and re.search(r"[A-Za-z]{3,}", cleaned):
+        normalized = cleaned.lower()
+        if (
+            cleaned
+            and re.search(r"[A-Za-z]{3,}", cleaned)
+            and "best" not in normalized
+            and not re.fullmatch(r"(top|best)\s*\d*", normalized)
+        ):
             source_keyword_items.append(cleaned)
     source_keywords = ", ".join(source_keyword_items)
     source_rule = f"source constraint: {source_keywords}" if source_keywords else "source constraint: topic objects"

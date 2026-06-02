@@ -301,3 +301,30 @@ def test_compact_prompt_adds_cover_depth_and_layering(monkeypatch):
     assert "cohesive color story" in prompt
     assert "high-end design magazine styling" in prompt
     assert "no paper flatlay grid" in prompt
+
+
+def test_cherry_blossom_prompt_uses_seasonal_place_anchors(monkeypatch):
+    monkeypatch.setattr(
+        moodboard_maker.llm_client,
+        "generate_text",
+        lambda *args, **kwargs: (
+            "material layers frosted glass dome over the vase, linen table runner, oak surface base, "
+            "blush pink, sage green"
+        ),
+    )
+
+    prompt = moodboard_maker.generate_moodboard_prompt(
+        topic="벚꽃 명소",
+        magazine_tags=[
+            "벚꽃 명소 올해는 미리 계획해야 합니다 국내 여행 추천 BEST 9",
+            "벚꽃 보러 어디 갈까 전국 벚꽃 명소 축제 일정은",
+        ],
+    )
+
+    assert prompt.startswith("cherry blossom branches")
+    assert "soft pink petals" in prompt
+    assert "stone park path texture" in prompt
+    assert "frosted glass dome" not in prompt
+    assert "vase" not in prompt
+    assert "BEST 9" not in prompt
+    assert "source constraint: BEST" not in prompt
