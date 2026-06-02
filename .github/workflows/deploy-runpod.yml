@@ -56,7 +56,10 @@ jobs:
         with:
           context: .
           file: ./Dockerfile.serverless
+          platforms: linux/amd64
           push: true
+          provenance: false
+          sbom: false
           build-args: |
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             GIT_COMMIT=${{ github.sha }}
