@@ -748,13 +748,9 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
 
     # 1. Context building
     interest_context = ""
-    mood_context = ""
     if user_interests and len(user_interests) > 0:
         interests_str = ', '.join(user_interests)
         interest_context = f"[Reader Profile]\nThis reader is interested in: {interests_str}\n"
-    
-    if user_mood:
-        mood_context = f"[User Mood]\nThe user wants a '{user_mood}' style.\n"
 
     moodboard_executor = None
     moodboard_future = None
@@ -845,7 +841,6 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     Topic (Korean): {topic}
     Original Topic (if any): {original_topic}
     {interest_context}
-    {mood_context}
     [Research Material - LABELED SOURCES]
     {labeled_material}
     [Available Images]
