@@ -328,3 +328,41 @@ def test_cherry_blossom_prompt_uses_seasonal_place_anchors(monkeypatch):
     assert "vase" not in prompt
     assert "BEST 9" not in prompt
     assert "source constraint: BEST" not in prompt
+
+
+def test_generic_anchored_topic_ignores_unrelated_llm_objects(monkeypatch):
+    monkeypatch.setattr(
+        moodboard_maker.llm_client,
+        "generate_text",
+        lambda *args, **kwargs: (
+            "perfume bottle, lipstick tube, glass dome, oak tray, generic luxury objects"
+        ),
+    )
+
+    prompt = moodboard_maker.generate_moodboard_prompt(
+        topic="AI 노트북 생산성 도구",
+        magazine_tags=["TOP 10 productivity guide", "AI software setup"],
+    )
+
+    assert prompt.startswith("minimal device corner")
+    assert "glass screen reflection" in prompt
+    assert "brushed metal texture" in prompt
+    assert "perfume bottle" not in prompt
+    assert "lipstick tube" not in prompt
+    assert "TOP 10" not in prompt
+
+
+def test_source_keyword_filter_removes_ranking_noise_generally():
+    keywords = moodboard_maker._source_keyword_phrases(
+        [
+            "국내 여행 추천 BEST 9",
+            "TOP 10 productivity guide",
+            "봄 재킷 소재와 컬러 팔레트",
+            "minimal device corner",
+        ]
+    )
+
+    assert "국내 여행 추천 BEST 9" not in keywords
+    assert "TOP 10 productivity guide" not in keywords
+    assert "봄 재킷 소재와 컬러 팔레트" in keywords
+    assert "minimal device corner" in keywords

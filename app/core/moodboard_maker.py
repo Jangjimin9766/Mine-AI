@@ -65,6 +65,27 @@ WEAK_MOODBOARD_KEYWORDS = {
     "추천 best", "국내 여행 추천 best",
 }
 
+WEAK_KEYWORD_PATTERNS = (
+    r"\bbest\s*\d*\b",
+    r"\btop\s*\d*\b",
+    r"\bmust\s*see\b",
+    r"\bguide\b",
+    r"\brecommendations?\b",
+    r"\d+\s*(곳|개|선|가지|위|places?|spots?|tips?)",
+    r"(추천|랭킹|순위|베스트|최고|올해|미리|계획|일정|어디|갈까|가기 좋은|좋은 곳|명당)",
+)
+
+
+def _is_weak_moodboard_keyword(value: str) -> bool:
+    normalized = " ".join(str(value or "").lower().split())
+    if not normalized or normalized in WEAK_MOODBOARD_KEYWORDS:
+        return True
+    if normalized.startswith("posted "):
+        return True
+    if any(term in normalized for term in ("로그인", "지면보기", "구독", "댓글")):
+        return True
+    return any(re.search(pattern, normalized) for pattern in WEAK_KEYWORD_PATTERNS)
+
 
 def _source_keyword_phrases(values: list, max_items: int = 6) -> list:
     phrases = []
@@ -83,9 +104,7 @@ def _source_keyword_phrases(values: list, max_items: int = 6) -> list:
             normalized = " ".join(candidate.lower().split())
             if (
                 normalized
-                and normalized not in WEAK_MOODBOARD_KEYWORDS
-                and not normalized.startswith("posted ")
-                and not any(term in normalized for term in ("로그인", "지면보기", "구독", "댓글"))
+                and not _is_weak_moodboard_keyword(normalized)
                 and normalized not in seen
             ):
                 seen.add(normalized)
@@ -108,7 +127,7 @@ TOPIC_OBJECT_ANCHORS = [
         ],
     ),
     (
-        ("여행", "travel", "명소", "place", "destination"),
+        ("여행", "travel", "명소", "place", "destination", "trip", "tour"),
         [
             "folded local map",
             "small travel notebook",
@@ -116,6 +135,39 @@ TOPIC_OBJECT_ANCHORS = [
             "ticket paper texture",
             "natural stone surface",
             "seasonal botanical detail",
+        ],
+    ),
+    (
+        ("패션", "fashion", "clothing", "wear", "golfwear", "sportswear", "옷", "의류"),
+        [
+            "folded garment fabric detail",
+            "premium textile swatches",
+            "stitching detail",
+            "matte accessory detail",
+            "seasonal color cards",
+            "soft fabric texture",
+        ],
+    ),
+    (
+        ("테크", "tech", "device", "digital", "ai", "software", "gadget", "기술"),
+        [
+            "minimal device corner",
+            "glass screen reflection",
+            "brushed metal texture",
+            "cable detail",
+            "microchip pattern",
+            "cool neutral color cards",
+        ],
+    ),
+    (
+        ("뷰티", "beauty", "perfume", "skincare", "cosmetic", "향수", "화장품"),
+        [
+            "frosted glass bottle",
+            "botanical stem detail",
+            "translucent packaging shape",
+            "soft petal texture",
+            "cream color cards",
+            "glossy surface reflection",
         ],
     ),
     (
@@ -213,9 +265,29 @@ def _prompt_object_phrases(prompt: str, max_items: int = 5) -> list:
     return phrases
 
 
+def _source_constraint_keywords(keywords: list, max_items: int = 4) -> list:
+    source_keyword_items = []
+    for keyword in keywords or []:
+        cleaned = _clean_prompt_phrase(keyword)
+        if not cleaned:
+            continue
+        normalized = cleaned.lower()
+        if _is_weak_moodboard_keyword(normalized):
+            continue
+        if re.search(r"[A-Za-z]{3,}", cleaned):
+            source_keyword_items.append(cleaned)
+        elif re.search(r"[가-힣]{2,}", cleaned):
+            # Keep Korean-only topic constraints out of the final SDXL prompt text,
+            # but use them to decide whether the fallback rule should stay topic-bound.
+            continue
+        if len(source_keyword_items) >= max_items:
+            break
+    return source_keyword_items
+
+
 def _compact_sdxl_prompt(prompt: str, visual_elements: dict) -> str:
     anchors = visual_elements.get("object_anchors") or []
-    llm_objects = _prompt_object_phrases(prompt)
+    llm_objects = [] if len(anchors) >= 4 else _prompt_object_phrases(prompt)
     objects = []
     seen = set()
     for item in [*anchors, *llm_objects]:
@@ -228,18 +300,7 @@ def _compact_sdxl_prompt(prompt: str, visual_elements: dict) -> str:
             break
 
     object_text = ", ".join(objects) if objects else _clean_prompt_phrase(prompt)[:220]
-    source_keyword_items = []
-    for keyword in visual_elements.get("keywords", [])[:4]:
-        cleaned = _clean_prompt_phrase(keyword)
-        normalized = cleaned.lower()
-        if (
-            cleaned
-            and re.search(r"[A-Za-z]{3,}", cleaned)
-            and "best" not in normalized
-            and not re.fullmatch(r"(top|best)\s*\d*", normalized)
-        ):
-            source_keyword_items.append(cleaned)
-    source_keywords = ", ".join(source_keyword_items)
+    source_keywords = ", ".join(_source_constraint_keywords(visual_elements.get("keywords", [])))
     source_rule = f"source constraint: {source_keywords}" if source_keywords else "source constraint: topic objects"
     return (
         f"{object_text}, premium editorial cover background, layered still-life composition, magazine brand board, "
