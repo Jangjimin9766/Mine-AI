@@ -303,13 +303,9 @@ def _compact_sdxl_prompt(prompt: str, visual_elements: dict) -> str:
     source_keywords = ", ".join(_source_constraint_keywords(visual_elements.get("keywords", [])))
     source_rule = f"source constraint: {source_keywords}" if source_keywords else "source constraint: topic objects"
     return (
-        f"{object_text}, premium editorial cover background, layered still-life composition, magazine brand board, "
-        "one clear hero object with supporting material layers, color palette cards, tactile details, "
-        "balanced asymmetrical composition, refined negative space for app title overlay, subtle shadows, "
-        "cinematic depth cues, soft directional daylight, cohesive color story, crisp texture, "
-        "high-end design magazine styling, photorealistic, "
-        f"no people, no humans, no hands, no model, no text, no logos, no single product shot, "
-        f"not a single product shot, no paper flatlay grid, {source_rule}"
+        f"{object_text}, editorial cover still life, hero object, material layers, color cards, "
+        "asymmetric layout, clean negative space, soft daylight, subtle shadows, cohesive color story, "
+        f"premium magazine style, photorealistic, no paper flatlay grid, {source_rule}"
     )
 
 
