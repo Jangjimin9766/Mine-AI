@@ -61,6 +61,17 @@ DEFAULT_IMAGE_KEYWORDS_BY_TAG = {
     "TECH": "modern office technology",
 }
 
+EDUCATIONAL_TITLE_TERMS = (
+    "개념", "개념 설명", "개념 다지기", "이점", "장점", "효과", "환경 이점",
+    "실전", "실전 워크플로우", "워크플로우", "실천 방법", "기대 효과",
+    "핵심 포인트", "활용법", "추천 기준", "가이드", "방법론",
+)
+
+EDITORIAL_HEADING_FALLBACKS = (
+    "매일 손에 닿는 선택",
+    "오래 쓰이는 물성의 기준",
+)
+
 PARAGRAPH_MIN_CHARS = 250
 PARAGRAPH_MAX_CHARS = 550
 TARGETED_EXPANSION_MAX_ITEMS = 3
@@ -240,6 +251,43 @@ def _section_thumbnail_query(topic: str, section: dict) -> str:
     return _fallback_image_keyword([], topic, section.get('heading', '') if isinstance(section, dict) else '')
 
 
+def _looks_educational_title(value: str) -> bool:
+    text = str(value or '').strip()
+    if not text:
+        return False
+    return any(term in text for term in EDUCATIONAL_TITLE_TERMS)
+
+
+def _editorial_heading_fallback(topic: str, section_idx: int) -> str:
+    if topic and "텀블러" in topic:
+        options = ("매일 들고 나가는 온도", "버려지지 않는 컵의 조건")
+        return options[min(section_idx, len(options) - 1)]
+    if topic and any(word in topic for word in ("환경", "친환경", "지속가능")):
+        options = ("일상에 남는 작은 선택", "오래 쓰이는 물성의 기준")
+        return options[min(section_idx, len(options) - 1)]
+    return EDITORIAL_HEADING_FALLBACKS[min(section_idx, len(EDITORIAL_HEADING_FALLBACKS) - 1)]
+
+
+def _sanitize_editorial_titles(result_json: dict, topic: str) -> dict:
+    if not isinstance(result_json, dict):
+        return result_json
+    for s_idx, section in enumerate(result_json.get('sections', [])):
+        if not isinstance(section, dict):
+            continue
+        if _looks_educational_title(section.get('heading', '')):
+            original = section.get('heading', '')
+            section['heading'] = _editorial_heading_fallback(topic, s_idx)
+            print(f"🔎 Replaced educational section heading: '{original}' -> '{section['heading']}'")
+        for p_idx, para in enumerate(section.get('paragraphs', [])):
+            if not isinstance(para, dict):
+                continue
+            if _looks_educational_title(para.get('subtitle', '')):
+                original = para.get('subtitle', '')
+                para['subtitle'] = f"{section.get('heading', topic)}의 장면 {p_idx + 1}"
+                print(f"🔎 Replaced educational paragraph subtitle: '{original}' -> '{para['subtitle']}'")
+    return result_json
+
+
 def _topic_thumbnail_query(topic: str) -> str:
     if is_mostly_english(topic):
         return topic
@@ -283,6 +331,7 @@ def _normalize_magazine_contract(result_json: dict, topic: str) -> dict:
     """Clean fields the frontend no longer uses and fill safe fallbacks."""
     result_json.pop('subtitle', None)
     result_json.pop('introduction', None)
+    result_json = _sanitize_editorial_titles(result_json, topic)
 
     tags = result_json.get('tags', [])
     for section in result_json.get('sections', []):
@@ -950,6 +999,11 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
                         target['thumbnail_url' if 'thumbnail_url' in target else 'image_url'] = img
                         used_image_urls.add(img)
                         return True
+                fallback_pool = scraped_images + real_tavily_images
+                for img in fallback_pool:
+                    if img and isinstance(img, str) and img.startswith('http'):
+                        target['thumbnail_url' if 'thumbnail_url' in target else 'image_url'] = img
+                        return True
         return False
 
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -998,8 +1052,11 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
             if scraped_images: result_json['cover_image_url'] = scraped_images[0]
             elif real_tavily_images: result_json['cover_image_url'] = real_tavily_images[0]
             else: result_json['cover_image_url'] = images[0] if images else ""
-    if result_json.get("moodboard") and result_json["moodboard"].get("image_url"):
-        result_json = _fill_missing_final_images(result_json, result_json["moodboard"]["image_url"])
+    paragraph_fallback_image = result_json.get('cover_image_url')
+    if not paragraph_fallback_image and result_json.get("moodboard"):
+        paragraph_fallback_image = result_json["moodboard"].get("image_url")
+    if paragraph_fallback_image:
+        result_json = _fill_missing_final_images(result_json, paragraph_fallback_image)
     timings["final_json_assembly_time"] = round(time.perf_counter() - assembly_start, 3)
     timings["total_time"] = round(time.perf_counter() - total_start, 3)
     timings["total_generation_time"] = timings["total_time"]

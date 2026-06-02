@@ -284,6 +284,32 @@ def test_second_operational_distribution_targets_two_or_fewer():
     assert [item["length"] for item in shorts] == [240, 220]
 
 
+def test_educational_section_headings_are_sanitized():
+    magazine = _valid_magazine_json()
+    magazine["sections"][0]["heading"] = "개념"
+    magazine["sections"][1]["heading"] = "환경 이점"
+    magazine["sections"][0]["paragraphs"][0]["subtitle"] = "활용법"
+
+    normalized = magazine_maker._normalize_magazine_contract(magazine, "환경친화 텀블러 추천")
+
+    headings = [section["heading"] for section in normalized["sections"]]
+    assert headings == ["매일 들고 나가는 온도", "버려지지 않는 컵의 조건"]
+    assert normalized["sections"][0]["paragraphs"][0]["subtitle"] == "매일 들고 나가는 온도의 장면 1"
+    assert all(not magazine_maker._looks_educational_title(heading) for heading in headings)
+
+
+def test_fill_missing_final_images_uses_cover_for_all_empty_paragraphs():
+    magazine = _valid_magazine_json()
+    magazine["cover_image_url"] = "https://example.com/cover.jpg"
+    magazine["sections"][0]["paragraphs"][0]["image_url"] = None
+    magazine["sections"][1]["paragraphs"][0]["image_url"] = None
+
+    filled = magazine_maker._fill_missing_final_images(magazine, magazine["cover_image_url"])
+
+    assert filled["sections"][0]["paragraphs"][0]["image_url"] == "https://example.com/cover.jpg"
+    assert filled["sections"][1]["paragraphs"][0]["image_url"] == "https://example.com/cover.jpg"
+
+
 def test_section_thumbnail_query_uses_paragraph_image_keyword_before_heading():
     section = {
         "heading": "김치찌개의 현대적 변형",
