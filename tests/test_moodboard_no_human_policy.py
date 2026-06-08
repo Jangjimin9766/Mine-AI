@@ -26,6 +26,8 @@ def test_no_human_negative_prompt_contains_body_terms():
         "no brand marks",
         "no typography",
         "single product shot",
+        "no object grid",
+        "scattered items on paper",
     ]:
         assert term in negative_prompt
 
@@ -49,8 +51,9 @@ def test_prompt_uses_supplied_magazine_keywords_without_category_palette(monkeyp
     assert "club head detail" not in prompt
     assert "golf balls" not in prompt
     assert "hero object" in prompt
-    assert "editorial cover still life" in prompt
-    assert len(prompt.split()) < 77
+    assert "editorial cover scene" in prompt
+    assert "objects integrated into a real setting" in prompt
+    assert len(prompt.split()) < 90
 
 
 def test_general_prompt_uses_keyword_driven_constraints(monkeypatch):
@@ -63,7 +66,7 @@ def test_general_prompt_uses_keyword_driven_constraints(monkeypatch):
     prompt = moodboard_maker.generate_moodboard_prompt(topic="봄 패션", magazine_tags=["FASHION"])
 
     assert "source constraint" in prompt
-    assert "editorial cover still life" in prompt
+    assert "editorial cover scene" in prompt
 
 
 def test_moodboard_prompt_does_not_use_object_specific_rejection(monkeypatch):
@@ -90,8 +93,8 @@ def test_home_office_prompt_uses_interior_object_palette(monkeypatch):
     prompt = moodboard_maker.generate_moodboard_prompt(topic="홈 오피스 생산성 셋업")
 
     assert "source constraint" in prompt
-    assert "editorial cover still life" in prompt
-    assert len(prompt.split()) < 77
+    assert "editorial cover scene" in prompt
+    assert len(prompt.split()) < 90
 
 
 def test_topic_moodboard_source_constraint_does_not_leak_user_interests(monkeypatch):
@@ -172,7 +175,7 @@ def test_moodboard_prompt_adds_topic_specific_anchor_objects(monkeypatch):
     assert "yoga mat" in prompt
     assert "resistance bands" in prompt
     assert "foam roller" in prompt
-    assert prompt.index("yoga mat") < prompt.index("editorial cover still life")
+    assert prompt.index("yoga mat") < prompt.index("editorial cover scene")
 
 
 def test_moodboard_prompt_is_compact_and_topic_first(monkeypatch):
@@ -192,8 +195,53 @@ def test_moodboard_prompt_is_compact_and_topic_first(monkeypatch):
 
     assert prompt.startswith("portable espresso grinder")
     assert "ceramic demitasse cup" in prompt
-    assert "editorial cover still life" in prompt
+    assert "editorial cover scene" in prompt
     assert len(prompt.split()) < 95
+
+
+def test_visual_anchor_llm_frontloads_real_setting_objects(monkeypatch):
+    responses = iter([
+        "stainless steel tumbler, tiled refill station, bamboo brush near sink edge, cafe counter surface",
+        "stainless steel tumbler beside a tiled refill station, condensation on metal, bamboo brush near sink edge",
+    ])
+    monkeypatch.setattr(
+        moodboard_maker.llm_client,
+        "generate_text",
+        lambda *args, **kwargs: next(responses),
+    )
+
+    prompt = moodboard_maker.generate_moodboard_prompt(
+        topic="친환경 텀블러",
+        content_keywords=["스테인리스 텀블러", "리필 스테이션", "세척 루틴"],
+    )
+
+    assert prompt.startswith("stainless steel tumbler, tiled refill station")
+    assert "environmental still life" in prompt
+    assert "objects integrated into a real setting" in prompt
+    assert "color cards" not in prompt
+    assert "brand board" not in prompt
+
+
+def test_visual_anchor_llm_failure_keeps_existing_topic_anchors(monkeypatch):
+    calls = {"count": 0}
+
+    def fake_generate_text(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("anchor extraction failed")
+        return "premium editorial board with clean materials"
+
+    monkeypatch.setattr(moodboard_maker.llm_client, "generate_text", fake_generate_text)
+
+    prompt = moodboard_maker.generate_moodboard_prompt(
+        topic="퇴근 후 20분 홈트 루틴",
+        content_keywords=["요가 매트", "저항 밴드", "폼롤러"],
+    )
+
+    assert "yoga mat" in prompt
+    assert "resistance bands" in prompt
+    assert "foam roller" in prompt
+    assert "editorial cover scene" in prompt
 
 
 def test_generic_routine_word_does_not_trigger_workout_anchors(monkeypatch):
@@ -257,7 +305,7 @@ def test_moodboard_generation_defaults(monkeypatch, capsys):
         moodboard_maker.local_diffusion_client,
         "last_timing",
         {
-            "inference_steps": 12,
+            "inference_steps": 24,
             "image_width": 768,
             "image_height": 768,
             "guidance_scale": 6.0,
@@ -273,12 +321,12 @@ def test_moodboard_generation_defaults(monkeypatch, capsys):
     assert result["success"] is True
     assert calls["width"] == 768
     assert calls["height"] == 768
-    assert calls["num_inference_steps"] == 12
+    assert calls["num_inference_steps"] == 24
     assert calls["guidance_scale"] == 6.0
     assert calls["quality"] == 88
     assert "no people" in calls["negative_prompt"]
     assert "no_human=true" in output
-    assert "inference_steps=12" in output
+    assert "inference_steps=24" in output
 
 
 def test_compact_prompt_uses_dense_cover_language(monkeypatch):
@@ -290,15 +338,16 @@ def test_compact_prompt_uses_dense_cover_language(monkeypatch):
 
     prompt = moodboard_maker.generate_moodboard_prompt(topic="환경친화 텀블러 추천")
 
-    assert "editorial cover still life" in prompt
+    assert "editorial cover scene" in prompt
     assert "hero object" in prompt
     assert "material layers" in prompt
     assert "clean negative space" in prompt
     assert "subtle shadows" in prompt
     assert "cohesive color story" in prompt
     assert "premium magazine style" in prompt
-    assert "no paper flatlay grid" in prompt
-    assert len(prompt.split()) < 77
+    assert "no flatlay" in prompt
+    assert "no object grid" in prompt
+    assert len(prompt.split()) < 90
 
 
 def test_cherry_blossom_prompt_uses_seasonal_place_anchors(monkeypatch):
@@ -326,7 +375,7 @@ def test_cherry_blossom_prompt_uses_seasonal_place_anchors(monkeypatch):
     assert "vase" not in prompt
     assert "BEST 9" not in prompt
     assert "source constraint: BEST" not in prompt
-    assert len(prompt.split()) < 77
+    assert len(prompt.split()) < 90
 
 
 def test_generic_anchored_topic_ignores_unrelated_llm_objects(monkeypatch):

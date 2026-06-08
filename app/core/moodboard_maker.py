@@ -23,7 +23,8 @@ BASE_MOODBOARD_NEGATIVE_PROMPT = (
     "messy composition, random snapshot, distorted objects, extra limbs, single product shot, "
     "single product photo, product advertisement, catalog photo, isolated object, oversized clothing item, "
     "flat boring layout, paper grid layout, scrapbook layout, empty composition, dull lighting, "
-    "washed out colors, generic stock photo"
+    "washed out colors, generic stock photo, flatlay, paper flatlay, object grid, color swatch board, "
+    "scattered items on paper, scrapbook, collage board, moodboard sheet, white paper background"
 )
 
 
@@ -45,7 +46,7 @@ def get_moodboard_generation_config() -> dict:
     return {
         "width": _env_int("MOODBOARD_WIDTH", 768),
         "height": _env_int("MOODBOARD_HEIGHT", 768),
-        "steps": _env_int("MOODBOARD_STEPS", 12),
+        "steps": _env_int("MOODBOARD_STEPS", 24),
         "guidance_scale": _env_float("MOODBOARD_GUIDANCE_SCALE", 6.0),
         "output_format": os.getenv("MOODBOARD_IMAGE_FORMAT", "JPEG"),
         "quality": _env_int("MOODBOARD_IMAGE_QUALITY", 88),
@@ -122,8 +123,8 @@ TOPIC_OBJECT_ANCHORS = [
             "soft pink petals",
             "stone park path texture",
             "spring picnic mat detail",
-            "pale sky color card",
-            "warm cream paper map",
+            "pale spring sky background",
+            "warm cream park map on stone bench",
         ],
     ),
     (
@@ -131,7 +132,7 @@ TOPIC_OBJECT_ANCHORS = [
         [
             "folded local map",
             "small travel notebook",
-            "landscape color cards",
+            "hotel window landscape",
             "ticket paper texture",
             "natural stone surface",
             "seasonal botanical detail",
@@ -144,7 +145,7 @@ TOPIC_OBJECT_ANCHORS = [
             "premium textile swatches",
             "stitching detail",
             "matte accessory detail",
-            "seasonal color cards",
+            "boutique fitting room surface",
             "soft fabric texture",
         ],
     ),
@@ -156,7 +157,7 @@ TOPIC_OBJECT_ANCHORS = [
             "brushed metal texture",
             "cable detail",
             "microchip pattern",
-            "cool neutral color cards",
+            "cool neutral desk surface",
         ],
     ),
     (
@@ -166,7 +167,7 @@ TOPIC_OBJECT_ANCHORS = [
             "botanical stem detail",
             "translucent packaging shape",
             "soft petal texture",
-            "cream color cards",
+            "cream stone vanity surface",
             "glossy surface reflection",
         ],
     ),
@@ -200,7 +201,7 @@ TOPIC_OBJECT_ANCHORS = [
             "floating oak shelf",
             "linen fabric swatches",
             "light oak flooring sample",
-            "neutral color cards",
+            "soft daylight wall corner",
         ],
     ),
     (
@@ -211,7 +212,7 @@ TOPIC_OBJECT_ANCHORS = [
             "ingredient bowls",
             "linen napkin",
             "stone countertop sample",
-            "warm color cards",
+            "warm kitchen counter background",
         ],
     ),
 ]
@@ -265,6 +266,84 @@ def _prompt_object_phrases(prompt: str, max_items: int = 5) -> list:
     return phrases
 
 
+def _parse_anchor_objects(text: str, max_items: int = 5) -> list:
+    anchors = []
+    seen = set()
+    for raw_part in re.split(r"[,;\n]", str(text or "")):
+        phrase = _clean_prompt_phrase(raw_part)
+        phrase = re.sub(
+            r"\b(premium|editorial|moodboard|photorealistic|cinematic|composition|quality|style|atmosphere)\b",
+            " ",
+            phrase,
+            flags=re.I,
+        )
+        phrase = re.sub(r"^\s*(with|and|featuring)\s+", "", phrase, flags=re.I)
+        phrase = re.sub(r"\s+", " ", phrase).strip()
+        normalized = phrase.lower()
+        if (
+            not phrase
+            or len(phrase) < 3
+            or len(phrase) > 56
+            or normalized in seen
+            or _is_weak_moodboard_keyword(normalized)
+            or any(term in normalized for term in (
+                "negative space", "color cards", "color swatch", "flatlay", "paper layout", "brand board",
+                "no people", "no human", "no text", "no logo",
+            ))
+        ):
+            continue
+        seen.add(normalized)
+        anchors.append(phrase)
+        if len(anchors) >= max_items:
+            break
+    return anchors
+
+
+def _merge_anchor_objects(primary: list, fallback: list, max_items: int = 5) -> list:
+    merged = []
+    seen = set()
+    for item in [*(primary or []), *(fallback or [])]:
+        phrase = _clean_prompt_phrase(item)
+        normalized = phrase.lower()
+        if phrase and normalized not in seen:
+            seen.add(normalized)
+            merged.append(phrase)
+        if len(merged) >= max_items:
+            break
+    return merged
+
+
+def generate_visual_anchor_objects(full_context: str, visual_elements: dict, request_id: str = None) -> list:
+    """
+    Ask the LLM for concrete English visual anchors only. If this fails, callers
+    keep the existing topic/source anchors.
+    """
+    system_prompt = """
+    You extract concrete visual anchor objects for an SDXL magazine cover scene.
+    Output ONLY a comma-separated list of 3-5 English physical objects, materials, surfaces, or place details.
+    Prefer objects that can be integrated into a real setting, not arranged on paper.
+    No people, no body parts, no logos, no text, no brand names, no abstract mood words.
+    Avoid: color cards, swatches, flatlay, moodboard, collage, brand board, paper layout.
+    """
+    user_prompt = f"""
+    [Magazine Context]
+    {full_context}
+
+    [Source Keyword Constraints]
+    {visual_elements.get('elements', '')}
+    """
+    log_prefix = f"[moodboard][request_id={request_id}]" if request_id else "[moodboard]"
+    try:
+        raw = llm_client.generate_text(system_prompt, user_prompt, temperature=0.2)
+        anchors = _parse_anchor_objects(raw)
+        if anchors:
+            print(f"{log_prefix} visual_anchor_objects={anchors}")
+        return anchors
+    except Exception as e:
+        print(f"{log_prefix} visual anchor extraction failed, using fallback anchors: {type(e).__name__}: {e}")
+        return []
+
+
 def _source_constraint_keywords(keywords: list, max_items: int = 4) -> list:
     source_keyword_items = []
     for keyword in keywords or []:
@@ -303,9 +382,9 @@ def _compact_sdxl_prompt(prompt: str, visual_elements: dict) -> str:
     source_keywords = ", ".join(_source_constraint_keywords(visual_elements.get("keywords", [])))
     source_rule = f"source constraint: {source_keywords}" if source_keywords else "source constraint: topic objects"
     return (
-        f"{object_text}, editorial cover still life, hero object, material layers, color cards, "
-        "asymmetric layout, clean negative space, soft daylight, subtle shadows, cohesive color story, "
-        f"premium magazine style, photorealistic, no paper flatlay grid, {source_rule}"
+        f"{object_text}, editorial cover scene, environmental still life, objects integrated into a real setting, "
+        "hero object on a real surface, natural background depth, soft window light, subtle shadows, "
+        f"refined negative space for cover title, premium magazine style, photorealistic, no flatlay, no object grid, {source_rule}"
     )
 
 
@@ -400,12 +479,18 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     
     topic_emphasis = ", ".join(topic_keywords) if topic_keywords else "general lifestyle"
     visual_elements = select_visual_elements(topic, user_interests, magazine_tags, magazine_titles, section_headings, content_keywords)
+    llm_anchor_objects = generate_visual_anchor_objects(full_context, visual_elements, request_id=request_id)
+    if llm_anchor_objects:
+        visual_elements = {
+            **visual_elements,
+            "object_anchors": _merge_anchor_objects(llm_anchor_objects, visual_elements.get("object_anchors")),
+        }
     object_anchors = visual_elements.get("object_anchors") or []
     object_anchor_text = ", ".join(object_anchors) if object_anchors else "objects explicitly named or directly implied by the supplied magazine keywords"
 
     system_prompt = f"""
     You are an award-winning Art Director and Senior Photographer.
-    Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's cover moodboard.
+    Your mission is to craft a HIGH-END, ATMOSPHERIC SDXL prompt for M:ine magazine's cover scene.
     The image must be a people-free editorial cover background, not a portrait, not a model shot, not a lifestyle photo with humans.
 
     [LANGUAGE RULE — ABSOLUTE]
@@ -419,30 +504,32 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     It MUST show object, product, material, and color elements instead of humans.
     Source keywords and constraints: {visual_elements['elements']}
     Magazine section headings and article content keywords are stronger than generic title, tag, or user mood signals.
-    The result must feel like a premium editorial cover background or magazine brand board, not a single product photo or advertisement.
-    Use a hero object plus supporting layers: 1 clear focal object, 1-2 secondary objects, 2-3 material or texture layers, and 2 color palette accents.
-    Use a wide editorial still-life composition with clean negative space so it works as an app cover background.
-    Do not use a paper grid, scrapbook layout, macro close-up, cropped close-up, or one oversized object filling the frame.
+    The result must feel like a premium editorial cover scene, not a single product photo, advertisement, flatlay, or brand board.
+    Use a hero object plus supporting layers: 1 clear focal object, 1-2 secondary objects, 2-3 environmental surface, material, or texture layers.
+    Integrate the objects into a real setting: a counter, desk, shelf, window corner, street surface, studio surface, sink edge, cafe counter, or other topic-relevant place.
+    Use a wide environmental still-life composition with clean negative space so it works as an app cover background.
+    Do not use a paper grid, scrapbook layout, color swatch board, macro close-up, cropped close-up, or one oversized object filling the frame.
     Do not use a fixed category palette. Derive every object from the supplied topic, titles, tags, and source keywords.
 
     [CONCRETE OBJECTS REQUIRED]
-    You MUST include a specific hero object and supporting physical objects, materials, textures, or color accents directly related to the supplied topic and magazine keywords.
+    You MUST include a specific hero object and supporting physical objects, materials, textures, surfaces, or place details directly related to the supplied topic and magazine keywords.
     Use the primary anchor objects as the first visual subjects in the prompt; do not replace them with generic category props.
     - BAD: "premium concept, lifestyle, motivation" (too abstract)
     - BAD: "model wearing clothes, athlete portrait, person using product" (humans are forbidden)
     - BAD: "single centered product photo, advertisement, logo close-up" (too much like a product ad)
-    - GOOD: a clear hero object, secondary objects, material textures, color palette accents, surfaces, and props directly implied by the supplied magazine keywords.
+    - BAD: "objects scattered on white paper, flatlay, color cards, scrapbook moodboard" (too much like a board)
+    - GOOD: "stainless steel tumbler beside a tiled refill station, condensation on metal, bamboo brush near sink edge, cafe counter surface, soft morning window light."
 
     [PHOTOGRAPHY PARAMETERS]
     1. Subject: specific, high-definition product/object/material subjects related to the Topic ({topic_emphasis}) and source keywords.
-    2. Composition: premium editorial cover background, layered still-life composition, one clear hero object with supporting material layers, color palette accents, magazine brand board, clean wallpaper composition, cohesive color story, refined negative space for app title overlay, tasteful lighting, design magazine style, not a single product shot, not a paper flatlay grid.
+    2. Composition: premium editorial cover scene, environmental still-life composition, one clear hero object integrated into a real setting with supporting material layers, clean wallpaper composition, cohesive color story, refined negative space for app title overlay, tasteful lighting, design magazine style, not a single product shot, not a paper flatlay grid, not a color swatch board.
     3. Lighting: cinematic volumetric light, soft natural dawn light, dramatic Rembrandt shadows.
     4. Camera/Film: 85mm lens for products, f/5.6, ISO 100, crisp focus, minimal grain.
     5. Style: premium magazine editorial style, Kinfolk, Magazine B, Vogue quality, photorealistic.
     6. Variation: {random_variation}
 
     [PROMPT STRUCTURE]
-    [Hero object and supporting concrete subjects], [Material/Color Story], [Editorial Cover Composition], [Specific Lighting], [Camera Settings], [Quality Tags: photorealistic, premium editorial]
+    [Hero object in a real setting], [2 supporting objects naturally placed in the scene], [Environmental surface/background], [Specific Lighting], [Camera Settings], [Quality Tags: photorealistic, premium editorial]
 
     [CRITICAL CONSTRAINTS]
     - NSFW POLICY: NEVER generate prompts for pornography, explicit sexual acts, extreme violence, or illegal content.
@@ -452,6 +539,7 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     - ABSOLUTELY NO HUMANS: no people, no humans, no person, no face, no portrait, no hands, no arms, no legs, no feet, no body, no mannequin, no model, no silhouette.
     - ABSOLUTELY NO TEXT OR BRANDING: no logos, no text, no labels, no brand marks, no typography, no watermarks.
     - Avoid product advertisement composition. No single product should occupy most of the frame.
+    - Avoid flatlay and board composition: no paper layout, no object grid, no color swatch board, no items scattered on paper.
     - Do not introduce sports equipment, food, travel props, beauty products, devices, or fashion items unless they are present in or directly implied by the supplied keywords.
     - Ensure the mood aligns with: {user_mood or "Sophisticated"}
     """
@@ -460,9 +548,10 @@ def generate_moodboard_prompt(topic: str = None, user_mood: str = None, user_int
     [User Context]
     {full_context}
     
-    Create a comma-separated ENGLISH prompt for a sophisticated people-free editorial cover moodboard image.
-    Remember: ENGLISH ONLY, use a hero object plus supporting material layers, texture details, and color accents related to the topic.
+    Create a comma-separated ENGLISH prompt for a sophisticated people-free editorial cover scene.
+    Remember: ENGLISH ONLY, use a hero object in a real setting plus supporting material layers, texture details, surfaces, lighting, and background depth related to the topic.
     Do not include people, body parts, logos, text, labels, brand marks, or typography.
+    Do not create a flatlay, paper layout, color swatch board, object grid, scrapbook, or items scattered on paper.
     """
 
     prompt = llm_client.generate_text(system_prompt, user_prompt)
