@@ -190,8 +190,8 @@ MAGAZINE_RESPONSE_FORMAT = {
                                                 "Korean magazine paragraph body. Must be 250-550 characters "
                                                 "by Python len(text), at least 6 complete Korean sentences, "
                                                 "written as dense prose without bullets or markdown emphasis. "
-                                                "Use the flow: concept explanation -> concrete example -> "
-                                                "practical application -> expected reader benefit. "
+                                                "Use the flow: scene observation -> concrete source detail -> "
+                                                "editorial context -> sensory closing impression. "
                                                 "Sub-220 character summaries are invalid."
                                             ),
                                         },
@@ -821,36 +821,36 @@ def _dedupe_and_pad_paragraph_texts(result_json: dict, topic: str) -> dict:
             if normalized in seen:
                 para["subtitle"] = f"{heading}의 다른 관점 {p_idx + 1}"
                 text = (
-                    f"{heading}을 다른 각도에서 보면, 같은 실천도 공간과 시간의 조건에 따라 달라진다. "
-                    f"{topic}라는 주제는 작은 선택을 반복 가능한 루틴으로 만드는 데 의미가 있다. "
-                    "독자는 이미 알고 있는 정보를 다시 확인하는 데서 그치지 않고, 자신의 생활 동선에 맞춰 적용할 기준을 얻을 수 있다. "
-                    "따라서 이 문단은 앞선 내용과 겹치지 않도록 실천의 맥락, 감각적 장면, 지속 가능한 선택 기준을 함께 제안한다."
+                    f"{heading}을 다른 각도에서 바라보면, {topic}의 표정은 놓이는 장소와 시간대에 따라 달라진다. "
+                    "같은 정보라도 어떤 물성, 색감, 거리감과 함께 놓이느냐에 따라 독자가 받아들이는 밀도는 달라진다. "
+                    "이 문단은 앞선 내용과 겹치지 않도록 장면의 배경과 세부 요소를 다시 배열한다. "
+                    "마지막에는 독자가 화면을 닫은 뒤에도 떠올릴 수 있는 하나의 촉감과 분위기를 남긴다."
                 )
             if _paragraph_length(text) < PARAGRAPH_MIN_CHARS:
                 text = (
                     text
                     + " "
-                    + f"이 관점은 {topic}를 일상의 구체적인 장면으로 옮길 때 더 분명해진다. "
-                    + f"{heading} 안에서 {p_idx + 1}번째 장면은 작은 변화라도 반복 가능해야 의미가 있고, "
-                    + "독자는 자신의 공간과 시간에 맞춰 부담 없이 적용할 수 있다."
+                    + f"이 관점은 {topic}를 손에 잡히는 장면으로 좁힐 때 더 선명해진다. "
+                    + f"{heading} 안에서 {p_idx + 1}번째 장면은 표면의 질감, 빛의 방향, 주변 사물의 간격이 함께 보일 때 살아난다. "
+                    + "독자는 그 구체성 속에서 기사 전체의 분위기를 자연스럽게 따라갈 수 있다."
                 )
             while _paragraph_length(text) < PARAGRAPH_MIN_CHARS:
                 text += (
-                    " 또한 준비와 실행, 마무리의 흐름을 분리해두면 부담이 줄고, "
-                    "같은 선택을 다음 날에도 이어갈 수 있는 현실적인 기준이 생긴다."
+                    " 또한 사물의 위치와 색의 온도를 조금 더 분명히 적어두면, "
+                    "문장은 정보 전달을 넘어 한 장의 매거진 컷처럼 오래 남는다."
                 )
             padded_normalized = re.sub(r"\s+", " ", text).strip()
             if padded_normalized in seen:
                 text = (
-                    f"{heading}을 또 다른 순서로 바라보면, {topic}의 실천은 결과보다 시작 조건을 정리하는 일에 가깝다. "
-                    "동일한 정보가 반복될 때 독자는 금방 피로해지므로, 이 문단은 앞선 내용과 달리 준비물, 시간 배분, 유지 기준을 중심으로 설명한다. "
-                    "작은 도구를 미리 보이는 곳에 두고, 시작 지점을 한 문장으로 정해두면 행동의 마찰이 줄어든다. "
-                    "이런 방식은 매일 완벽하게 해내는 목표보다 다시 돌아올 수 있는 생활 구조를 만드는 데 도움이 된다."
+                    f"{heading}을 또 다른 순서로 바라보면, {topic}는 결과보다 장면의 첫인상으로 먼저 다가온다. "
+                    "동일한 정보가 반복될 때 독자는 금방 피로해지므로, 이 문단은 앞선 내용과 달리 색, 표면, 거리, 계절감을 중심에 둔다. "
+                    "작은 사물이 놓인 방향과 주변의 여백을 함께 묘사하면 문장의 화면성이 살아난다. "
+                    "그렇게 정리된 문단은 설명보다 이미지에 가까운 리듬으로 매거진의 톤을 붙든다."
                 )
                 while _paragraph_length(text) < PARAGRAPH_MIN_CHARS:
                     text += (
-                        " 특히 독자는 자신의 생활 리듬 안에서 실행 가능한 최소 단위를 고를 수 있어야 하며, "
-                        "그 기준이 있어야 실천이 일회성 결심으로 끝나지 않는다."
+                        " 특히 마지막 문장은 단정한 결론보다 잔상에 가깝게 남아야 하며, "
+                        "그 여백이 다음 섹션으로 넘어가는 호흡을 만든다."
                     )
             para["text"] = _trim_to_sentence_limit(text)
             seen.add(re.sub(r"\s+", " ", para["text"]).strip())
@@ -877,6 +877,9 @@ def _repair_magazine_contract(result_json: dict, topic: str, labeled_material: s
     - 정확히 2개 섹션, 각 섹션 정확히 3개 문단을 유지한다.
     - 섹션에 `layout_type`, `layout_hint`를 넣지 않는다.
     - 각 문단의 `text`는 반드시 한국어 250~550자로 확장한다.
+    - 전체 톤은 교육 자료가 아니라 프리미엄 한국어 매거진 산문이어야 한다.
+    - "개념", "개념 설명", "개념 다지기", "이점", "장점", "효과", "환경 이점", "실전", "실전 워크플로우", "워크플로우", "실천 방법", "기대 효과", "핵심 포인트", "활용법", "추천 기준", "가이드", "방법론" 같은 교육용/커리큘럼식 표현을 `heading`, `subtitle`, `text` 어디에서도 구조 표지로 쓰지 않는다.
+    - 문단은 도식적 설명 순서가 아니라 장면 관찰, 구체 정보, 맥락 해석, 감각적 잔상을 자연스럽게 엮어 쓴다.
     - 각 문단의 `text` 안에는 URL이나 `[source_url]:` 표기를 넣지 않는다.
     - 기존 `source_url`과 `image_search_keyword`는 최대한 보존한다.
     - `source_url`과 `image_search_keyword`가 비어 있으면 채운다.
@@ -962,7 +965,7 @@ def _expand_short_paragraphs(
         - 기존 문장의 관점은 유지하되, 배경 맥락, 구체적인 장면, 독자 관점의 해석, 감각적/공간적 묘사를 보강한다.
         - "개념", "실전", "워크플로우", "실천 방법", "기대 효과", "핵심 포인트", "활용법" 같은 교육용/커리큘럼식 표현을 구조 표지로 쓰지 않는다.
         - 각 `text` 안에 URL, `[source_url]:`, 출처 표기 문장을 넣지 않는다.
-        - Markdown은 `**굵게**`, `> 인용`, `- 목록`을 필요한 만큼 자연스럽게 사용한다.
+        - Markdown 강조, 인용, 목록은 쓰지 않는다. 문단형 산문으로만 작성한다.
         """
         try:
             expanded = llm_client.generate_json(

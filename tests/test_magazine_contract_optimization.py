@@ -423,6 +423,58 @@ def test_targeted_expansion_caps_to_three_shortest(monkeypatch):
     assert [item["length"] for item in remaining] == [238]
 
 
+def test_response_schema_text_description_uses_editorial_flow():
+    description = magazine_maker.MAGAZINE_RESPONSE_FORMAT["json_schema"]["schema"]["properties"]["sections"]["items"]["properties"]["paragraphs"]["items"]["properties"]["text"]["description"]
+
+    assert "concept explanation" not in description
+    assert "practical application" not in description
+    assert "expected reader benefit" not in description
+    assert "scene observation" in description
+    assert "sensory closing impression" in description
+
+
+def test_local_padding_avoids_educational_body_language():
+    magazine = _valid_magazine_json()
+    duplicate = "짧은 문장입니다. " * 3
+    magazine["sections"][0]["paragraphs"][0]["text"] = duplicate
+    magazine["sections"][0]["paragraphs"][1]["text"] = duplicate
+
+    padded = magazine_maker._dedupe_and_pad_paragraph_texts(magazine, "홈 오피스")
+    texts = [
+        para["text"]
+        for section in padded["sections"]
+        for para in section["paragraphs"]
+    ]
+    joined = " ".join(texts)
+
+    for forbidden in [
+        "같은 실천",
+        "반복 가능한 루틴",
+        "적용할 기준",
+        "실천의 맥락",
+        "준비와 실행",
+        "실행 가능한 최소 단위",
+    ]:
+        assert forbidden not in joined
+
+
+def test_repair_prompt_reinforces_editorial_language(monkeypatch):
+    captured = {}
+
+    class RepairLLM:
+        def generate_json(self, system_prompt, user_prompt, **kwargs):
+            captured["user"] = user_prompt
+            return _valid_magazine_json()
+
+    monkeypatch.setattr(magazine_maker, "llm_client", RepairLLM())
+
+    magazine_maker._repair_magazine_contract({"sections": []}, "홈 오피스", "research")
+
+    assert "프리미엄 한국어 매거진 산문" in captured["user"]
+    assert "교육용/커리큘럼식 표현" in captured["user"]
+    assert "도식적 설명 순서" in captured["user"]
+
+
 def test_second_operational_distribution_targets_two_or_fewer():
     magazine = _valid_magazine_json()
     lengths = [300, 280, 274, 263, 240, 220]
