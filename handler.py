@@ -448,12 +448,32 @@ def handle_edit_magazine(data: dict) -> dict:
         result = None
         new_sections = []
         deleted_section_ids = []
+
+        def edit_rejection_response(action: str, rejected: dict, default_message: str) -> dict:
+            message = rejected.get("message", default_message)
+            return {
+                "intent": action,
+                "success": False,
+                "error_code": rejected.get("error", "EDIT_REJECTED"),
+                "message": message,
+                "updated_magazine": {
+                    "heading": message,
+                    "new_sections": [],
+                    "deleted_section_ids": [],
+                },
+            }
         
         if intent.action == "regenerate_section":
             # ⭐ Fix: target_section_index가 None이면 regenerate 불가 → add_section으로 처리
             if intent.target_section_index is None:
                 logger.warning(f"⚠️ regenerate_section 요청이지만 target_section_index=None → add_section으로 처리: {message[:50]}")
                 result = add_new_section(magazine_data, intent.instruction or message)
+                if isinstance(result, dict) and result.get("success") is False:
+                    return edit_rejection_response(
+                        "add_section",
+                        result,
+                        "요청한 내용을 검증할 수 없어 섹션을 추가하지 않았습니다.",
+                    )
                 new_sections = [result] if result else []
             else:
                 result = regenerate_section(
@@ -465,13 +485,11 @@ def handle_edit_magazine(data: dict) -> dict:
         elif intent.action == "add_section":
             result = add_new_section(magazine_data, intent.instruction)
             if isinstance(result, dict) and result.get("success") is False:
-                return {
-                    "intent": "add_section",
-                    "success": False,
-                    "error": result.get("error", "EDIT_REJECTED"),
-                    "message": result.get("message", "요청한 내용을 검증할 수 없어 섹션을 추가하지 않았습니다."),
-                    "updated_magazine": None,
-                }
+                return edit_rejection_response(
+                    "add_section",
+                    result,
+                    "요청한 내용을 검증할 수 없어 섹션을 추가하지 않았습니다.",
+                )
             new_sections = [result] if result else []
         elif intent.action == "delete_section":
             # 삭제 대상 섹션 ID 추출
@@ -484,13 +502,11 @@ def handle_edit_magazine(data: dict) -> dict:
             if isinstance(result, list):
                 rejected = next((item for item in result if isinstance(item, dict) and item.get("success") is False), None)
                 if rejected:
-                    return {
-                        "intent": "change_tone",
-                        "success": False,
-                        "error": rejected.get("error", "EDIT_REJECTED"),
-                        "message": rejected.get("message", "요청한 내용을 검증할 수 없어 톤 변경을 적용하지 않았습니다."),
-                        "updated_magazine": None,
-                    }
+                    return edit_rejection_response(
+                        "change_tone",
+                        rejected,
+                        "요청한 내용을 검증할 수 없어 톤 변경을 적용하지 않았습니다.",
+                    )
             new_sections = result if isinstance(result, list) else []
         else:
             # 기본: 전체 톤 변경으로 처리
@@ -517,8 +533,13 @@ def handle_edit_magazine(data: dict) -> dict:
         return {
             "intent": "no_change",
             "success": False,
-            "error": str(e),
-            "updated_magazine": None
+            "error_code": "EDIT_MAGAZINE_FAILED",
+            "message": "매거진 변경 처리 중 오류가 발생했습니다.",
+            "updated_magazine": {
+                "heading": "매거진 변경 처리 중 오류가 발생했습니다.",
+                "new_sections": [],
+                "deleted_section_ids": [],
+            },
         }
 
 

@@ -68,6 +68,29 @@ EDUCATIONAL_TITLE_TERMS = (
     "핵심 포인트", "활용법", "추천 기준", "가이드", "방법론",
 )
 
+PLACEHOLDER_TITLE_PATTERNS = (
+    r"^매거진\s*제목$",
+    r"^섹션\s*\d*\s*제목$",
+    r"^섹션\s*\d+\s*요약$",
+    r"^문단\s*소제목$",
+    r"^소제목\s*\d+$",
+)
+
+NOISY_SOURCE_HOST_TERMS = (
+    "github.com",
+    "gitlab.com",
+    "stackoverflow.com",
+    "health.kr",
+)
+
+NOISY_SOURCE_PATH_TERMS = (
+    ".php",
+    ".json",
+    "/ajax/",
+    "/api/",
+    "/blob/",
+)
+
 EDITORIAL_HEADING_FALLBACKS = (
     "매일 손에 닿는 선택",
     "오래 쓰이는 물성의 기준",
@@ -84,6 +107,44 @@ ENTITY_RECOMMENDATION_TERMS = [
 ]
 
 ALLOWED_MAGAZINE_TAGS = set(DEFAULT_IMAGE_KEYWORDS_BY_TAG.keys())
+TOPIC_TAG_RULES = (
+    (("패션", "fashion", "옷", "코디"), "FASHION"),
+    (("뷰티", "beauty", "피부", "화장품"), "BEAUTY"),
+    (("액세서리", "시계", "가방", "신발"), "ACCESSORY"),
+    (("디자인", "design"), "DESIGN"),
+    (("인테리어", "interior", "홈", "집", "공간"), "INTERIOR"),
+    (("음악", "노래", "팝송", "재즈", "힙합", "앨범"), "MUSIC"),
+    (("예술", "미술", "art"), "ART"),
+    (("독서", "책", "서점"), "READING"),
+    (("드라마",), "DRAMA"),
+    (("영화", "시네마"), "MOVIE"),
+    (("과학",), "SCIENCE"),
+    (("문화",), "CULTURE"),
+    (("교육", "취업", "학과"), "EDUCATION"),
+    (("미니멀",), "MINIMALISM"),
+    (("레트로",), "RETRO"),
+    (("빈티지",), "VINTAGE"),
+    (("트렌드",), "TREND"),
+    (("날씨",), "WEATHER"),
+    (("스포츠", "야구", "축구", "농구", "테니스", "wbc", "아스날"), "SPORTS"),
+    (("운동", "러닝", "헬스", "fitness"), "FITNESS"),
+    (("여행", "travel", "명소", "제주", "부산", "다낭"), "TRAVEL"),
+    (("캠핑",), "CAMPING"),
+    (("등산", "하이킹"), "HIKING"),
+    (("환경", "친환경", "지속가능"), "ENVIRONMENT"),
+    (("건축",), "ARCHITECTURE"),
+    (("사진", "카메라"), "PHOTOGRAPHY"),
+    (("개발", "소프트웨어", "프로그래밍"), "IT"),
+    (("전자", "노트북", "맥북", "애플", "기기"), "ELECTRONICS"),
+    (("게임", "gaming"), "GAME"),
+    (("식물",), "PLANT"),
+    (("심리",), "PSYCHOLOGY"),
+    (("금융",), "FINANCE"),
+    (("투자", "etf"), "INVESTMENT"),
+    (("음식", "food", "맛집", "요리", "레시피", "커피", "햄버거", "파스타", "김치"), "FOOD"),
+    (("건강", "의학"), "HEALTH"),
+    (("기술", "테크", "tech", "인공지능"), "TECH"),
+)
 DEFAULT_FORBIDDEN_VISUALS = [
     "low quality",
     "blurry",
@@ -257,19 +318,35 @@ def _fallback_image_keyword(tags: list, topic: str, section_heading: str) -> str
 
 def _topic_default_tags(topic: str) -> list:
     text = (topic or "").lower()
-    rules = [
-        (("패션", "fashion", "옷", "코디"), "FASHION"),
-        (("인테리어", "interior", "홈", "집", "공간"), "INTERIOR"),
-        (("음식", "food", "맛집", "요리", "레시피"), "FOOD"),
-        (("여행", "travel", "제주", "부산"), "TRAVEL"),
-        (("운동", "fitness", "헬스", "러닝"), "FITNESS"),
-        (("기술", "tech", "ai", "it", "전자"), "TECH"),
-        (("환경", "친환경", "지속가능"), "ENVIRONMENT"),
-    ]
-    tags = [tag for keywords, tag in rules if any(keyword in text for keyword in keywords)]
+    tags = [tag for keywords, tag in TOPIC_TAG_RULES if any(keyword in text for keyword in keywords)]
     if not tags:
         tags = ["LIFESTYLE", "TREND"]
     return tags[:2]
+
+
+def _normalize_topic_tags(tags: list, topic: str, result_json: dict = None) -> list:
+    topic_tags = _topic_default_tags(topic)
+    context_parts = []
+    if isinstance(result_json, dict):
+        context_parts.append(str(result_json.get("title") or ""))
+        context_parts.extend(
+            str(section.get("heading") or "")
+            for section in result_json.get("sections", [])
+            if isinstance(section, dict)
+        )
+    relevant = topic_tags
+    if topic_tags == ["LIFESTYLE", "TREND"] and context_parts:
+        relevant = _topic_default_tags(" ".join(context_parts))
+    if relevant == ["LIFESTYLE", "TREND"]:
+        return relevant
+    supplied = [
+        str(tag).upper()
+        for tag in tags or []
+        if str(tag).upper() in ALLOWED_MAGAZINE_TAGS
+    ]
+    ordered = [tag for tag in supplied if tag in relevant]
+    ordered.extend(tag for tag in relevant if tag not in ordered)
+    return ordered[:4]
 
 
 def _topic_visual_keywords(topic: str, tags: list = None) -> list:
@@ -338,6 +415,26 @@ def _looks_educational_title(value: str) -> bool:
         return False
     return any(term in text for term in EDUCATIONAL_TITLE_TERMS)
 
+def _looks_placeholder_title(value: str) -> bool:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    return any(re.fullmatch(pattern, text, re.IGNORECASE) for pattern in PLACEHOLDER_TITLE_PATTERNS)
+
+
+def _is_noisy_source_url(url: str) -> bool:
+    normalized = str(url or "").lower()
+    return (
+        any(term in normalized for term in NOISY_SOURCE_HOST_TERMS)
+        or any(term in normalized for term in NOISY_SOURCE_PATH_TERMS)
+    )
+
+
+def _filter_research_results(search_results: list) -> list:
+    return [
+        result
+        for result in search_results or []
+        if isinstance(result, dict) and not _is_noisy_source_url(result.get("url", ""))
+    ]
+
 
 def _editorial_heading_fallback(topic: str, section_idx: int) -> str:
     if topic and "텀블러" in topic:
@@ -355,14 +452,14 @@ def _sanitize_editorial_titles(result_json: dict, topic: str) -> dict:
     for s_idx, section in enumerate(result_json.get('sections', [])):
         if not isinstance(section, dict):
             continue
-        if _looks_educational_title(section.get('heading', '')):
+        if _looks_educational_title(section.get('heading', '')) or _looks_placeholder_title(section.get('heading', '')):
             original = section.get('heading', '')
             section['heading'] = _editorial_heading_fallback(topic, s_idx)
             print(f"🔎 Replaced educational section heading: '{original}' -> '{section['heading']}'")
         for p_idx, para in enumerate(section.get('paragraphs', [])):
             if not isinstance(para, dict):
                 continue
-            if _looks_educational_title(para.get('subtitle', '')):
+            if _looks_educational_title(para.get('subtitle', '')) or _looks_placeholder_title(para.get('subtitle', '')):
                 original = para.get('subtitle', '')
                 para['subtitle'] = f"{section.get('heading', topic)}의 장면 {p_idx + 1}"
                 print(f"🔎 Replaced educational paragraph subtitle: '{original}' -> '{para['subtitle']}'")
@@ -414,7 +511,8 @@ def _normalize_magazine_contract(result_json: dict, topic: str) -> dict:
     result_json.pop('introduction', None)
     result_json = _sanitize_editorial_titles(result_json, topic)
 
-    tags = result_json.get('tags', [])
+    tags = _normalize_topic_tags(result_json.get('tags', []), topic, result_json)
+    result_json['tags'] = tags
     for section in result_json.get('sections', []):
         section.pop('layout_type', None)
         section.pop('layout_hint', None)
@@ -433,6 +531,8 @@ def _repair_reasons(result_json: dict) -> list:
 
     if not result_json.get('title') or not isinstance(result_json.get('title'), str):
         reasons.add("missing_required_field:title")
+    elif _looks_placeholder_title(result_json.get('title')):
+        reasons.add("placeholder_title")
     if not result_json.get('tags') or not isinstance(result_json.get('tags'), list):
         reasons.add("missing_required_field:tags")
 
@@ -443,12 +543,22 @@ def _repair_reasons(result_json: dict) -> list:
     if len(sections) != 2:
         reasons.add("section_count_mismatch")
 
+    normalized_headings = [
+        re.sub(r"\s+", " ", str(section.get("heading") or "")).strip().lower()
+        for section in sections
+        if isinstance(section, dict)
+    ]
+    if len(normalized_headings) != len(set(normalized_headings)):
+        reasons.add("duplicate_section_heading")
+
     for s_idx, section in enumerate(sections):
         if not isinstance(section, dict):
             reasons.add("invalid_json_schema")
             continue
         if not section.get('heading'):
             reasons.add(f"missing_required_field:section[{s_idx}].heading")
+        elif _looks_placeholder_title(section.get('heading')):
+            reasons.add("placeholder_heading")
         paragraphs = section.get('paragraphs')
         if not isinstance(paragraphs, list):
             reasons.add("invalid_json_schema")
@@ -464,6 +574,8 @@ def _repair_reasons(result_json: dict) -> list:
             for field in ("subtitle", "text"):
                 if not para.get(field):
                     reasons.add(f"missing_required_field:section[{s_idx}].paragraph[{p_idx}].{field}")
+            if _looks_placeholder_title(para.get("subtitle")):
+                reasons.add("placeholder_subtitle")
             if not para.get('source_url'):
                 reasons.add("missing_source_url")
             if not para.get('image_search_keyword'):
@@ -530,7 +642,12 @@ def _trim_to_sentence_limit(text: str, max_chars: int = PARAGRAPH_MAX_CHARS) -> 
 def _needs_contract_repair(result_json: dict, reasons: list = None) -> bool:
     reasons = reasons if reasons is not None else _repair_reasons(result_json)
     for reason in reasons:
-        if reason in STRUCTURAL_REPAIR_REASONS or reason.startswith("missing_required_field"):
+        if (
+            reason in STRUCTURAL_REPAIR_REASONS
+            or reason.startswith("missing_required_field")
+            or reason.startswith("placeholder_")
+            or reason == "duplicate_section_heading"
+        ):
             if reason in ("missing_required_field:title", "missing_required_field:tags", "missing_required_field:image_search_keyword"):
                 continue
             return True
@@ -617,8 +734,7 @@ def _ensure_create_magazine_contract(result_json: dict, topic: str, errors: list
     if not isinstance(tags, list) or not tags:
         result_json["tags"] = plan["tags"]
     else:
-        normalized_tags = [str(tag).upper() for tag in tags if str(tag).upper() in ALLOWED_MAGAZINE_TAGS]
-        result_json["tags"] = normalized_tags[:4] or plan["tags"]
+        result_json["tags"] = _normalize_topic_tags(tags, topic, result_json)
 
     sections = result_json.get("sections")
     if not isinstance(sections, list):
@@ -1105,6 +1221,7 @@ def generate_magazine_content(topic: str, user_interests: list = None, user_mood
     search_query = f"{original_topic} {topic}" if original_topic != topic else topic
     web_search_start = time.perf_counter()
     search_results, images = search_with_tavily(search_query, topic=topic)
+    search_results = _filter_research_results(search_results)
     timings["web_search_time"] = round(time.perf_counter() - web_search_start, 3)
     _log_create_step(
         request_id,
