@@ -297,7 +297,24 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     from app.core.searcher import search_with_tavily, search_with_pexels, scrape_labeled_sources
     from app.core.llm_client import llm_client
     from app.core.utils import is_mostly_english, translate_to_korean, force_translate_section
+    from concurrent.futures import ThreadPoolExecutor
     import json
+
+    def scrape_source(url: str):
+        try:
+            scraped, _ = scrape_labeled_sources([url], max_count=1)
+            return scraped[0] if scraped else None
+        except Exception:
+            return None
+
+    def search_image(keyword: str):
+        if not keyword:
+            return None
+        try:
+            found = search_with_pexels(keyword, orientation='landscape', per_page=1)
+            return found[0] if found else None
+        except Exception:
+            return None
     
     # 1. 주제 추출 및 [Source 1, 2, 3] 확보
     magazine_title = magazine_data.get('title', '')
@@ -316,7 +333,13 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
         search_results, images = search_with_tavily(search_query, topic=magazine_title)
         if search_results:
             urls = [r['url'] for r in search_results[:3]]
-            labeled_sources, _ = scrape_labeled_sources(urls, max_count=3)
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                scraped_sources = list(executor.map(scrape_source, urls))
+            search_content_by_url = {r.get('url'): r.get('content', '') for r in search_results}
+            labeled_sources = [
+                source or (url, search_content_by_url.get(url, ''))
+                for url, source in zip(urls, scraped_sources)
+            ]
             if len(labeled_sources) < 3:
                 used_urls = {url for url, _ in labeled_sources}
                 for r in search_results:
@@ -409,7 +432,13 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
 
     # 2. 이미지 검색 및 source_url 보정 (V2 Fallback Hack)
     source_count = len(labeled_sources)
-    for i, para in enumerate(new_section.get('paragraphs', [])):
+    paragraphs = new_section.get('paragraphs', [])
+    image_queries = [para.get('image_search_keyword') for para in paragraphs]
+    image_queries.append(new_section.get('heading', magazine_title))
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        found_images = list(executor.map(search_image, image_queries))
+
+    for i, para in enumerate(paragraphs):
         # source_url Fallback
         if not para.get('source_url'):
             fallback_idx = min(i, 2) # Local fallback for 3 paragraphs in one section
@@ -418,13 +447,7 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
             elif source_count > 0:
                 para['source_url'] = labeled_sources[0][0]
 
-        keyword = para.get('image_search_keyword')
-        para['image_url'] = None
-        if keyword:
-            try:
-                imgs = search_with_pexels(keyword, orientation='landscape', per_page=1)
-                if imgs: para['image_url'] = imgs[0]
-            except: pass
+        para['image_url'] = found_images[i]
         if not para['image_url'] and images: para['image_url'] = images[0]
 
     if requires_verified_sources(instruction):
@@ -434,11 +457,7 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
             error["reason"] = reason
             return error
 
-    new_section['thumbnail_url'] = None
-    try:
-        imgs = search_with_pexels(new_section.get('heading', magazine_title), orientation='landscape', per_page=1)
-        if imgs: new_section['thumbnail_url'] = imgs[0]
-    except: pass
+    new_section['thumbnail_url'] = found_images[-1]
     if not new_section['thumbnail_url'] and images: new_section['thumbnail_url'] = images[0]
     
     # V2 Cleanup
