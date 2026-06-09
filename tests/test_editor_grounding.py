@@ -83,3 +83,19 @@ def test_add_new_section_retries_once_after_invalid_llm_json(monkeypatch):
 
     assert result["heading"] == "새로운 관점"
     assert calls == [0.7, 0.3]
+
+
+def test_generated_section_strips_numbered_subtitle_prefix():
+    result = magazine_editor.sanitize_generated_section({
+        "heading": "아이브의 초창기",
+        "paragraphs": [{"subtitle": "소제목 1: 데뷔의 시작", "text": "완성된 본문"}],
+    })
+
+    assert result["paragraphs"][0]["subtitle"] == "데뷔의 시작"
+
+
+def test_generated_section_rejects_exact_placeholders():
+    assert magazine_editor.contains_section_placeholders({
+        "heading": "섹션 제목",
+        "paragraphs": [{"subtitle": "소제목 1", "text": "본문 1"}],
+    }) is True

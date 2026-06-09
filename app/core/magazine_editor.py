@@ -27,6 +27,40 @@ def insufficient_verified_sources_error(instruction: str) -> dict:
     }
 
 
+def invalid_generated_section_error() -> dict:
+    return {
+        "error": "INVALID_GENERATED_SECTION",
+        "success": False,
+        "message": "유효한 섹션 내용을 생성하지 못해 변경사항을 적용하지 않았습니다.",
+    }
+
+
+def sanitize_generated_section(section: dict) -> dict:
+    if not isinstance(section, dict):
+        return section
+    for para in section.get("paragraphs", []):
+        if not isinstance(para, dict):
+            continue
+        subtitle = str(para.get("subtitle") or "").strip()
+        para["subtitle"] = re.sub(r"^소제목\s*\d+\s*:\s*", "", subtitle)
+    return section
+
+
+def contains_section_placeholders(section: dict) -> bool:
+    if not isinstance(section, dict):
+        return True
+    if re.fullmatch(r"섹션\s*제목", str(section.get("heading") or "").strip()):
+        return True
+    for para in section.get("paragraphs", []):
+        if not isinstance(para, dict):
+            return True
+        if re.fullmatch(r"소제목\s*\d+", str(para.get("subtitle") or "").strip()):
+            return True
+        if re.fullmatch(r"본문(?:\s*내용)?\s*\d+", str(para.get("text") or "").strip()):
+            return True
+    return False
+
+
 def source_urls_from_labeled_sources(labeled_sources: list) -> set:
     return {url for url, _ in (labeled_sources or []) if url}
 
@@ -170,6 +204,7 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     - Structure: EXACTLY 3 paragraphs in the "paragraphs" array.
     - Each paragraph: subtitle (10-30 chars) + text (600-800 characters REQUIRED) + image_search_keyword (English, 3 words)
     - Heading: Korean, concise.
+    - Never output placeholder phrases such as "섹션 제목", "소제목 1", or "본문 1".
     
     [SOURCE INTEGRITY]
     - Every paragraph MUST include a `source_url`.
@@ -177,24 +212,24 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
 
     Output JSON EXACTLY:
     {
-        "heading": "섹션 제목",
+        "heading": "빛바랜 프레임에 남은 기억",
         "paragraphs": [
             {
-                "subtitle": "소제목 1",
-                "text": "본문 1",
-                "image_search_keyword": "kw1",
+                "subtitle": "창가에 머문 오후의 색",
+                "text": "완성된 한국어 매거진 본문",
+                "image_search_keyword": "vintage animation window",
                 "source_url": "https://..."
             },
             {
-                "subtitle": "소제목 2",
-                "text": "본문 2",
-                "image_search_keyword": "kw2",
+                "subtitle": "골목을 채우는 오래된 선율",
+                "text": "완성된 한국어 매거진 본문",
+                "image_search_keyword": "nostalgic city alley",
                 "source_url": "https://..."
             },
             {
-                "subtitle": "소제목 3",
-                "text": "본문 3",
-                "image_search_keyword": "kw3",
+                "subtitle": "다시 재생되는 장면",
+                "text": "완성된 한국어 매거진 본문",
+                "image_search_keyword": "classic animation scene",
                 "source_url": "https://..."
             }
         ]
@@ -213,6 +248,9 @@ def regenerate_section(magazine_data: dict, section_index: int, instruction: str
     
     if "error" in new_data:
         return new_data
+    new_data = sanitize_generated_section(new_data)
+    if contains_section_placeholders(new_data):
+        return invalid_generated_section_error()
 
     # 이미지 검색 (기존 이미지 활용 또는 신규 검색)
     current_paras = current_section.get('paragraphs', [])
@@ -321,28 +359,29 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     - Use only the provided [Research Results] for concrete names, channels, people, places, brands, URLs, rankings, statistics, and recommendations.
     - If [Research Results] does not verify a concrete recommendation target, do not invent it.
     - Every `source_url` MUST be one of the Source URLs provided in [Research Results].
+    - Never output placeholder phrases such as "섹션 제목", "소제목 1", or "본문 내용 1".
 
     Output JSON EXACTLY:
     {
-        "heading": "섹션 제목",
+        "heading": "도시 러닝이 바꾸는 아침",
         "thumbnail_search_keyword": "english landscape keyword",
         "paragraphs": [
             {
-                "subtitle": "소제목 1",
-                "text": "본문 내용 1",
-                "image_search_keyword": "keyword1",
+                "subtitle": "가벼운 발걸음이 만드는 리듬",
+                "text": "완성된 한국어 매거진 본문",
+                "image_search_keyword": "urban morning running",
                 "source_url": "Source 1 URL"
             },
             {
-                "subtitle": "소제목 2",
-                "text": "본문 내용 2",
-                "image_search_keyword": "keyword2",
+                "subtitle": "강변에서 만나는 새로운 풍경",
+                "text": "완성된 한국어 매거진 본문",
+                "image_search_keyword": "riverside running path",
                 "source_url": "Source 2 URL"
             },
             {
-                "subtitle": "소제목 3",
-                "text": "본문 내용 3",
-                "image_search_keyword": "keyword3",
+                "subtitle": "꾸준함을 지키는 작은 장비",
+                "text": "완성된 한국어 매거진 본문",
+                "image_search_keyword": "running gear detail",
                 "source_url": "Source 3 URL"
             }
         ]
@@ -364,6 +403,9 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     
     if "error" in new_section:
         return new_section
+    new_section = sanitize_generated_section(new_section)
+    if contains_section_placeholders(new_section):
+        return invalid_generated_section_error()
 
     # 2. 이미지 검색 및 source_url 보정 (V2 Fallback Hack)
     source_count = len(labeled_sources)
