@@ -2,6 +2,8 @@ from app.core import magazine_editor
 from app.core import searcher
 from app.core import llm_client as llm_client_module
 import json
+import threading
+import time
 
 
 def test_add_new_section_rejects_youtuber_recommendation_without_sources(monkeypatch):
@@ -99,3 +101,96 @@ def test_generated_section_rejects_exact_placeholders():
         "heading": "섹션 제목",
         "paragraphs": [{"subtitle": "소제목 1", "text": "본문 1"}],
     }) is True
+
+
+def test_add_new_section_parallelizes_scraping_and_preserves_source_order(monkeypatch):
+    urls = [f"https://source.example/{i}" for i in range(3)]
+    monkeypatch.setattr(searcher, "search_with_tavily", lambda *args, **kwargs: (
+        [{"url": url, "content": f"fallback-{i}"} for i, url in enumerate(urls)],
+        [],
+    ))
+    barrier = threading.Barrier(3)
+
+    def scrape(url_list, max_count):
+        barrier.wait(timeout=1)
+        url = url_list[0]
+        time.sleep(0.01 * (3 - urls.index(url)))
+        return [(url, f"scraped-{url}")], []
+
+    monkeypatch.setattr(searcher, "scrape_labeled_sources", scrape)
+    monkeypatch.setattr(searcher, "search_with_pexels", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        magazine_editor.llm_client,
+        "generate_json",
+        lambda system, user, **kwargs: {
+            "heading": "새 섹션",
+            "paragraphs": [
+                {"subtitle": f"문단 {i}", "text": "완성된 본문", "image_search_keyword": f"image {i}"}
+                for i in range(3)
+            ],
+        },
+    )
+
+    result = magazine_editor.add_new_section({"title": "생활", "sections": []}, "새 섹션 추가")
+
+    assert [para["source_url"] for para in result["paragraphs"]] == urls
+
+
+def test_add_new_section_parallel_image_search_preserves_order_and_fallback(monkeypatch):
+    monkeypatch.setattr(searcher, "search_with_tavily", lambda *args, **kwargs: ([], ["tavily-fallback"]))
+    barrier = threading.Barrier(4)
+
+    def search_image(keyword, **kwargs):
+        barrier.wait(timeout=1)
+        return [] if keyword == "image 1" else [f"pexels-{keyword}"]
+
+    monkeypatch.setattr(searcher, "search_with_pexels", search_image)
+    monkeypatch.setattr(
+        magazine_editor.llm_client,
+        "generate_json",
+        lambda system, user, **kwargs: {
+            "heading": "새 섹션",
+            "paragraphs": [
+                {"subtitle": f"문단 {i}", "text": "완성된 본문", "image_search_keyword": f"image {i}"}
+                for i in range(3)
+            ],
+        },
+    )
+
+    result = magazine_editor.add_new_section({"title": "생활", "sections": []}, "새 섹션 추가")
+
+    assert [para["image_url"] for para in result["paragraphs"]] == [
+        "pexels-image 0",
+        "tavily-fallback",
+        "pexels-image 2",
+    ]
+    assert result["thumbnail_url"] == "pexels-새 섹션"
+
+
+def test_add_new_section_scrape_failure_keeps_original_source_position(monkeypatch):
+    urls = [f"https://source.example/{i}" for i in range(3)]
+    monkeypatch.setattr(searcher, "search_with_tavily", lambda *args, **kwargs: (
+        [{"url": url, "content": f"fallback-{i}"} for i, url in enumerate(urls)],
+        [],
+    ))
+    monkeypatch.setattr(
+        searcher,
+        "scrape_labeled_sources",
+        lambda url_list, max_count: ([], []) if url_list[0] == urls[0] else ([(url_list[0], "scraped")], []),
+    )
+    monkeypatch.setattr(searcher, "search_with_pexels", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        magazine_editor.llm_client,
+        "generate_json",
+        lambda system, user, **kwargs: {
+            "heading": "새 섹션",
+            "paragraphs": [
+                {"subtitle": f"문단 {i}", "text": "완성된 본문", "image_search_keyword": f"image {i}"}
+                for i in range(3)
+            ],
+        },
+    )
+
+    result = magazine_editor.add_new_section({"title": "생활", "sections": []}, "새 섹션 추가")
+
+    assert [para["source_url"] for para in result["paragraphs"]] == urls
