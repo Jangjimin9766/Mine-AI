@@ -437,6 +437,18 @@ def handle_edit_magazine(data: dict) -> dict:
             return {"error": "message is required"}
         if not magazine_data:
             return {"error": "magazine_data is required"}
+        if len(message.strip()) <= 1:
+            return {
+                "intent": "no_change",
+                "success": False,
+                "error_code": "MESSAGE_TOO_SHORT",
+                "message": "요청 내용을 조금 더 구체적으로 입력해 주세요.",
+                "updated_magazine": {
+                    "heading": "요청 내용을 조금 더 구체적으로 입력해 주세요.",
+                    "new_sections": [],
+                    "deleted_section_ids": [],
+                },
+            }
         
         logger.info(f"💬 [3/4] Analyzing intent for: {message[:50]}...")
         
@@ -468,7 +480,7 @@ def handle_edit_magazine(data: dict) -> dict:
             if intent.target_section_index is None:
                 logger.warning(f"⚠️ regenerate_section 요청이지만 target_section_index=None → add_section으로 처리: {message[:50]}")
                 result = add_new_section(magazine_data, intent.instruction or message)
-                if isinstance(result, dict) and result.get("success") is False:
+                if isinstance(result, dict) and (result.get("success") is False or result.get("error")):
                     return edit_rejection_response(
                         "add_section",
                         result,
@@ -481,10 +493,16 @@ def handle_edit_magazine(data: dict) -> dict:
                     intent.target_section_index,
                     intent.instruction
                 )
+                if isinstance(result, dict) and (result.get("success") is False or result.get("error")):
+                    return edit_rejection_response(
+                        "regenerate_section",
+                        result,
+                        "유효한 섹션 내용을 생성하지 못해 변경사항을 적용하지 않았습니다.",
+                    )
                 new_sections = [result] if result else []
         elif intent.action == "add_section":
             result = add_new_section(magazine_data, intent.instruction)
-            if isinstance(result, dict) and result.get("success") is False:
+            if isinstance(result, dict) and (result.get("success") is False or result.get("error")):
                 return edit_rejection_response(
                     "add_section",
                     result,

@@ -77,3 +77,46 @@ def test_edit_exception_does_not_mark_runpod_job_failed(monkeypatch):
     assert result["error_code"] == "EDIT_MAGAZINE_FAILED"
     assert "error" not in result
     assert result["updated_magazine"]["new_sections"] == []
+
+
+def test_single_character_message_is_rejected_before_intent_analysis(monkeypatch):
+    monkeypatch.setattr(
+        "app.core.magazine_editor.analyze_user_intent",
+        lambda *_: (_ for _ in ()).throw(AssertionError("intent analysis should not run")),
+    )
+
+    result = handler.handle_edit_magazine({
+        "message": "줘",
+        "magazine_data": {"title": "여행", "sections": []},
+    })
+
+    assert result["intent"] == "no_change"
+    assert result["error_code"] == "MESSAGE_TOO_SHORT"
+    assert result["updated_magazine"]["new_sections"] == []
+
+
+def test_regenerate_placeholder_rejection_is_not_saved_as_section(monkeypatch):
+    class Intent:
+        action = "regenerate_section"
+        instruction = "첫 번째 섹션 수정"
+        response_message = "첫 번째 섹션을 수정했습니다."
+        target_section_index = 0
+
+    monkeypatch.setattr("app.core.magazine_editor.analyze_user_intent", lambda *_: Intent())
+    monkeypatch.setattr(
+        "app.core.magazine_editor.regenerate_section",
+        lambda *_: {
+            "error": "INVALID_GENERATED_SECTION",
+            "success": False,
+            "message": "유효한 섹션 내용을 생성하지 못했습니다.",
+        },
+    )
+
+    result = handler.handle_edit_magazine({
+        "message": "첫 번째 섹션 수정",
+        "magazine_data": {"title": "여행", "sections": [{"heading": "기존 섹션"}]},
+    })
+
+    assert result["success"] is False
+    assert result["error_code"] == "INVALID_GENERATED_SECTION"
+    assert result["updated_magazine"]["new_sections"] == []
