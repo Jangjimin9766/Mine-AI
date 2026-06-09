@@ -604,8 +604,9 @@ MAGAZINE_SYSTEM_PROMPT_V8 = """
 - 각 문단은 하나의 명확한 관점, 장소, 제품, 트렌드, 사례 중 하나에 집중한다.
 - 빈약한 요약문이 아니라 배경, 구체 정보, 독자 관점의 해석을 포함한다.
 - 전체 결과는 절대 교육 자료, 설명문, 강의안, 커리큘럼, 가이드 문서처럼 보이면 안 된다.
-- `heading`과 `subtitle`은 잡지의 소제목처럼 감각적이고 구체적인 장면, 물성, 선택의 순간을 담는다.
+- `title`, `heading`, `subtitle`은 잡지 제목처럼 구체적인 주제와 장면을 담는다.
 - `heading`은 "개념", "이점", "장점", "효과", "활용법", "추천 기준" 같은 설명형 제목을 쓰지 않는다.
+- "매거진 제목", "섹션 제목", "섹션2 제목", "섹션 1 요약", "문단 소제목", "소제목 1" 같은 예시·플레이스홀더 문구를 실제 값으로 절대 출력하지 않는다.
 
 [SOURCE INTEGRITY]
 - 제공된 [Research Material - LABELED SOURCES]를 우선 근거로 사용한다.
@@ -685,29 +686,29 @@ FASHION, BEAUTY, ACCESSORY, DESIGN, INTERIOR, DOLL, MUSIC, ART, MUSICAL, THEATER
 실제 출력의 `sections` 배열에는 반드시 같은 구조의 섹션 객체가 정확히 2개 있어야 한다.
 각 섹션의 `paragraphs` 배열에는 반드시 같은 구조의 문단 객체가 정확히 3개 있어야 한다.
 {
-  "title": "매거진 제목",
-  "tags": ["FASHION", "TRAVEL"],
+  "title": "새벽 도시를 달리는 리듬",
+  "tags": ["FITNESS", "LIFESTYLE"],
   "sections": [
     {
-      "heading": "섹션 제목",
+      "heading": "새벽 방파제에 남는 겹",
       "thumbnail_url": null,
       "paragraphs": [
         {
-          "subtitle": "문단 소제목",
+          "subtitle": "바람을 막는 첫 번째 선택",
           "text": "250~550자의 고급 한국어 매거진 산문 본문",
           "image_search_keyword": "english nouns",
           "source_url": "https://...",
           "image_url": null
         },
         {
-          "subtitle": "문단 소제목",
+          "subtitle": "젖은 장비와 원단의 거리",
           "text": "250~550자의 고급 한국어 매거진 산문 본문",
           "image_search_keyword": "english nouns",
           "source_url": "https://...",
           "image_url": null
         },
         {
-          "subtitle": "문단 소제목",
+          "subtitle": "도시로 돌아온 기능성 재킷",
           "text": "250~550자의 고급 한국어 매거진 산문 본문",
           "image_search_keyword": "english nouns",
           "source_url": "https://...",

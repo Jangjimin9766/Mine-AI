@@ -1,6 +1,7 @@
 from app.core import magazine_editor
 from app.core import searcher
 from app.core import llm_client as llm_client_module
+import json
 
 
 def test_add_new_section_rejects_youtuber_recommendation_without_sources(monkeypatch):
@@ -59,3 +60,26 @@ def test_add_new_section_rejects_unverified_source_url(monkeypatch):
     assert result["success"] is False
     assert result["error"] == "INSUFFICIENT_VERIFIED_SOURCES"
     assert result["reason"].startswith("UNVERIFIED_SOURCE")
+
+
+def test_add_new_section_retries_once_after_invalid_llm_json(monkeypatch):
+    monkeypatch.setattr(searcher, "search_with_tavily", lambda *args, **kwargs: ([], []))
+    monkeypatch.setattr(searcher, "search_with_pexels", lambda *args, **kwargs: [])
+
+    calls = []
+
+    def generate_json(*args, **kwargs):
+        calls.append(kwargs.get("temperature"))
+        if len(calls) == 1:
+            raise json.JSONDecodeError("invalid", "", 0)
+        return {"heading": "새로운 관점", "paragraphs": []}
+
+    monkeypatch.setattr(magazine_editor.llm_client, "generate_json", generate_json)
+
+    result = magazine_editor.add_new_section(
+        {"title": "생활", "sections": []},
+        "새로운 관점 추가",
+    )
+
+    assert result["heading"] == "새로운 관점"
+    assert calls == [0.7, 0.3]

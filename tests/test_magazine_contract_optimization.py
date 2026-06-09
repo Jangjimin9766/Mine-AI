@@ -504,6 +504,64 @@ def test_educational_section_headings_are_sanitized():
     assert normalized["sections"][0]["paragraphs"][0]["subtitle"] == "매일 들고 나가는 온도의 장면 1"
     assert all(not magazine_maker._looks_educational_title(heading) for heading in headings)
 
+def test_placeholder_titles_are_sanitized_and_trigger_repair():
+    magazine = _valid_magazine_json()
+    magazine["title"] = "매거진 제목"
+    magazine["sections"][1]["heading"] = "섹션2 제목"
+    magazine["sections"][0]["paragraphs"][0]["subtitle"] = "소제목 1"
+
+    reasons = magazine_maker._repair_reasons(magazine)
+    normalized = magazine_maker._normalize_magazine_contract(magazine, "50대 낚시 패션")
+
+    assert "placeholder_title" in reasons
+    assert "placeholder_heading" in reasons
+    assert "placeholder_subtitle" in reasons
+    assert magazine_maker._needs_contract_repair(magazine, reasons) is True
+    assert normalized["sections"][1]["heading"] != "섹션2 제목"
+    assert normalized["sections"][0]["paragraphs"][0]["subtitle"] != "소제목 1"
+
+
+def test_filter_research_results_removes_code_and_api_sources():
+    results = [
+        {"url": "https://github.com/noirbizarre/jinja2/blob/master/file.py"},
+        {"url": "https://health.kr/searchDrug/ajax/result.asp"},
+        {"url": "http://example.com/db_quote_to_json.php"},
+        {"url": "https://fishing.example.com/fishing-fashion"},
+    ]
+
+    filtered = magazine_maker._filter_research_results(results)
+
+    assert filtered == [{"url": "https://fishing.example.com/fishing-fashion"}]
+
+
+def test_topic_tags_remove_unrelated_fashion_and_travel_pollution():
+    magazine = _valid_magazine_json()
+    magazine["title"] = "게임 속 세계관의 진화"
+    magazine["tags"] = ["FASHION", "TRAVEL"]
+
+    normalized = magazine_maker._normalize_magazine_contract(magazine, "게임 세계관의 진화")
+
+    assert normalized["tags"] == ["GAME"]
+
+
+def test_topic_tags_keep_tags_that_are_relevant_to_topic():
+    magazine = _valid_magazine_json()
+    magazine["tags"] = ["TRAVEL", "FASHION"]
+
+    normalized = magazine_maker._normalize_magazine_contract(magazine, "제주 여행 패션")
+
+    assert normalized["tags"] == ["TRAVEL", "FASHION"]
+
+
+def test_duplicate_section_headings_trigger_repair():
+    magazine = _valid_magazine_json()
+    magazine["sections"][1]["heading"] = magazine["sections"][0]["heading"]
+
+    reasons = magazine_maker._repair_reasons(magazine)
+
+    assert "duplicate_section_heading" in reasons
+    assert magazine_maker._needs_contract_repair(magazine, reasons) is True
+
 
 def test_fill_missing_final_images_keeps_empty_paragraphs_null():
     magazine = _valid_magazine_json()

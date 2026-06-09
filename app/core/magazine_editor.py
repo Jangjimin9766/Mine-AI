@@ -3,6 +3,7 @@ import json
 import re
 from app.core.llm_client import llm_client
 from app.models.chat import AgentIntent
+from app.core.utils import is_mostly_english, translate_to_korean, force_translate_section
 
 
 ENTITY_RECOMMENDATION_TERMS = [
@@ -356,7 +357,10 @@ def add_new_section(magazine_data: dict, instruction: str) -> dict:
     {research_content}
     """
     
-    new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+    try:
+        new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.7)
+    except json.JSONDecodeError:
+        new_section = llm_client.generate_json(system_prompt, user_prompt, temperature=0.3)
     
     if "error" in new_section:
         return new_section
